@@ -227,6 +227,7 @@ const (
 	REVERT       OpCode = 0xfd
 	INVALID      OpCode = 0xfe
 	SELFDESTRUCT OpCode = 0xff
+	SENDALL      OpCode = 0xff
 )
 
 // Since the opcodes aren't all in order we can't use a regular slice.
@@ -392,11 +393,10 @@ var opCodeToString = map[OpCode]string{
 	STATICCALL:   "STATICCALL",
 	REVERT:       "REVERT",
 	INVALID:      "INVALID",
-	SELFDESTRUCT: "SELFDESTRUCT",
-
-	PUSH: "PUSH",
-	DUP:  "DUP",
-	SWAP: "SWAP",
+	PUSH:         "PUSH",
+	DUP:          "DUP",
+	SWAP:         "SWAP",
+	SELFDESTRUCT: "SELFDESTRUCT", // TODO: rename to self-destruct after EIP-4758 goes in
 }
 
 func (op OpCode) String() string {
@@ -552,6 +552,7 @@ var stringToOp = map[string]OpCode{
 	"REVERT":         REVERT,
 	"INVALID":        INVALID,
 	"SELFDESTRUCT":   SELFDESTRUCT,
+	"SENDALL":        SENDALL,
 }
 
 // StringToOp finds the opcode whose name is stored in `str`.
