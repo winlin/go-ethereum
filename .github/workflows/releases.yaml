@@ -8,12 +8,9 @@ jobs:
   release:
     strategy:
       matrix:
-        goos: [linux, windows, darwin]
+        goos: [linux, darwin]
         goarch: [amd64, arm64]
         include:
-          - goos: windows
-            goarch: amd64
-            ext: .exe
           - goos: linux
             goarch: amd64
             ext: ""
@@ -42,13 +39,12 @@ jobs:
     - name: Install zip
       run: sudo apt-get install zip
 
-    
     - name: Build geth binary and create archives
       env:
         GOOS: ${{ matrix.goos }}
         GOARCH: ${{ matrix.goarch }}
       run: |
-        env GO111MODULE=on go run build/ci.go install ./cmd/geth
+        env GO111MODULE=on GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go run build/ci.go install ./cmd/geth
         binary_name="l2geth-${GOOS}-${GOARCH}${{ matrix.ext }}"
         mv build/bin/geth "build/bin/${binary_name}"
         tar -czvf "build/bin/${binary_name}.tar.gz" -C build/bin "${binary_name}"
