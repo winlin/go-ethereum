@@ -1,43 +1,69 @@
 name: Build and Publish Release Binaries
 
 on:
-  push:
-    tags:
-      - 'v*'
+  release:
+    types: [created]
 
 jobs:
   release:
+    strategy:
+      matrix:
+        goos: [linux, windows, darwin]
+        goarch: [amd64, arm64]
+        include:
+          - goos: windows
+            goarch: amd64
+            ext: .exe
+          - goos: linux
+            goarch: amd64
+            ext: ""
+          - goos: darwin
+            goarch: amd64
+            ext: ""
+          - goos: linux
+            goarch: arm64
+            ext: ""
+          - goos: darwin
+            goarch: arm64
+            ext: ""
     runs-on: ubuntu-latest
     steps:
     - name: Check out code
       uses: actions/checkout@v2
+      with:
+          submodules: recursive
+          token: ${{ secrets.GITHUB_TOKEN }}
     
     - name: Set up Go
       uses: actions/setup-go@v2
       with:
         go-version: "1.18.x"
     
-    - name: Build geth binaries
+    - name: Install zip
+      run: sudo apt-get install zip
+
+    
+    - name: Build geth binary and create archives
+      env:
+        GOOS: ${{ matrix.goos }}
+        GOARCH: ${{ matrix.goarch }}
       run: |
         env GO111MODULE=on go run build/ci.go install ./cmd/geth
-    - name: Upload geth binary
-      uses: actions/upload-artifact@v2
-      with:
-        name: geth
-        path: build/bin/geth
-
-    - name: Create and upload release
+        binary_name="geth-${GOOS}-${GOARCH}${{ matrix.ext }}"
+        mv build/bin/geth "build/bin/${binary_name}"
+        tar -czvf "build/bin/${binary_name}.tar.gz" -C build/bin "${binary_name}"
+        zip -j "build/bin/${binary_name}.zip" "build/bin/${binary_name}"
+        
+    - name: Create and upload release assets
       uses: softprops/action-gh-release@v1
-      if: startsWith(github.ref, 'refs/tags/') # the step will only execute if the current github.ref starts with 'refs/tags/'.
       with:
         draft: false
         prerelease: false
-        body_path: CHANGELOGS.md # TODO: change path for release text
         # note you'll typically need to create a personal access token
         # with permissions to create releases in the other repo
-        token: ${{ secrets.CUSTOM_GITHUB_TOKEN }}
+        token: ${{ secrets.GITHUB_TOKEN }}
         files: |
-          build/bin/geth
-      env:
-        GITHUB_REPOSITORY: scroll-tech/go-ethereum
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          build/bin/geth-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}
+          build/bin/geth-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}.tar.gz
+          build/bin/geth-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}.zip
+
