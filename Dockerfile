@@ -16,9 +16,11 @@ RUN apk add --no-cache gcc musl-dev linux-headers git ca-certificates \
 FROM alpine:latest
 
 COPY --from=builder /go-ethereum/build/bin/geth /usr/local/bin/
+COPY ./entrypoint.sh .
+COPY ./genesis.json .
 
 EXPOSE 8545 8546 30303 30303/udp
-ENTRYPOINT ["geth"]
+ENTRYPOINT ["./entrypoint.sh"]
 
 # Add some metadata labels to help programatic image consumption
 ARG COMMIT=""
