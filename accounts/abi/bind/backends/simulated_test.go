@@ -415,7 +415,7 @@ func TestTransactionByHash(t *testing.T) {
 
 func TestEstimateGas(t *testing.T) {
 	/*
-		pragma solidity ^0.6.4;
+		pragma solidity =0.6.12;
 		contract GasEstimation {
 		    function PureRevert() public { revert(); }
 		    function Revert() public { revert("revert reason");}
