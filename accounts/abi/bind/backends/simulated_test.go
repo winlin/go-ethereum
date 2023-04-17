@@ -415,13 +415,12 @@ func TestTransactionByHash(t *testing.T) {
 
 func TestEstimateGas(t *testing.T) {
 	/*
-		pragma solidity =0.6.12;
+		pragma solidity ^0.6.4;
 		contract GasEstimation {
 		    function PureRevert() public { revert(); }
 		    function Revert() public { revert("revert reason");}
 		    function OOG() public { for (uint i = 0; ; i++) {}}
 		    function Assert() public { assert(false);}
-		    function SelfDestruct() public { selfdestruct(msg.sender); }
 		    function Valid() public {}
 		    function Difficulty() public { assert(block.difficulty == 0); }
 		}*/
@@ -499,15 +498,6 @@ func TestEstimateGas(t *testing.T) {
 			Value:    nil,
 			Data:     common.Hex2Bytes("b9b046f9"),
 		}, 0, errors.New("invalid opcode: INVALID"), nil},
-
-		{"SelfDestruct", ethereum.CallMsg{
-			From:     addr,
-			To:       &contractAddr,
-			Gas:      100000,
-			GasPrice: big.NewInt(0),
-			Value:    nil,
-			Data:     common.Hex2Bytes("dba5e917"),
-		}, 0, errors.New("invalid opcode: SELFDESTRUCT"), nil},
 
 		{"Valid", ethereum.CallMsg{
 			From:     addr,
