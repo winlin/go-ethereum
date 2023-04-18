@@ -25,6 +25,7 @@ import (
 	"reflect"
 	"unicode"
 
+	"github.com/naoina/toml"
 	"gopkg.in/urfave/cli.v1"
 
 	"github.com/scroll-tech/go-ethereum/accounts/external"
@@ -39,7 +40,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/metrics"
 	"github.com/scroll-tech/go-ethereum/node"
 	"github.com/scroll-tech/go-ethereum/params"
-	"github.com/naoina/toml"
 )
 
 var (
