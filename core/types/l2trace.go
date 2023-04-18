@@ -2,24 +2,10 @@ package types
 
 import (
 	"encoding/json"
-	"math/big"
-	"sync"
-
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
 	"github.com/scroll-tech/go-ethereum/params"
-)
-
-var (
-	loggerResPool = sync.Pool{
-		New: func() interface{} {
-			// init arrays here; other types are inited with default values
-			return &StructLogRes{
-				Stack:  []string{},
-				Memory: []string{},
-			}
-		},
-	}
+	"math/big"
 )
 
 // BlockTrace contains block execution traces and results required for rollers.
