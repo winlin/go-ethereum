@@ -19,6 +19,7 @@ package zktrie
 import (
 	"fmt"
 
+	itrie "github.com/scroll-tech/zktrie/trie"
 	itypes "github.com/scroll-tech/zktrie/types"
 
 	"github.com/scroll-tech/go-ethereum/common"
@@ -30,7 +31,14 @@ var magicHash []byte = []byte("THIS IS THE MAGIC INDEX FOR ZKTRIE")
 
 // wrap itrie for trie interface
 type SecureTrie struct {
-	trie Trie
+	trie *itrie.ZkTrie
+	db   *Database
+}
+
+func sanityCheckByte32Key(b []byte) {
+	if len(b) != 32 && len(b) != 20 {
+		panic(fmt.Errorf("do not support length except for 120bit and 256bit now. data: %v len: %v", b, len(b)))
+	}
 }
 
 // New creates a trie
@@ -40,26 +48,17 @@ func NewSecure(root common.Hash, db *Database) (*SecureTrie, error) {
 	if db == nil {
 		panic("zktrie.NewSecure called without a database")
 	}
-	t, err := New(root, db)
+	t, err := itrie.NewZkTrie(*itypes.NewByte32FromBytes(root.Bytes()), db)
 	if err != nil {
 		return nil, err
 	}
-	return &SecureTrie{trie: *t}, nil
-}
-
-func (t *SecureTrie) hashKey(key []byte) []byte {
-	i, err := itypes.ToSecureKey(key)
-	if err != nil {
-		log.Error(fmt.Sprintf("unhandled secure trie error: %v", err))
-	}
-	hash := itypes.NewHashFromBigInt(i)
-	return hashToBytes(hash)
+	return &SecureTrie{trie: t, db: db}, nil
 }
 
 // Get returns the value for key stored in the trie.
 // The value bytes must not be modified by the caller.
 func (t *SecureTrie) Get(key []byte) []byte {
-	res, err := t.trie.TryGet(t.hashKey(key))
+	res, err := t.TryGet(key)
 	if err != nil {
 		log.Error(fmt.Sprintf("Unhandled trie error: %v", err))
 	}
@@ -67,13 +66,20 @@ func (t *SecureTrie) Get(key []byte) []byte {
 }
 
 func (t *SecureTrie) TryGet(key []byte) ([]byte, error) {
-	return t.trie.TryGet(t.hashKey(key))
+	sanityCheckByte32Key(key)
+	return t.trie.TryGet(key)
+}
+
+func (t *SecureTrie) TryGetNode(path []byte) ([]byte, int, error) {
+	panic("implement me!")
 }
 
 // TryUpdateAccount will abstract the write of an account to the
 // secure trie.
 func (t *SecureTrie) TryUpdateAccount(key []byte, acc *types.StateAccount) error {
-	return t.trie.TryUpdateAccount(t.hashKey(key), acc)
+	sanityCheckByte32Key(key)
+	value, flag := acc.MarshalFields()
+	return t.trie.TryUpdate(key, flag, value)
 }
 
 // Update associates key with value in the trie. Subsequent calls to
@@ -91,33 +97,34 @@ func (t *SecureTrie) Update(key, value []byte) {
 // NOTE: value is restricted to length of bytes32.
 // we override the underlying itrie's TryUpdate method
 func (t *SecureTrie) TryUpdate(key, value []byte) error {
-	return t.trie.TryUpdate(t.hashKey(key), value)
+	sanityCheckByte32Key(key)
+	return t.trie.TryUpdate(key, 1, []itypes.Byte32{*itypes.NewByte32FromBytes(value)})
 }
 
 // Delete removes any existing value for key from the trie.
 func (t *SecureTrie) Delete(key []byte) {
-	if err := t.trie.TryDelete(t.hashKey(key)); err != nil {
-		log.Error(fmt.Sprintf("Unhandled secure trie error: %v", err))
+	if err := t.TryDelete(key); err != nil {
+		log.Error(fmt.Sprintf("Unhandled trie error: %v", err))
 	}
 }
 
 func (t *SecureTrie) TryDelete(key []byte) error {
-	return t.trie.TryDelete(t.hashKey(key))
+	sanityCheckByte32Key(key)
+	return t.trie.TryDelete(key)
 }
 
 // GetKey returns the preimage of a hashed key that was
 // previously used to store a value.
 func (t *SecureTrie) GetKey(kHashBytes []byte) []byte {
-	panic("not implemented")
-	// TODO: use a kv cache in memory, need preimage
-	//k, err := itypes.NewBigIntFromHashBytes(kHashBytes)
-	//if err != nil {
-	//	log.Error(fmt.Sprintf("Unhandled trie error: %v", err))
-	//}
-	//if t.db.preimages != nil {
-	//	return t.db.preimages.preimage(common.BytesToHash(k.Bytes()))
-	//}
-	//return nil
+	// TODO: use a kv cache in memory
+	k, err := itypes.NewBigIntFromHashBytes(kHashBytes)
+	if err != nil {
+		log.Error(fmt.Sprintf("Unhandled trie error: %v", err))
+	}
+	if t.db.preimages != nil {
+		return t.db.preimages.preimage(common.BytesToHash(k.Bytes()))
+	}
+	return nil
 }
 
 // Commit writes all nodes and the secure hash pre-images to the trie's database.
@@ -125,22 +132,26 @@ func (t *SecureTrie) GetKey(kHashBytes []byte) []byte {
 //
 // Committing flushes nodes from memory. Subsequent Get calls will load nodes
 // from the database.
-func (t *SecureTrie) Commit(LeafCallback) (common.Hash, int, error) {
+func (t *SecureTrie) Commit(onleaf LeafCallback) (common.Hash, int, error) {
 	// in current implmentation, every update of trie already writes into database
 	// so Commmit does nothing
+	if onleaf != nil {
+		log.Warn("secure trie commit with onleaf callback is skipped!")
+	}
 	return t.Hash(), 0, nil
 }
 
 // Hash returns the root hash of SecureBinaryTrie. It does not write to the
 // database and can be used even if the trie doesn't have one.
 func (t *SecureTrie) Hash() common.Hash {
-	return t.trie.Hash()
+	var hash common.Hash
+	hash.SetBytes(t.trie.Hash())
+	return hash
 }
 
 // Copy returns a copy of SecureBinaryTrie.
 func (t *SecureTrie) Copy() *SecureTrie {
-	cpy := *t
-	return &cpy
+	return &SecureTrie{trie: t.trie.Copy(), db: t.db}
 }
 
 // NodeIterator returns an iterator that returns nodes of the underlying trie. Iteration
@@ -149,24 +160,3 @@ func (t *SecureTrie) NodeIterator(start []byte) NodeIterator {
 	/// FIXME
 	panic("not implemented")
 }
-
-func (t *SecureTrie) TryGetNode(path []byte) ([]byte, int, error) {
-	return t.trie.TryGetNode(path)
-}
-
-// hashKey returns the hash of key as an ephemeral buffer.
-// The caller must not hold onto the return value because it will become
-// invalid on the next call to hashKey or secKey.
-/*func (t *Trie) hashKey(key []byte) []byte {
-	if len(key) != 32 {
-		panic("non byte32 input to hashKey")
-	}
-	low16 := new(big.Int).SetBytes(key[:16])
-	high16 := new(big.Int).SetBytes(key[16:])
-	hash, err := poseidon.Hash([]*big.Int{low16, high16})
-	if err != nil {
-		panic(err)
-	}
-	return hash.Bytes()
-}
-*/

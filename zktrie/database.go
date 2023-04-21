@@ -75,7 +75,7 @@ func NewDatabaseWithConfig(diskdb ethdb.KeyValueStore, config *Config) *Database
 		cleans:     cleans,
 		rawDirties: make(trie.KvMap),
 	}
-	if config != nil || config.Preimages { // TODO(karalabe): Flip to default off in the future
+	if config != nil && config.Preimages {
 		db.preimages = newPreimageStore(diskdb)
 	}
 	return db
@@ -196,7 +196,7 @@ func (db *Database) DiskDB() ethdb.KeyValueStore {
 
 // EmptyRoot indicate what root is for an empty trie
 func (db *Database) EmptyRoot() common.Hash {
-	return common.Hash{}
+	return emptyRoot
 }
 
 // SaveCachePeriodically atomically saves fast cache data to the given dir with

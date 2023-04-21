@@ -30,7 +30,7 @@ import (
 
 var (
 	// emptyRoot is the known root hash of an empty trie.
-	emptyRoot = common.HexToHash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
+	emptyRoot = common.Hash{}
 
 	//TODO
 	// emptyState is the known hash of an empty state trie entry.
@@ -54,9 +54,10 @@ var (
 type LeafCallback func(paths [][]byte, hexpath []byte, leaf []byte, parent common.Hash) error
 
 type Trie struct {
-	impl *itrie.ZkTrieImpl
-	tr   *itrie.ZkTrie
 	db   *Database
+	impl *itrie.ZkTrieImpl
+	// tr is constructed for ZkTrie.ProofWithDeletion calling
+	tr *itrie.ZkTrie
 }
 
 // New creates a trie
@@ -80,10 +81,6 @@ func New(root common.Hash, db *Database) (*Trie, error) {
 	return &Trie{impl: impl, tr: tr, db: db}, nil
 }
 
-func (t *Trie) TryGet(key []byte) ([]byte, error) {
-	return t.impl.TryGet(bytesToHash(key))
-}
-
 // Get returns the value for key stored in the trie.
 // The value bytes must not be modified by the caller.
 func (t *Trie) Get(key []byte) []byte {
@@ -92,6 +89,22 @@ func (t *Trie) Get(key []byte) []byte {
 		log.Error(fmt.Sprintf("Unhandled trie error: %v", err))
 	}
 	return res
+}
+
+func (t *Trie) TryGet(key []byte) ([]byte, error) {
+	return t.impl.TryGet(bytesToHash(key))
+}
+
+// Update associates key with value in the trie. Subsequent calls to
+// Get will return value. If value has length zero, any existing value
+// is deleted from the trie and calls to Get will return nil.
+//
+// The value bytes must not be modified by the caller while they are
+// stored in the trie.
+func (t *Trie) Update(key, value []byte) {
+	if err := t.TryUpdate(key, value); err != nil {
+		log.Error(fmt.Sprintf("Unhandled trie error: %v", err))
+	}
 }
 
 // TryUpdateAccount will abstract the write of an account to the
@@ -107,18 +120,6 @@ func (t *Trie) TryUpdate(key, value []byte) error {
 	return t.impl.TryUpdate(bytesToHash(key), 1, []itypes.Byte32{*itypes.NewByte32FromBytes(value)})
 }
 
-// Update associates key with value in the trie. Subsequent calls to
-// Get will return value. If value has length zero, any existing value
-// is deleted from the trie and calls to Get will return nil.
-//
-// The value bytes must not be modified by the caller while they are
-// stored in the trie.
-func (t *Trie) Update(key, value []byte) {
-	if err := t.TryUpdate(key, value); err != nil {
-		log.Error(fmt.Sprintf("Unhandled trie error: %v", err))
-	}
-}
-
 func (t *Trie) TryDelete(key []byte) error {
 	return t.impl.TryDelete(bytesToHash(key))
 }
@@ -128,20 +129,6 @@ func (t *Trie) Delete(key []byte) {
 	if err := t.impl.TryDelete(bytesToHash(key)); err != nil {
 		log.Error(fmt.Sprintf("Unhandled trie error: %v", err))
 	}
-}
-
-// GetKey returns the preimage of a hashed key that was
-// previously used to store a value.
-func (t *Trie) GetKey(kHashBytes []byte) []byte {
-	// TODO: use a kv cache in memory
-	k, err := itypes.NewBigIntFromHashBytes(kHashBytes)
-	if err != nil {
-		log.Error(fmt.Sprintf("Unhandled trie error: %v", err))
-	}
-	if t.db.preimages != nil {
-		return t.db.preimages.preimage(common.BytesToHash(k.Bytes()))
-	}
-	return nil
 }
 
 func (t *Trie) TryGetNode(path []byte) ([]byte, int, error) {
@@ -162,6 +149,9 @@ func (t *Trie) Commit(LeafCallback) (common.Hash, int, error) {
 // Hash returns the root hash of SecureBinaryTrie. It does not write to the
 // database and can be used even if the trie doesn't have one.
 func (t *Trie) Hash() common.Hash {
+	if t.impl == nil {
+		return emptyRoot
+	}
 	var hash common.Hash
 	hash.SetBytes(t.impl.Root().Bytes())
 	return hash
@@ -173,20 +163,3 @@ func (t *Trie) NodeIterator(start []byte) trie.NodeIterator {
 	/// FIXME
 	panic("not implemented")
 }
-
-// hashKey returns the hash of key as an ephemeral buffer.
-// The caller must not hold onto the return value because it will become
-// invalid on the next call to hashKey or secKey.
-/*func (t *Trie) hashKey(key []byte) []byte {
-	if len(key) != 32 {
-		panic("non byte32 input to hashKey")
-	}
-	low16 := new(big.Int).SetBytes(key[:16])
-	high16 := new(big.Int).SetBytes(key[16:])
-	hash, err := poseidon.Hash([]*big.Int{low16, high16})
-	if err != nil {
-		panic(err)
-	}
-	return hash.Bytes()
-}
-*/
