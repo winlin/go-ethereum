@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-package trie
+package zktrie
 
 import (
 	"bytes"
@@ -27,30 +27,26 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	zkt "github.com/scroll-tech/zktrie/types"
+	itypes "github.com/scroll-tech/zktrie/types"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/ethdb/leveldb"
 	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
 )
 
-func newEmptyZkTrie() *ZkTrie {
-	trie, _ := NewZkTrie(
+func newEmpty() *Trie {
+	trie, _ := New(
 		common.Hash{},
-		&ZktrieDatabase{
-			db: NewDatabaseWithConfig(memorydb.New(),
-				&Config{Preimages: true}),
-			prefix: []byte{},
-		},
+		NewDatabaseWithConfig(memorydb.New(), &Config{Preimages: true}),
 	)
 	return trie
 }
 
 // makeTestSecureTrie creates a large enough secure trie for testing.
-func makeTestZkTrie() (*ZktrieDatabase, *ZkTrie, map[string][]byte) {
+func makeTestTrie() (*Database, *Trie, map[string][]byte) {
 	// Create an empty trie
-	triedb := NewZktrieDatabase(memorydb.New())
-	trie, _ := NewZkTrie(common.Hash{}, triedb)
+	triedb := NewDatabase(memorydb.New())
+	trie, _ := New(common.Hash{}, triedb)
 
 	// Fill it with some arbitrary data
 	content := make(map[string][]byte)
@@ -77,9 +73,9 @@ func makeTestZkTrie() (*ZktrieDatabase, *ZkTrie, map[string][]byte) {
 	return triedb, trie, content
 }
 
-func TestZktrieDelete(t *testing.T) {
+func TestTrieDelete(t *testing.T) {
 	t.Skip("var-len kv not supported")
-	trie := newEmptyZkTrie()
+	trie := newEmpty()
 	vals := []struct{ k, v string }{
 		{"do", "verb"},
 		{"ether", "wookiedoo"},
@@ -104,13 +100,13 @@ func TestZktrieDelete(t *testing.T) {
 	}
 }
 
-func TestZktrieGetKey(t *testing.T) {
-	trie := newEmptyZkTrie()
+func TestTrieGetKey(t *testing.T) {
+	trie := newEmpty()
 	key := []byte("0a1b2c3d4e5f6g7h8i9j0a1b2c3d4e5f")
 	value := []byte("9j8i7h6g5f4e3d2c1b0a9j8i7h6g5f4e")
 	trie.Update(key, value)
 
-	kPreimage := zkt.NewByte32FromBytesPaddingZero(key)
+	kPreimage := itypes.NewByte32FromBytesPaddingZero(key)
 	kHash, err := kPreimage.Hash()
 	assert.Nil(t, err)
 
@@ -124,10 +120,10 @@ func TestZktrieGetKey(t *testing.T) {
 
 func TestZkTrieConcurrency(t *testing.T) {
 	// Create an initial trie and copy if for concurrent access
-	_, trie, _ := makeTestZkTrie()
+	_, trie, _ := makeTestTrie()
 
 	threads := runtime.NumCPU()
-	tries := make([]*ZkTrie, threads)
+	tries := make([]*Trie, threads)
 	for i := 0; i < threads; i++ {
 		cpy := *trie
 		tries[i] = &cpy
@@ -166,7 +162,7 @@ func tempDBZK(b *testing.B) (string, *Database) {
 
 	diskdb, err := leveldb.New(dir, 256, 0, "", false)
 	assert.NoError(b, err)
-	config := &Config{Cache: 256, Preimages: true, Zktrie: true}
+	config := &Config{Cache: 256, Preimages: true}
 	return dir, NewDatabaseWithConfig(diskdb, config)
 }
 
@@ -174,9 +170,9 @@ const benchElemCountZk = 10000
 
 func BenchmarkZkTrieGet(b *testing.B) {
 	_, tmpdb := tempDBZK(b)
-	zkTrie, _ := NewZkTrie(common.Hash{}, NewZktrieDatabaseFromTriedb(tmpdb))
+	trie, _ := New(common.Hash{}, tmpdb)
 	defer func() {
-		ldb := zkTrie.db.db.diskdb.(*leveldb.Database)
+		ldb := trie.db.diskdb.(*leveldb.Database)
 		ldb.Close()
 		os.RemoveAll(ldb.Path())
 	}()
@@ -185,15 +181,15 @@ func BenchmarkZkTrieGet(b *testing.B) {
 	for i := 0; i < benchElemCountZk; i++ {
 		binary.LittleEndian.PutUint64(k, uint64(i))
 
-		err := zkTrie.TryUpdate(k, k)
+		err := trie.TryUpdate(k, k)
 		assert.NoError(b, err)
 	}
 
-	zkTrie.db.db.Commit(common.Hash{}, true, nil)
+	trie.db.Commit(common.Hash{}, true, nil)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		binary.LittleEndian.PutUint64(k, uint64(i))
-		_, err := zkTrie.TryGet(k)
+		_, err := trie.TryGet(k)
 		assert.NoError(b, err)
 	}
 	b.StopTimer()
@@ -201,9 +197,9 @@ func BenchmarkZkTrieGet(b *testing.B) {
 
 func BenchmarkZkTrieUpdate(b *testing.B) {
 	_, tmpdb := tempDBZK(b)
-	zkTrie, _ := NewZkTrie(common.Hash{}, NewZktrieDatabaseFromTriedb(tmpdb))
+	zkTrie, _ := New(common.Hash{}, tmpdb)
 	defer func() {
-		ldb := zkTrie.db.db.diskdb.(*leveldb.Database)
+		ldb := zkTrie.db.diskdb.(*leveldb.Database)
 		ldb.Close()
 		os.RemoveAll(ldb.Path())
 	}()
@@ -220,7 +216,7 @@ func BenchmarkZkTrieUpdate(b *testing.B) {
 	binary.LittleEndian.PutUint64(k, benchElemCountZk/2)
 
 	//zkTrie.Commit(nil)
-	zkTrie.db.db.Commit(common.Hash{}, true, nil)
+	zkTrie.db.Commit(common.Hash{}, true, nil)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		binary.LittleEndian.PutUint64(k, uint64(i))
@@ -234,34 +230,33 @@ func BenchmarkZkTrieUpdate(b *testing.B) {
 func TestZkTrieDelete(t *testing.T) {
 	key := make([]byte, 32)
 	value := make([]byte, 32)
-	trie1 := newEmptyZkTrie()
+	emptyTrie := newEmpty()
 
 	var count int = 6
 	var hashes []common.Hash
-	hashes = append(hashes, trie1.Hash())
+	hashes = append(hashes, emptyTrie.Hash())
 	for i := 0; i < count; i++ {
 		binary.LittleEndian.PutUint64(key, uint64(i))
 		binary.LittleEndian.PutUint64(value, uint64(i))
-		err := trie1.TryUpdate(key, value)
+		err := emptyTrie.TryUpdate(key, value)
 		assert.NoError(t, err)
-		hashes = append(hashes, trie1.Hash())
+		hashes = append(hashes, emptyTrie.Hash())
 	}
 
 	// binary.LittleEndian.PutUint64(key, uint64(0xffffff))
-	// err := trie1.TryDelete(key)
+	// err := emptyTrie.TryDelete(key)
 	// assert.Equal(t, err, zktrie.ErrKeyNotFound)
 
-	trie1.Commit(nil)
+	emptyTrie.Commit(nil)
 
 	for i := count - 1; i >= 0; i-- {
-
 		binary.LittleEndian.PutUint64(key, uint64(i))
-		v, err := trie1.TryGet(key)
+		v, err := emptyTrie.TryGet(key)
 		assert.NoError(t, err)
 		assert.NotEmpty(t, v)
-		err = trie1.TryDelete(key)
+		err = emptyTrie.TryDelete(key)
 		assert.NoError(t, err)
-		hash := trie1.Hash()
+		hash := emptyTrie.Hash()
 		assert.Equal(t, hashes[i].Hex(), hash.Hex())
 	}
 }

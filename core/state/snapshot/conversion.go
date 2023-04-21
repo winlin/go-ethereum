@@ -31,7 +31,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/rlp"
-	"github.com/scroll-tech/go-ethereum/trie"
+	"github.com/scroll-tech/go-ethereum/zktrie"
 )
 
 // trieKV represents a trie key-value pair
@@ -361,7 +361,7 @@ func generateTrieRoot(db ethdb.KeyValueWriter, it Iterator, account common.Hash,
 }
 
 func stackTrieGenerate(db ethdb.KeyValueWriter, in chan trieKV, out chan common.Hash) {
-	t := trie.NewStackTrie(db)
+	t := zktrie.NewStackTrie(db)
 	for leaf := range in {
 		t.TryUpdate(leaf.key[:], leaf.value)
 	}

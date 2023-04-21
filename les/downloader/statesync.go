@@ -29,7 +29,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/crypto"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/log"
-	"github.com/scroll-tech/go-ethereum/trie"
+	"github.com/scroll-tech/go-ethereum/zktrie"
 )
 
 // stateReq represents a batch of state fetch requests grouped together into
@@ -262,7 +262,7 @@ type stateSync struct {
 	d *Downloader // Downloader instance to access and manage current peerset
 
 	root   common.Hash        // State root currently being synced
-	sched  *trie.Sync         // State trie sync scheduler defining the tasks
+	sched  *zktrie.Sync       // State trie sync scheduler defining the tasks
 	keccak crypto.KeccakState // Keccak256 hasher to verify deliveries with
 
 	trieTasks map[common.Hash]*trieTask // Set of trie node tasks currently queued for retrieval
@@ -454,7 +454,7 @@ func (s *stateSync) assignTasks() {
 
 // fillTasks fills the given request object with a maximum of n state download
 // tasks to send to the remote peer.
-func (s *stateSync) fillTasks(n int, req *stateReq) (nodes []common.Hash, paths []trie.SyncPath, codes []common.Hash) {
+func (s *stateSync) fillTasks(n int, req *stateReq) (nodes []common.Hash, paths []zktrie.SyncPath, codes []common.Hash) {
 	// Refill available tasks from the scheduler.
 	if fill := n - (len(s.trieTasks) + len(s.codeTasks)); fill > 0 {
 		nodes, paths, codes := s.sched.Missing(fill)
@@ -473,7 +473,7 @@ func (s *stateSync) fillTasks(n int, req *stateReq) (nodes []common.Hash, paths 
 	// Find tasks that haven't been tried with the request's peer. Prefer code
 	// over trie nodes as those can be written to disk and forgotten about.
 	nodes = make([]common.Hash, 0, n)
-	paths = make([]trie.SyncPath, 0, n)
+	paths = make([]zktrie.SyncPath, 0, n)
 	codes = make([]common.Hash, 0, n)
 
 	req.trieTasks = make(map[common.Hash]*trieTask, n)
@@ -538,9 +538,9 @@ func (s *stateSync) process(req *stateReq) (int, error) {
 			s.numUncommitted++
 			s.bytesUncommitted += len(blob)
 			successful++
-		case trie.ErrNotRequested:
+		case zktrie.ErrNotRequested:
 			unexpected++
-		case trie.ErrAlreadyProcessed:
+		case zktrie.ErrAlreadyProcessed:
 			duplicate++
 		default:
 			return successful, fmt.Errorf("invalid state node %s: %v", hash.TerminalString(), err)
@@ -588,7 +588,7 @@ func (s *stateSync) process(req *stateReq) (int, error) {
 // peer into the state trie, returning whether anything useful was written or any
 // error occurred.
 func (s *stateSync) processNodeData(blob []byte) (common.Hash, error) {
-	res := trie.SyncResult{Data: blob}
+	res := zktrie.SyncResult{Data: blob}
 	s.keccak.Reset()
 	s.keccak.Write(blob)
 	s.keccak.Read(res.Hash[:])

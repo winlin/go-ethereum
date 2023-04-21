@@ -34,7 +34,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/metrics"
 	"github.com/scroll-tech/go-ethereum/rlp"
-	"github.com/scroll-tech/go-ethereum/trie"
+	"github.com/scroll-tech/go-ethereum/zktrie"
 )
 
 type revision struct {
@@ -184,10 +184,6 @@ func (s *StateDB) Error() error {
 	return s.dbErr
 }
 
-func (s *StateDB) IsZktrie() bool {
-	return s.db.TrieDB().Zktrie
-}
-
 func (s *StateDB) AddLog(log *types.Log) {
 	s.journal.append(addLogChange{txhash: s.thash})
 
@@ -324,11 +320,8 @@ func (s *StateDB) GetState(addr common.Address, hash common.Hash) common.Hash {
 
 // GetProof returns the Merkle proof for a given account.
 func (s *StateDB) GetProof(addr common.Address) ([][]byte, error) {
-	if s.IsZktrie() {
-		addr_s, _ := zkt.ToSecureKeyBytes(addr.Bytes())
-		return s.GetProofByHash(common.BytesToHash(addr_s.Bytes()))
-	}
-	return s.GetProofByHash(crypto.Keccak256Hash(addr.Bytes()))
+	addr_s, _ := zkt.ToSecureKeyBytes(addr.Bytes())
+	return s.GetProofByHash(common.BytesToHash(addr_s.Bytes()))
 }
 
 // GetProofByHash returns the Merkle proof for a given account.
@@ -573,12 +566,7 @@ func (s *StateDB) getDeletedStateObject(addr common.Address) *stateObject {
 		if len(enc) == 0 {
 			return nil
 		}
-		if s.IsZktrie() {
-			data, err = types.UnmarshalStateAccount(enc)
-		} else {
-			data = new(types.StateAccount)
-			err = rlp.DecodeBytes(enc, data)
-		}
+		data, err = types.UnmarshalStateAccount(enc)
 		if err != nil {
 			log.Error("Failed to decode state object", "addr", addr, "err", err)
 			return nil
@@ -634,8 +622,8 @@ func (s *StateDB) createObject(addr common.Address) (newobj, prev *stateObject) 
 // CreateAccount is called during the EVM CREATE operation. The situation might arise that
 // a contract does the following:
 //
-//   1. sends funds to sha(account ++ (nonce + 1))
-//   2. tx_create(sha(account ++ nonce)) (note that this gets the address of 1)
+//  1. sends funds to sha(account ++ (nonce + 1))
+//  2. tx_create(sha(account ++ nonce)) (note that this gets the address of 1)
 //
 // Carrying over the balance ensures that Ether doesn't disappear.
 func (s *StateDB) CreateAccount(addr common.Address) {
@@ -650,7 +638,7 @@ func (db *StateDB) ForEachStorage(addr common.Address, cb func(key, value common
 	if so == nil {
 		return nil
 	}
-	it := trie.NewIterator(so.getTrie(db.db).NodeIterator(nil))
+	it := zktrie.NewIterator(so.getTrie(db.db).NodeIterator(nil))
 
 	for it.Next() {
 		key := common.BytesToHash(db.trie.GetKey(it.Key))

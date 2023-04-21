@@ -14,7 +14,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
 	"github.com/scroll-tech/go-ethereum/log"
-	"github.com/scroll-tech/go-ethereum/trie"
+	zktrie2 "github.com/scroll-tech/go-ethereum/zktrie"
 )
 
 type proofList [][]byte
@@ -139,9 +139,9 @@ func decodeProofForMPTPath(proof proofList, path *SMTPath) {
 }
 
 type zktrieProofWriter struct {
-	db                  *trie.ZktrieDatabase
-	tracingZktrie       *trie.ZkTrie
-	tracingStorageTries map[common.Address]*trie.ZkTrie
+	db                  *zktrie2.Database
+	tracingZktrie       *zktrie2.Trie
+	tracingStorageTries map[common.Address]*zktrie2.Trie
 	tracingAccounts     map[common.Address]*types.StateAccount
 }
 
@@ -152,7 +152,7 @@ func (wr *zktrieProofWriter) TracingAccounts() map[common.Address]*types.StateAc
 func NewZkTrieProofWriter(storage *types.StorageTrace) (*zktrieProofWriter, error) {
 
 	underlayerDb := memorydb.New()
-	zkDb := trie.NewZktrieDatabase(underlayerDb)
+	zkDb := zktrie2.NewDatabase(underlayerDb)
 
 	accounts := make(map[common.Address]*types.StateAccount)
 
@@ -179,7 +179,7 @@ func NewZkTrieProofWriter(storage *types.StorageTrace) (*zktrieProofWriter, erro
 		}
 	}
 
-	storages := make(map[common.Address]*trie.ZkTrie)
+	storages := make(map[common.Address]*zktrie2.Trie)
 
 	for addrs, stgLists := range storage.StorageProofs {
 
@@ -191,7 +191,7 @@ func NewZkTrieProofWriter(storage *types.StorageTrace) (*zktrieProofWriter, erro
 			continue
 		} else if accState == nil {
 			// create an empty zktrie for uninit address
-			storages[addr], _ = trie.NewZkTrie(common.Hash{}, zkDb)
+			storages[addr], _ = zktrie2.New(common.Hash{}, zkDb)
 			continue
 		}
 
@@ -199,7 +199,7 @@ func NewZkTrieProofWriter(storage *types.StorageTrace) (*zktrieProofWriter, erro
 
 			if n := resumeProofs(proof, underlayerDb); n != nil {
 				var err error
-				storages[addr], err = trie.NewZkTrie(accState.Root, zkDb)
+				storages[addr], err = zktrie2.New(accState.Root, zkDb)
 				if err != nil {
 					return nil, fmt.Errorf("zktrie create failure for storage in addr <%s>: %s, (root %s)", addrs, err, accState.Root)
 				}
@@ -228,9 +228,9 @@ func NewZkTrieProofWriter(storage *types.StorageTrace) (*zktrieProofWriter, erro
 		}
 	}
 
-	zktrie, err := trie.NewZkTrie(
+	zktrie, err := zktrie2.New(
 		storage.RootBefore,
-		trie.NewZktrieDatabase(underlayerDb),
+		zktrie2.NewDatabase(underlayerDb),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("zktrie create failure: %s", err)
