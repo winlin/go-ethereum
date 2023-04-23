@@ -110,16 +110,12 @@ func TestTrieGetKey(t *testing.T) {
 	kHash, err := kPreimage.Hash()
 	assert.Nil(t, err)
 
-	//TODO(kevinyum): delete when kHash is used
-	assert.NotNil(t, kHash)
-
 	if !bytes.Equal(trie.Get(key), value) {
 		t.Errorf("Get did not return bar")
 	}
-	//TODO(kevinyum): re-enable when implemented
-	//if k := trie.GetKey(kHash.Bytes()); !bytes.Equal(k, key) {
-	//	t.Errorf("GetKey returned %q, want %q", k, key)
-	//}
+	if k := trie.GetKey(kHash.Bytes()); !bytes.Equal(k, key) {
+		t.Errorf("GetKey returned %q, want %q", k, key)
+	}
 }
 
 func TestZkTrieConcurrency(t *testing.T) {

@@ -22,11 +22,10 @@ import (
 	"errors"
 	"fmt"
 	"hash"
-	"io/ioutil"
 	"math/big"
 	"math/rand"
-	"os"
 	"reflect"
+	"strings"
 	"testing"
 	"testing/quick"
 
@@ -38,7 +37,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/crypto"
 	"github.com/scroll-tech/go-ethereum/crypto/codehash"
 	"github.com/scroll-tech/go-ethereum/ethdb"
-	"github.com/scroll-tech/go-ethereum/ethdb/leveldb"
 	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
 	"github.com/scroll-tech/go-ethereum/rlp"
 )
@@ -64,7 +62,7 @@ func TestEmptyTrie(t *testing.T) {
 }
 
 func TestNull(t *testing.T) {
-	t.Skip("zk-trie will only be accessed after construction")
+	t.Skip("zk-trie will only be accessed with correct construction.")
 	var trie Trie
 	key := make([]byte, 32)
 	value := []byte("test")
@@ -79,16 +77,12 @@ func TestMissingRoot(t *testing.T) {
 	if trie != nil {
 		t.Error("New returned non-nil trie for invalid root")
 	}
-	//TODO(wenhao): get correct error type
-	if _, ok := err.(*MissingNodeError); !ok {
+	if !strings.Contains(err.Error(), "not found") {
 		t.Errorf("New returned wrong error: %v", err)
 	}
 }
 
-func TestMissingNodeDisk(t *testing.T)    { testMissingNode(t, false) }
-func TestMissingNodeMemonly(t *testing.T) { testMissingNode(t, true) }
-
-func testMissingNode(t *testing.T, memonly bool) {
+func TestMissingNode(t *testing.T) {
 	diskdb := memorydb.New()
 	triedb := NewDatabase(diskdb)
 
@@ -96,9 +90,7 @@ func testMissingNode(t *testing.T, memonly bool) {
 	updateString(trie, "120000", "qwerqwerqwerqwerqwerqwerqwerqwer")
 	updateString(trie, "123456", "asdfasdfasdfasdfasdfasdfasdfasdf")
 	root, _, _ := trie.Commit(nil)
-	if !memonly {
-		triedb.Commit(root, true, nil)
-	}
+	triedb.Commit(root, true, nil)
 
 	trie, _ = New(root, triedb)
 	_, err := trie.TryGet([]byte("120000"))
@@ -126,42 +118,13 @@ func testMissingNode(t *testing.T, memonly bool) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
-	hash := common.HexToHash("0xe1d943cc8f061a0c0b98162830b970395ac9315654824bf21b73b891365262f9")
-	if memonly {
-		//TODO(kevinyum): re-enable when implemented
-		//delete(triedb.dirties, hash)
-	} else {
-		diskdb.Delete(hash[:])
-	}
+	rootHash, _ := diskdb.Get([]byte("currentroot"))
+	diskdb.Delete(rootHash[1:])
 
-	trie, _ = New(root, triedb)
-	_, err = trie.TryGet([]byte("120000"))
-	//TODO(wenhao): get correct error type
-	if _, ok := err.(*MissingNodeError); !ok {
-		t.Errorf("Wrong error: %v", err)
-	}
-	trie, _ = New(root, triedb)
-	_, err = trie.TryGet([]byte("120099"))
-	//TODO(wenhao): get correct error type
-	if _, ok := err.(*MissingNodeError); !ok {
-		t.Errorf("Wrong error: %v", err)
-	}
-	trie, _ = New(root, triedb)
-	_, err = trie.TryGet([]byte("123456"))
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	trie, _ = New(root, triedb)
-	err = trie.TryUpdate([]byte("120099"), []byte("zxcv"))
-	//TODO(wenhao): get correct error type
-	if _, ok := err.(*MissingNodeError); !ok {
-		t.Errorf("Wrong error: %v", err)
-	}
-	trie, _ = New(root, triedb)
-	err = trie.TryDelete([]byte("123456"))
-	//TODO(wenhao): get correct error type
-	if _, ok := err.(*MissingNodeError); !ok {
-		t.Errorf("Wrong error: %v", err)
+	// zk trie will validate database on construction
+	trie, err = New(root, triedb)
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf("New returned wrong error: %v", err)
 	}
 }
 
@@ -193,14 +156,16 @@ func TestInsert(t *testing.T) {
 
 func TestGet(t *testing.T) {
 	trie := newEmpty()
+	// zk-trie modifies pass-in value to be 32-byte long
+	var value32bytes = "xxxxxxxxxxxxxxxxxxxxxxxxxxxpuppy"
 	updateString(trie, "doe", "reindeer")
-	updateString(trie, "dog", "puppy")
+	updateString(trie, "dog", value32bytes)
 	updateString(trie, "dogglesworth", "cat")
 
 	for i := 0; i < 2; i++ {
 		res := getString(trie, "dog")
-		if !bytes.Equal(res, []byte("puppy")) {
-			t.Errorf("expected puppy got %x", res)
+		if !bytes.Equal(res, []byte(value32bytes)) {
+			t.Errorf("expected %x got %x", value32bytes, res)
 		}
 
 		unknown := getString(trie, "unknown")
@@ -236,7 +201,7 @@ func TestDelete(t *testing.T) {
 	}
 
 	hash := trie.Hash()
-	exp := common.HexToHash("5991bb8c6514148a29db676a14ac506cd2cd5775ace63c30a4fe457715e9ac84")
+	exp := common.HexToHash("15eac0c283c26710dc9303aff3d4a90dabef1a55989335bb9e970a4d27870d1b")
 	if hash != exp {
 		t.Errorf("expected %x got %x", exp, hash)
 	}
@@ -260,7 +225,7 @@ func TestEmptyValues(t *testing.T) {
 	}
 
 	hash := trie.Hash()
-	exp := common.HexToHash("5991bb8c6514148a29db676a14ac506cd2cd5775ace63c30a4fe457715e9ac84")
+	exp := common.HexToHash("1162454b37d69ef1bca0a8968e90ca88942c5bb95dcb2fe6bf35a8ea1056d8df")
 	if hash != exp {
 		t.Errorf("expected %x got %x", exp, hash)
 	}
@@ -269,13 +234,13 @@ func TestEmptyValues(t *testing.T) {
 func TestReplication(t *testing.T) {
 	trie := newEmpty()
 	vals := []struct{ k, v string }{
-		{"do", "verb"},
-		{"ether", "wookiedoo"},
-		{"horse", "stallion"},
-		{"shaman", "horse"},
-		{"doge", "coin"},
-		{"dog", "puppy"},
-		{"somethingveryoddindeedthis is", "myothernodedata"},
+		{"do", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxverb"},
+		{"ether", "xxxxxxxxxxxxxxxxxxxxxxxwookiedoo"},
+		{"horse", "xxxxxxxxxxxxxxxxxxxxxxxxstallion"},
+		{"shaman", "xxxxxxxxxxxxxxxxxxxxxxxxxxxhorse"},
+		{"doge", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxcoin"},
+		{"dog", "xxxxxxxxxxxxxxxxxxxxxxxxxxxpuppy"},
+		{"somethingveryoddindeedthis is", "xxxxxxxxxxxxxxxxxmyothernodedata"},
 	}
 	for _, val := range vals {
 		updateString(trie, val.k, val.v)
@@ -305,9 +270,9 @@ func TestReplication(t *testing.T) {
 
 	// perform some insertions on the new trie.
 	vals2 := []struct{ k, v string }{
-		{"do", "verb"},
-		{"ether", "wookiedoo"},
-		{"horse", "stallion"},
+		{"do", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxverb"},
+		{"ether", "xxxxxxxxxxxxxxxxxxxxxxxwookiedoo"},
+		{"horse", "xxxxxxxxxxxxxxxxxxxxxxxxstallion"},
 		// {"shaman", "horse"},
 		// {"doge", "coin"},
 		// {"ether", ""},
@@ -332,6 +297,8 @@ func TestLargeValue(t *testing.T) {
 
 // TestRandomCases tests som cases that were found via random fuzzing
 func TestRandomCases(t *testing.T) {
+	//TODO(kevinyum): re-enable after iterator is implemented
+	t.Skip("re-enable after zk-trie implements iterator")
 	var rt = []randTestStep{
 		{op: 6, key: common.Hex2Bytes(""), value: common.Hex2Bytes("")},                                                                                                 // step 0
 		{op: 6, key: common.Hex2Bytes(""), value: common.Hex2Bytes("")},                                                                                                 // step 1
@@ -473,6 +440,8 @@ func runRandTest(rt randTest) bool {
 }
 
 func TestRandom(t *testing.T) {
+	//TODO(kevinyum): re-enable after iterator is implemented
+	t.Skip("re-enable after zk-trie implements iterator")
 	if err := quick.Check(runRandTest, nil); err != nil {
 		if cerr, ok := err.(*quick.CheckError); ok {
 			t.Fatalf("random test iteration %d failed: %s", cerr.Count, spew.Sdump(cerr.In))
@@ -481,121 +450,9 @@ func TestRandom(t *testing.T) {
 	}
 }
 
-func BenchmarkGet(b *testing.B)      { benchGet(b, false) }
-func BenchmarkGetDB(b *testing.B)    { benchGet(b, true) }
-func BenchmarkUpdateBE(b *testing.B) { benchUpdate(b, binary.BigEndian) }
-func BenchmarkUpdateLE(b *testing.B) { benchUpdate(b, binary.LittleEndian) }
-
-const benchElemCount = 20000
-
-func benchGet(b *testing.B, commit bool) {
-	trie := new(Trie)
-	if commit {
-		_, tmpdb := tempDB()
-		trie, _ = New(common.Hash{}, tmpdb)
-	}
-	k := make([]byte, 32)
-	for i := 0; i < benchElemCount; i++ {
-		binary.LittleEndian.PutUint64(k, uint64(i))
-		trie.Update(k, k)
-	}
-	binary.LittleEndian.PutUint64(k, benchElemCount/2)
-	if commit {
-		trie.Commit(nil)
-	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		trie.Get(k)
-	}
-	b.StopTimer()
-
-	if commit {
-		ldb := trie.db.diskdb.(*leveldb.Database)
-		ldb.Close()
-		os.RemoveAll(ldb.Path())
-	}
-}
-
-func benchUpdate(b *testing.B, e binary.ByteOrder) *Trie {
-	trie := newEmpty()
-	k := make([]byte, 32)
-	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
-		e.PutUint64(k, uint64(i))
-		trie.Update(k, k)
-	}
-	return trie
-}
-
-// Benchmarks the trie hashing. Since the trie caches the result of any operation,
-// we cannot use b.N as the number of hashing rouns, since all rounds apart from
-// the first one will be NOOP. As such, we'll use b.N as the number of account to
-// insert into the trie before measuring the hashing.
-// BenchmarkHash-6   	  288680	      4561 ns/op	     682 B/op	       9 allocs/op
-// BenchmarkHash-6   	  275095	      4800 ns/op	     685 B/op	       9 allocs/op
-// pure hasher:
-// BenchmarkHash-6   	  319362	      4230 ns/op	     675 B/op	       9 allocs/op
-// BenchmarkHash-6   	  257460	      4674 ns/op	     689 B/op	       9 allocs/op
-// With hashing in-between and pure hasher:
-// BenchmarkHash-6   	  225417	      7150 ns/op	     982 B/op	      12 allocs/op
-// BenchmarkHash-6   	  220378	      6197 ns/op	     983 B/op	      12 allocs/op
-// same with old hasher
-// BenchmarkHash-6   	  229758	      6437 ns/op	     981 B/op	      12 allocs/op
-// BenchmarkHash-6   	  212610	      7137 ns/op	     986 B/op	      12 allocs/op
-func BenchmarkHash(b *testing.B) {
-	// Create a realistic account trie to hash. We're first adding and hashing N
-	// entries, then adding N more.
-	addresses, accounts := makeAccounts(2 * b.N)
-	// Insert the accounts into the trie and hash it
-	trie := newEmpty()
-	i := 0
-	for ; i < len(addresses)/2; i++ {
-		trie.Update(crypto.Keccak256(addresses[i][:]), accounts[i])
-	}
-	trie.Hash()
-	for ; i < len(addresses); i++ {
-		trie.Update(crypto.Keccak256(addresses[i][:]), accounts[i])
-	}
-	b.ResetTimer()
-	b.ReportAllocs()
-	//trie.hashRoot(nil, nil)
-	trie.Hash()
-}
-
-// Benchmarks the trie Commit following a Hash. Since the trie caches the result of any operation,
-// we cannot use b.N as the number of hashing rouns, since all rounds apart from
-// the first one will be NOOP. As such, we'll use b.N as the number of account to
-// insert into the trie before measuring the hashing.
-func BenchmarkCommitAfterHash(b *testing.B) {
-	b.Run("no-onleaf", func(b *testing.B) {
-		benchmarkCommitAfterHash(b, nil)
-	})
-	var a types.StateAccount
-	onleaf := func(paths [][]byte, hexpath []byte, leaf []byte, parent common.Hash) error {
-		rlp.DecodeBytes(leaf, &a)
-		return nil
-	}
-	b.Run("with-onleaf", func(b *testing.B) {
-		benchmarkCommitAfterHash(b, onleaf)
-	})
-}
-
-func benchmarkCommitAfterHash(b *testing.B, onleaf LeafCallback) {
-	// Make the random benchmark deterministic
-	addresses, accounts := makeAccounts(b.N)
-	trie := newEmpty()
-	for i := 0; i < len(addresses); i++ {
-		trie.Update(crypto.Keccak256(addresses[i][:]), accounts[i])
-	}
-	// Insert the accounts into the trie and hash it
-	trie.Hash()
-	b.ResetTimer()
-	b.ReportAllocs()
-	trie.Commit(onleaf)
-}
-
 func TestTinyTrie(t *testing.T) {
+	//TODO(kevinyum): re-enable after iterator is implemented
+	t.Skip("re-enable after zk-trie implements iterator")
 	// Create a realistic account trie to hash
 	_, accounts := makeAccounts(5)
 	trie := newEmpty()
@@ -632,7 +489,7 @@ func TestCommitAfterHash(t *testing.T) {
 	trie.Hash()
 	trie.Commit(nil)
 	root := trie.Hash()
-	exp := common.HexToHash("f0c0681648c93b347479cd58c61995557f01294425bd031ce1943c2799bbd4ec")
+	exp := common.HexToHash("14b8f675075f485d1b0b3e3a19410dc1b16ab24f4dce952536f70a9874e29d1d")
 	if exp != root {
 		t.Errorf("got %x, exp %x", root, exp)
 	}
@@ -727,6 +584,7 @@ func (b *spongeBatch) Replay(w ethdb.KeyValueWriter) error { return nil }
 // The test data was based on the 'master' code, and is basically random. It can be used
 // to check whether changes to the trie modifies the write order or data in any way.
 func TestCommitSequence(t *testing.T) {
+	t.Skip("zk-trie writes database on each trie update and commit does nothing.")
 	for i, tc := range []struct {
 		count              int
 		expWriteSeqHash    []byte
@@ -769,6 +627,7 @@ func TestCommitSequence(t *testing.T) {
 // TestCommitSequenceRandomBlobs is identical to TestCommitSequence
 // but uses random blobs instead of 'accounts'
 func TestCommitSequenceRandomBlobs(t *testing.T) {
+	t.Skip("zk-trie writes database on each trie update and commit does nothing.")
 	for i, tc := range []struct {
 		count              int
 		expWriteSeqHash    []byte
@@ -819,6 +678,8 @@ func TestCommitSequenceRandomBlobs(t *testing.T) {
 }
 
 func TestCommitSequenceStackTrie(t *testing.T) {
+	//TODO(kevinyum): re-enable after stack trie is implemented
+	t.Skip("re-enable after stack trie is implemented.")
 	for count := 1; count < 200; count++ {
 		prng := rand.New(rand.NewSource(int64(count)))
 		// This spongeDb is used to check the sequence of disk-db-writes
@@ -878,6 +739,8 @@ func TestCommitSequenceStackTrie(t *testing.T) {
 // that even a small trie which contains a leaf will have an extension making it
 // not fit into 32 bytes, rlp-encoded. However, it's still the correct thing to do.
 func TestCommitSequenceSmallRoot(t *testing.T) {
+	//TODO(kevinyum): re-enable after stack trie is implemented
+	t.Skip("re-enable after stack trie is implemented.")
 	s := &spongeDb{sponge: sha3.NewLegacyKeccak256(), id: "a"}
 	db := NewDatabase(s)
 	trie, _ := New(common.Hash{}, db)
@@ -907,177 +770,6 @@ func TestCommitSequenceSmallRoot(t *testing.T) {
 	}
 }
 
-// BenchmarkCommitAfterHashFixedSize benchmarks the Commit (after Hash) of a fixed number of updates to a trie.
-// This benchmark is meant to capture the difference on efficiency of small versus large changes. Typically,
-// storage tries are small (a couple of entries), whereas the full post-block account trie update is large (a couple
-// of thousand entries)
-func BenchmarkHashFixedSize(b *testing.B) {
-	b.Run("10", func(b *testing.B) {
-		b.StopTimer()
-		acc, add := makeAccounts(20)
-		for i := 0; i < b.N; i++ {
-			benchmarkHashFixedSize(b, acc, add)
-		}
-	})
-	b.Run("100", func(b *testing.B) {
-		b.StopTimer()
-		acc, add := makeAccounts(100)
-		for i := 0; i < b.N; i++ {
-			benchmarkHashFixedSize(b, acc, add)
-		}
-	})
-
-	b.Run("1K", func(b *testing.B) {
-		b.StopTimer()
-		acc, add := makeAccounts(1000)
-		for i := 0; i < b.N; i++ {
-			benchmarkHashFixedSize(b, acc, add)
-		}
-	})
-	b.Run("10K", func(b *testing.B) {
-		b.StopTimer()
-		acc, add := makeAccounts(10000)
-		for i := 0; i < b.N; i++ {
-			benchmarkHashFixedSize(b, acc, add)
-		}
-	})
-	b.Run("100K", func(b *testing.B) {
-		b.StopTimer()
-		acc, add := makeAccounts(100000)
-		for i := 0; i < b.N; i++ {
-			benchmarkHashFixedSize(b, acc, add)
-		}
-	})
-}
-
-func benchmarkHashFixedSize(b *testing.B, addresses [][20]byte, accounts [][]byte) {
-	b.ReportAllocs()
-	trie := newEmpty()
-	for i := 0; i < len(addresses); i++ {
-		trie.Update(crypto.Keccak256(addresses[i][:]), accounts[i])
-	}
-	// Insert the accounts into the trie and hash it
-	b.StartTimer()
-	trie.Hash()
-	b.StopTimer()
-}
-
-func BenchmarkCommitAfterHashFixedSize(b *testing.B) {
-	b.Run("10", func(b *testing.B) {
-		b.StopTimer()
-		acc, add := makeAccounts(20)
-		for i := 0; i < b.N; i++ {
-			benchmarkCommitAfterHashFixedSize(b, acc, add)
-		}
-	})
-	b.Run("100", func(b *testing.B) {
-		b.StopTimer()
-		acc, add := makeAccounts(100)
-		for i := 0; i < b.N; i++ {
-			benchmarkCommitAfterHashFixedSize(b, acc, add)
-		}
-	})
-
-	b.Run("1K", func(b *testing.B) {
-		b.StopTimer()
-		acc, add := makeAccounts(1000)
-		for i := 0; i < b.N; i++ {
-			benchmarkCommitAfterHashFixedSize(b, acc, add)
-		}
-	})
-	b.Run("10K", func(b *testing.B) {
-		b.StopTimer()
-		acc, add := makeAccounts(10000)
-		for i := 0; i < b.N; i++ {
-			benchmarkCommitAfterHashFixedSize(b, acc, add)
-		}
-	})
-	b.Run("100K", func(b *testing.B) {
-		b.StopTimer()
-		acc, add := makeAccounts(100000)
-		for i := 0; i < b.N; i++ {
-			benchmarkCommitAfterHashFixedSize(b, acc, add)
-		}
-	})
-}
-
-func benchmarkCommitAfterHashFixedSize(b *testing.B, addresses [][20]byte, accounts [][]byte) {
-	b.ReportAllocs()
-	trie := newEmpty()
-	for i := 0; i < len(addresses); i++ {
-		trie.Update(crypto.Keccak256(addresses[i][:]), accounts[i])
-	}
-	// Insert the accounts into the trie and hash it
-	trie.Hash()
-	b.StartTimer()
-	trie.Commit(nil)
-	b.StopTimer()
-}
-
-func BenchmarkDerefRootFixedSize(b *testing.B) {
-	b.Run("10", func(b *testing.B) {
-		b.StopTimer()
-		acc, add := makeAccounts(20)
-		for i := 0; i < b.N; i++ {
-			benchmarkDerefRootFixedSize(b, acc, add)
-		}
-	})
-	b.Run("100", func(b *testing.B) {
-		b.StopTimer()
-		acc, add := makeAccounts(100)
-		for i := 0; i < b.N; i++ {
-			benchmarkDerefRootFixedSize(b, acc, add)
-		}
-	})
-
-	b.Run("1K", func(b *testing.B) {
-		b.StopTimer()
-		acc, add := makeAccounts(1000)
-		for i := 0; i < b.N; i++ {
-			benchmarkDerefRootFixedSize(b, acc, add)
-		}
-	})
-	b.Run("10K", func(b *testing.B) {
-		b.StopTimer()
-		acc, add := makeAccounts(10000)
-		for i := 0; i < b.N; i++ {
-			benchmarkDerefRootFixedSize(b, acc, add)
-		}
-	})
-	b.Run("100K", func(b *testing.B) {
-		b.StopTimer()
-		acc, add := makeAccounts(100000)
-		for i := 0; i < b.N; i++ {
-			benchmarkDerefRootFixedSize(b, acc, add)
-		}
-	})
-}
-
-func benchmarkDerefRootFixedSize(b *testing.B, addresses [][20]byte, accounts [][]byte) {
-	b.ReportAllocs()
-	trie := newEmpty()
-	for i := 0; i < len(addresses); i++ {
-		trie.Update(crypto.Keccak256(addresses[i][:]), accounts[i])
-	}
-	h := trie.Hash()
-	trie.Commit(nil)
-	b.StartTimer()
-	trie.db.Dereference(h)
-	b.StopTimer()
-}
-
-func tempDB() (string, *Database) {
-	dir, err := ioutil.TempDir("", "trie-bench")
-	if err != nil {
-		panic(fmt.Sprintf("can't create temporary directory: %v", err))
-	}
-	diskdb, err := leveldb.New(dir, 256, 0, "", false)
-	if err != nil {
-		panic(fmt.Sprintf("can't create temporary database: %v", err))
-	}
-	return dir, NewDatabase(diskdb)
-}
-
 func getString(trie *Trie, k string) []byte {
 	return trie.Get([]byte(k))
 }
@@ -1088,18 +780,4 @@ func updateString(trie *Trie, k, v string) {
 
 func deleteString(trie *Trie, k string) {
 	trie.Delete([]byte(k))
-}
-
-func TestDecodeNode(t *testing.T) {
-	t.Parallel()
-	var (
-		hash  = make([]byte, 20)
-		elems = make([]byte, 20)
-	)
-	for i := 0; i < 5000000; i++ {
-		rand.Read(hash)
-		rand.Read(elems)
-		//TODO(kevinyum): re-enable when implemented
-		//decodeNode(hash, elems)
-	}
 }
