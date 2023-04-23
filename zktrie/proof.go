@@ -1,6 +1,7 @@
 package zktrie
 
 import (
+	"bytes"
 	"fmt"
 
 	itrie "github.com/scroll-tech/zktrie/trie"
@@ -9,40 +10,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 )
-
-// VerifyProof checks merkle proofs. The given proof must contain the value for
-// key in a trie with the given root hash. VerifyProof returns an error if the
-// proof contains invalid trie nodes or the wrong value.
-func VerifyProofSMT(rootHash common.Hash, key []byte, proofDb ethdb.KeyValueReader) (value []byte, err error) {
-
-	h := itypes.NewHashFromBytes(rootHash.Bytes())
-	k, err := itypes.ToSecureKey(key)
-	if err != nil {
-		return nil, err
-	}
-
-	proof, n, err := itrie.BuildZkTrieProof(h, k, len(key)*8, func(key *itypes.Hash) (*itrie.Node, error) {
-		buf, _ := proofDb.Get(key[:])
-		if buf == nil {
-			return nil, itrie.ErrKeyNotFound
-		}
-		n, err := itrie.NewNodeFromBytes(buf)
-		return n, err
-	})
-
-	if err != nil {
-		// do not contain the key
-		return nil, err
-	} else if !proof.Existence {
-		return nil, nil
-	}
-
-	if itrie.VerifyProofZkTrie(h, proof, n) {
-		return n.Data(), nil
-	} else {
-		return nil, fmt.Errorf("bad proof node %v", proof)
-	}
-}
 
 // Prove constructs a merkle proof for key. The result contains all encoded nodes
 // on the path to the value at key. The value itself is also included in the last
@@ -58,6 +25,8 @@ func (t *SecureTrie) Prove(key []byte, fromLevel uint, proofDb ethdb.KeyValueWri
 }
 
 func (t *SecureTrie) ProveWithDeletion(key []byte, fromLevel uint, proofDb ethdb.KeyValueWriter) (sibling []byte, err error) {
+	// standardize the key format, which is the same as trie interface
+	key = itypes.ReverseByteOrder(key)
 	err = t.trie.ProveWithDeletion(key, fromLevel,
 		func(n *itrie.Node) error {
 			nodeHash, err := n.NodeHash()
@@ -104,6 +73,8 @@ func (t *Trie) Prove(key []byte, fromLevel uint, proofDb ethdb.KeyValueWriter) e
 // the returned sibling node has no key along with it for witness generator must decode
 // the node for its purpose
 func (t *Trie) ProveWithDeletion(key []byte, fromLevel uint, proofDb ethdb.KeyValueWriter) (sibling []byte, err error) {
+	// standardize the key format, which is the same as trie interface
+	key = itypes.ReverseByteOrder(key)
 	err = t.tr.ProveWithDeletion(key, fromLevel,
 		func(n *itrie.Node) error {
 			nodeHash, err := n.NodeHash()
@@ -120,6 +91,43 @@ func (t *Trie) ProveWithDeletion(key []byte, fromLevel uint, proofDb ethdb.KeyVa
 		},
 	)
 	return
+}
+
+// VerifyProof checks merkle proofs. The given proof must contain the value for
+// key in a trie with the given root hash. VerifyProof returns an error if the
+// proof contains invalid trie nodes or the wrong value.
+func VerifyProof(rootHash common.Hash, key []byte, proofDb ethdb.KeyValueReader) (value []byte, err error) {
+	path := NewBinaryPathFromKeyBytes(key)
+	wantHash := zktNodeHash(rootHash)
+	for i := 0; i < path.Size(); i++ {
+		buf, _ := proofDb.Get(wantHash[:])
+		if buf == nil {
+			return nil, fmt.Errorf("proof node %d (hash %064x) missing", i, wantHash)
+		}
+		n, err := itrie.NewNodeFromBytes(buf)
+		if err != nil {
+			return nil, fmt.Errorf("bad proof node %d: %v", i, err)
+		}
+		switch n.Type {
+		case itrie.NodeTypeEmpty:
+			return n.Data(), nil
+		case itrie.NodeTypeLeaf:
+			if bytes.Equal(key, n.NodeKey[:]) {
+				return n.Data(), nil
+			}
+			// We found a leaf whose entry didn't match hIndex
+			return nil, nil
+		case itrie.NodeTypeParent:
+			if path.Pos(i) {
+				wantHash = n.ChildR
+			} else {
+				wantHash = n.ChildL
+			}
+		default:
+			return nil, itrie.ErrInvalidNodeFound
+		}
+	}
+	return nil, itrie.ErrKeyNotFound
 }
 
 func VerifyRangeProof(rootHash common.Hash, firstKey []byte, lastKey []byte, keys [][]byte, values [][]byte, proof ethdb.KeyValueReader) (bool, error) {
