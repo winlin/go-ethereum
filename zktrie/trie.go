@@ -18,6 +18,8 @@ package zktrie
 
 import (
 	"fmt"
+	"reflect"
+	"unsafe"
 
 	itrie "github.com/scroll-tech/zktrie/trie"
 	itypes "github.com/scroll-tech/zktrie/types"
@@ -60,6 +62,12 @@ type Trie struct {
 	tr *itrie.ZkTrie
 }
 
+func unsafeSetImpl(zkTrie *itrie.ZkTrie, impl *itrie.ZkTrieImpl) {
+	implField := reflect.ValueOf(zkTrie).Elem().Field(0)
+	implField = reflect.NewAt(implField.Type(), unsafe.Pointer(implField.UnsafeAddr())).Elem()
+	implField.Set(reflect.ValueOf(impl))
+}
+
 // New creates a trie
 // New bypasses all the buffer mechanism in *Database, it directly uses the
 // underlying diskdb
@@ -69,15 +77,15 @@ func New(root common.Hash, db *Database) (*Trie, error) {
 	}
 
 	// for proof generation
-	tr, err := itrie.NewZkTrie(*itypes.NewByte32FromBytes(root.Bytes()), db)
-	if err != nil {
-		return nil, err
-	}
-
 	impl, err := itrie.NewZkTrieImplWithRoot(db, zktNodeHash(root), itrie.NodeKeyValidBytes*8)
 	if err != nil {
 		return nil, err
 	}
+
+	tr := &itrie.ZkTrie{}
+	//TODO: it is ugly and dangerous, fix it in the zktrie repo later!
+	unsafeSetImpl(tr, impl)
+
 	return &Trie{impl: impl, tr: tr, db: db}, nil
 }
 
