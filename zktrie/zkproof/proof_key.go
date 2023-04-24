@@ -1,8 +1,18 @@
 package zkproof
 
-import itypes "github.com/scroll-tech/zktrie/types"
+import (
+	"fmt"
 
-func toProveKey(b []byte) []byte {
-	k, _ := itypes.ToSecureKey(b)
-	return itypes.NewHashFromBigInt(k)[:]
+	itypes "github.com/scroll-tech/zktrie/types"
+
+	"github.com/scroll-tech/go-ethereum/log"
+)
+
+func ToProveKey(b []byte) []byte {
+	if k, err := itypes.ToSecureKey(b); err != nil {
+		log.Error(fmt.Sprintf("unhandled error: %v", err))
+		return nil
+	} else {
+		return itypes.NewHashFromBigInt(k)[:]
+	}
 }

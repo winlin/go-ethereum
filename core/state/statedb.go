@@ -24,8 +24,6 @@ import (
 	"sort"
 	"time"
 
-	zkt "github.com/scroll-tech/zktrie/types"
-
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/state/snapshot"
@@ -35,6 +33,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/metrics"
 	"github.com/scroll-tech/go-ethereum/rlp"
 	"github.com/scroll-tech/go-ethereum/zktrie"
+	"github.com/scroll-tech/go-ethereum/zktrie/zkproof"
 )
 
 type revision struct {
@@ -320,14 +319,8 @@ func (s *StateDB) GetState(addr common.Address, hash common.Hash) common.Hash {
 
 // GetProof returns the Merkle proof for a given account.
 func (s *StateDB) GetProof(addr common.Address) ([][]byte, error) {
-	addr_s, _ := zkt.ToSecureKeyBytes(addr.Bytes())
-	return s.GetProofByHash(common.BytesToHash(addr_s.Bytes()))
-}
-
-// GetProofByHash returns the Merkle proof for a given account.
-func (s *StateDB) GetProofByHash(addrHash common.Hash) ([][]byte, error) {
 	var proof proofList
-	err := s.trie.Prove(addrHash[:], 0, &proof)
+	err := s.trie.Prove(zkproof.ToProveKey(addr.Bytes()), 0, &proof)
 	return proof, err
 }
 

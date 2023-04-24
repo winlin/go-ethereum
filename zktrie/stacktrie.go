@@ -53,7 +53,7 @@ type StackTrie struct {
 	val       []byte               // value contained by this node if it's a leaf
 	key       []byte               // key chunk covered by this (full|ext) node
 	keyOffset int                  // offset of the key chunk inside a full key
-	children  [16]*StackTrie       // list of children (for fullnodes and exts)
+	children  [2]*StackTrie        // list of children (for fullnodes and exts)
 	db        ethdb.KeyValueWriter // Pointer to the commit db, can be nil
 }
 
