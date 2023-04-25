@@ -29,21 +29,21 @@ import (
 
 var magicHash []byte = []byte("THIS IS THE MAGIC INDEX FOR ZKTRIE")
 
-// wrap itrie for trie interface
+// SecureTrie is a wrapper of Trie which make the key secure
 type SecureTrie struct {
 	trie *itrie.ZkTrie
 	db   *Database
 }
 
-func sanityCheckByte32Key(b []byte) {
-	if len(b) != 32 && len(b) != 20 {
-		panic(fmt.Errorf("do not support length except for 120bit and 256bit now. data: %v len: %v", b, len(b)))
+func sanityCheckKeyBytes(b []byte, accountAddress bool, storageKey bool) {
+	if (accountAddress && len(b) == 20) || (storageKey && len(b) == 32) {
+	} else {
+		panic(fmt.Errorf(
+			"bytes length is not supported, accountAddress: %v, storageKey: %v, length: %v",
+			accountAddress, storageKey, len(b)))
 	}
 }
 
-// New creates a trie
-// New bypasses all the buffer mechanism in *Database, it directly uses the
-// underlying diskdb
 func NewSecure(root common.Hash, db *Database) (*SecureTrie, error) {
 	if db == nil {
 		panic("zktrie.NewSecure called without a database")
@@ -66,7 +66,7 @@ func (t *SecureTrie) Get(key []byte) []byte {
 }
 
 func (t *SecureTrie) TryGet(key []byte) ([]byte, error) {
-	sanityCheckByte32Key(key)
+	sanityCheckKeyBytes(key, true, true)
 	return t.trie.TryGet(key)
 }
 
@@ -74,11 +74,10 @@ func (t *SecureTrie) TryGetNode(path []byte) ([]byte, int, error) {
 	panic("implement me!")
 }
 
-// TryUpdateAccount will abstract the write of an account to the
-// secure trie.
-func (t *SecureTrie) TryUpdateAccount(key []byte, acc *types.StateAccount) error {
-	sanityCheckByte32Key(key)
-	value, flag := acc.MarshalFields()
+// TryUpdateAccount will update the account value in trie
+func (t *SecureTrie) TryUpdateAccount(key []byte, account *types.StateAccount) error {
+	sanityCheckKeyBytes(key, true, false)
+	value, flag := account.MarshalFields()
 	return t.trie.TryUpdate(key, flag, value)
 }
 
@@ -94,10 +93,9 @@ func (t *SecureTrie) Update(key, value []byte) {
 	}
 }
 
-// NOTE: value is restricted to length of bytes32.
-// we override the underlying itrie's TryUpdate method
+// TryUpdate will update the storage value in trie. value is restricted to length of bytes32.
 func (t *SecureTrie) TryUpdate(key, value []byte) error {
-	sanityCheckByte32Key(key)
+	sanityCheckKeyBytes(key, false, true)
 	return t.trie.TryUpdate(key, 1, []itypes.Byte32{*itypes.NewByte32FromBytes(value)})
 }
 
@@ -109,7 +107,7 @@ func (t *SecureTrie) Delete(key []byte) {
 }
 
 func (t *SecureTrie) TryDelete(key []byte) error {
-	sanityCheckByte32Key(key)
+	sanityCheckKeyBytes(key, true, true)
 	return t.trie.TryDelete(key)
 }
 
