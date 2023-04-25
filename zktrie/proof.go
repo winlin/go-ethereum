@@ -51,6 +51,13 @@ func (t *SecureTrie) ProveWithDeletion(key []byte, fromLevel uint, proofDb ethdb
 			}
 		},
 	)
+	if err != nil {
+		return
+	}
+
+	// we put this special kv pair in db so we can distinguish the type and
+	// make suitable Proof
+	err = proofDb.Put(magicHash, itrie.ProofMagicBytes())
 	return
 }
 
@@ -90,6 +97,13 @@ func (t *Trie) ProveWithDeletion(key []byte, fromLevel uint, proofDb ethdb.KeyVa
 			}
 		},
 	)
+	if err != nil {
+		return
+	}
+
+	// we put this special kv pair in db so we can distinguish the type and
+	// make suitable Proof
+	err = proofDb.Put(magicHash, itrie.ProofMagicBytes())
 	return
 }
 
@@ -118,7 +132,7 @@ func VerifyProof(rootHash common.Hash, key []byte, proofDb ethdb.KeyValueReader)
 			// We found a leaf whose entry didn't match hIndex
 			return nil, nil
 		case itrie.NodeTypeParent:
-			if path.Pos(i) {
+			if path.Pos(i) > 0 {
 				wantHash = n.ChildR
 			} else {
 				wantHash = n.ChildL
