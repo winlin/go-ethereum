@@ -49,10 +49,11 @@ package zktrie
 //	}
 //}
 //
-//type kv struct {
-//	k, v []byte
-//	t    bool
-//}
+type kv struct {
+	k, v []byte
+	t    bool
+}
+
 //
 //func TestIteratorLargeData(t *testing.T) {
 //	trie := newEmpty()
