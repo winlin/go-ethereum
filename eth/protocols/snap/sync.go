@@ -2159,11 +2159,7 @@ func (s *Syncer) forwardAccountTask(task *accountTask) {
 		// If the task is complete, drop it into the stack trie to generate
 		// account trie nodes for it
 		if !task.needHeal[i] {
-			full, err := snapshot.FullAccountRLP(slim) // TODO(karalabe): Slim parsing can be omitted
-			if err != nil {
-				panic(err) // Really shouldn't ever happen
-			}
-			task.genTrie.Update(hash[:], full)
+			task.genTrie.UpdateAccount(hash[:], res.accounts[i])
 		}
 	}
 	// Flush anything written just now and update the stats

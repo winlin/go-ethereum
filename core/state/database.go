@@ -79,6 +79,7 @@ type Trie interface {
 	// existing value is deleted from the trie. The value bytes must not be modified
 	// by the caller while they are stored in the trie. If a node was not found in the
 	// database, a trie.MissingNodeError is returned.
+	// note that this is used for update storage data only!
 	TryUpdate(key, value []byte) error
 
 	// TryDelete removes any existing value for key from the trie. If a node was not

@@ -115,6 +115,12 @@ func (t *Trie) Update(key, value []byte) {
 	}
 }
 
+func (t *Trie) UpdateAccount(key []byte, account *types.StateAccount) {
+	if err := t.TryUpdateAccount(key, account); err != nil {
+		log.Error(fmt.Sprintf("Unhandled trie error: %v", err))
+	}
+}
+
 // TryUpdateAccount will abstract the write of an account to the
 // secure trie.
 func (t *Trie) TryUpdateAccount(key []byte, acc *types.StateAccount) error {

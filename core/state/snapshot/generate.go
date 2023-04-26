@@ -30,6 +30,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
 	"github.com/scroll-tech/go-ethereum/common/math"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
+	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/crypto/codehash"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
@@ -310,7 +311,15 @@ func (dl *diskLayer) proveRange(stats *generatorStats, root common.Hash, prefix 
 	if origin == nil && !diskMore {
 		stackTr := zktrie.NewStackTrie(nil)
 		for i, key := range keys {
-			stackTr.TryUpdate(key, vals[i])
+			if kind == "storage" {
+				stackTr.TryUpdate(key, vals[i])
+			} else {
+				var account types.StateAccount
+				if err := rlp.DecodeBytes(vals[i], &account); err != nil {
+					panic(fmt.Sprintf("decode full account into state.account failed: %v", err))
+				}
+				stackTr.TryUpdateAccount(key, &account)
+			}
 		}
 		if gotRoot := stackTr.Hash(); gotRoot != root {
 			return &proofResult{
@@ -436,7 +445,15 @@ func (dl *diskLayer) generateRange(root common.Hash, prefix []byte, kind string,
 		snapTrieDb := zktrie.NewDatabase(snapNodeCache)
 		snapTrie, _ := zktrie.New(common.Hash{}, snapTrieDb)
 		for i, key := range result.keys {
-			snapTrie.Update(key, result.vals[i])
+			if kind == "storage" {
+				snapTrie.Update(key, result.vals[i])
+			} else {
+				var account types.StateAccount
+				if err := rlp.DecodeBytes(result.vals[i], &account); err != nil {
+					panic(fmt.Sprintf("decode full account into state.account failed: %v", err))
+				}
+				snapTrie.UpdateAccount(key, &account)
+			}
 		}
 		root, _, _ := snapTrie.Commit(nil)
 		snapTrieDb.Commit(root, false, nil)
