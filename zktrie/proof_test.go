@@ -25,6 +25,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	itypes "github.com/scroll-tech/zktrie/types"
 	zkt "github.com/scroll-tech/zktrie/types"
 
 	"github.com/scroll-tech/go-ethereum/common"
@@ -35,9 +36,34 @@ func init() {
 	mrand.Seed(time.Now().Unix())
 }
 
+// convert key representation from Trie to SecureTrie
+func toProveKey(b []byte) []byte {
+	if k, err := itypes.ToSecureKey(b); err != nil {
+		return nil
+	} else {
+		return itypes.NewHashFromBigInt(k)[:]
+	}
+}
+
 // makeProvers creates Merkle trie provers based on different implementations to
 // test all variations.
 func makeTrieProvers(tr *Trie) []func(key []byte) *memorydb.Database {
+	var provers []func(key []byte) *memorydb.Database
+
+	// Create a direct trie based Merkle prover
+	provers = append(provers, func(key []byte) *memorydb.Database {
+		proof := memorydb.New()
+		err := tr.Prove(key, 0, proof)
+		if err != nil {
+			panic(err)
+		}
+
+		return proof
+	})
+	return provers
+}
+
+func makeSecureTrieProvers(tr *SecureTrie) []func(key []byte) *memorydb.Database {
 	var provers []func(key []byte) *memorydb.Database
 
 	// Create a direct trie based Merkle prover
@@ -80,8 +106,32 @@ func TestTrieOneElementProof(t *testing.T) {
 	}
 }
 
+func TestSecureTrieOneElementProof(t *testing.T) {
+	tr, _ := NewSecure(common.Hash{}, NewDatabase(memorydb.New()))
+	key := zkt.NewByte32FromBytesPaddingZero(append(bytes.Repeat([]byte("k"), 10), bytes.Repeat([]byte("l"), 21)...)).Bytes()
+	err := tr.TryUpdate(key, bytes.Repeat([]byte("v"), 32))
+	assert.Nil(t, err)
+	for i, prover := range makeSecureTrieProvers(tr) {
+		secureKey := toProveKey(key)
+		proof := prover(secureKey)
+		if proof == nil {
+			t.Fatalf("prover %d: nil proof", i)
+		}
+		if proof.Len() != 2 {
+			t.Errorf("prover %d: proof should have 1+1 element (including the magic kv)", i)
+		}
+		val, err := VerifyProof(tr.Hash(), secureKey, proof)
+		if err != nil {
+			t.Fatalf("prover %d: failed to verify proof: %v\nraw proof: %x", i, err, proof)
+		}
+		if !verifyValue(val, bytes.Repeat([]byte("v"), 32)) {
+			t.Fatalf("prover %d: verified value mismatch: want 'v' get %x", i, val)
+		}
+	}
+}
+
 func TestTrieProof(t *testing.T) {
-	tr, vals := randomZktrie(t, 500)
+	tr, vals := randomTrie(t, 500)
 	root := tr.Hash()
 	for i, prover := range makeTrieProvers(tr) {
 		for _, kv := range vals {
@@ -100,19 +150,29 @@ func TestTrieProof(t *testing.T) {
 	}
 }
 
-// mutateByte changes one byte in b.
-func mutateByte(b []byte) {
-	for r := mrand.Intn(len(b)); ; {
-		new := byte(mrand.Intn(255))
-		if new != b[r] {
-			b[r] = new
-			break
+func TestSecureTrieProof(t *testing.T) {
+	tr, vals := randomSecureTrie(t, 500)
+	root := tr.Hash()
+	for i, prover := range makeSecureTrieProvers(tr) {
+		for _, kv := range vals {
+			secureKey := toProveKey(kv.k)
+			proof := prover(secureKey)
+			if proof == nil {
+				t.Fatalf("prover %d: missing key %x while constructing proof", i, secureKey)
+			}
+			val, err := VerifyProof(common.BytesToHash(root.Bytes()), secureKey, proof)
+			if err != nil {
+				t.Fatalf("prover %d: failed to verify proof for key %x: %v\nraw proof: %x\n", i, secureKey, err, proof)
+			}
+			if !verifyValue(val, zkt.NewByte32FromBytesPaddingZero(kv.v)[:]) {
+				t.Fatalf("prover %d: verified value mismatch for key %x, want %x, get %x", i, secureKey, kv.v, val)
+			}
 		}
 	}
 }
 
 func TestTrieBadProof(t *testing.T) {
-	tr, vals := randomZktrie(t, 500)
+	tr, vals := randomTrie(t, 500)
 	for i, prover := range makeTrieProvers(tr) {
 		for _, kv := range vals {
 			proof := prover(kv.k)
@@ -134,6 +194,35 @@ func TestTrieBadProof(t *testing.T) {
 
 			if _, err := VerifyProof(tr.Hash(), kv.k, proof); err == nil {
 				t.Fatalf("prover %d: expected proof to fail for key %x", i, kv.k)
+			}
+		}
+	}
+}
+
+func TestSecureTrieBadProof(t *testing.T) {
+	tr, vals := randomSecureTrie(t, 500)
+	for i, prover := range makeSecureTrieProvers(tr) {
+		for _, kv := range vals {
+			secureKey := toProveKey(kv.k)
+			proof := prover(secureKey)
+			if proof == nil {
+				t.Fatalf("prover %d: nil proof", i)
+			}
+			it := proof.NewIterator(nil, nil)
+			for i, d := 0, mrand.Intn(proof.Len()-1); i <= d; i++ {
+				it.Next()
+			}
+
+			// Need to randomly mutate two keys, as magic kv in Proof is not used in verifyProof
+			for i := 0; i <= 2; i++ {
+				key := it.Key()
+				proof.Delete(key)
+				it.Next()
+			}
+			it.Release()
+
+			if _, err := VerifyProof(tr.Hash(), secureKey, proof); err == nil {
+				t.Fatalf("prover %d: expected proof to fail for key %x", i, secureKey)
 			}
 		}
 	}
@@ -166,13 +255,39 @@ func TestTrieMissingKeyProof(t *testing.T) {
 	}
 }
 
+func TestSecureTrieMissingKeyProof(t *testing.T) {
+	tr, _ := NewSecure(common.Hash{}, NewDatabase(memorydb.New()))
+	key := zkt.NewByte32FromBytesPaddingZero(append(bytes.Repeat([]byte("k"), 10), bytes.Repeat([]byte("l"), 21)...)).Bytes()
+	err := tr.TryUpdate(key, bytes.Repeat([]byte("v"), 32))
+	assert.Nil(t, err)
+
+	prover := makeSecureTrieProvers(tr)[0]
+
+	for i, key := range []string{"a", "j", "l", "z"} {
+		keyBytes := bytes.Repeat([]byte(key), 32)
+		secureKey := toProveKey(keyBytes)
+		proof := prover(secureKey)
+
+		if proof.Len() != 2 {
+			t.Errorf("test %d: proof should have 2 element (with magic kv)", i)
+		}
+		val, err := VerifyProof(tr.Hash(), secureKey, proof)
+		if err != nil {
+			t.Fatalf("test %d: failed to verify proof: %v\nraw proof: %x", i, err, proof)
+		}
+		if val != nil {
+			t.Fatalf("test %d: verified value mismatch: have %x, want nil", i, val)
+		}
+	}
+}
+
 func randBytes(n int) []byte {
 	r := make([]byte, n)
 	crand.Read(r)
 	return r
 }
 
-func randomZktrie(t *testing.T, n int) (*Trie, map[string]*kv) {
+func randomTrie(t *testing.T, n int) (*Trie, map[string]*kv) {
 	tr, err := New(common.Hash{}, NewDatabase((memorydb.New())))
 	if err != nil {
 		panic(err)
@@ -200,8 +315,36 @@ func randomZktrie(t *testing.T, n int) (*Trie, map[string]*kv) {
 	return tr, vals
 }
 
+func randomSecureTrie(t *testing.T, n int) (*SecureTrie, map[string]*kv) {
+	tr, err := NewSecure(common.Hash{}, NewDatabase((memorydb.New())))
+	if err != nil {
+		panic(err)
+	}
+	vals := make(map[string]*kv)
+	for i := byte(0); i < 100; i++ {
+
+		value := &kv{zkt.NewByte32FromBytesPaddingZero(bytes.Repeat([]byte{i}, 31)).Bytes(), bytes.Repeat([]byte{i}, 32), false}
+		value2 := &kv{zkt.NewByte32FromBytesPaddingZero(bytes.Repeat([]byte{i + 10}, 31)).Bytes(), bytes.Repeat([]byte{i + 5}, 32), false}
+
+		err = tr.TryUpdate(value.k, value.v)
+		assert.Nil(t, err)
+		err = tr.TryUpdate(value2.k, value2.v)
+		assert.Nil(t, err)
+		vals[string(value.k)] = value
+		vals[string(value2.k)] = value2
+	}
+	for i := 0; i < n; i++ {
+		value := &kv{zkt.NewByte32FromBytesPaddingZero(randBytes(31)).Bytes(), randBytes(32), false}
+		err = tr.TryUpdate(value.k, value.v)
+		assert.Nil(t, err)
+		vals[string(value.k)] = value
+	}
+
+	return tr, vals
+}
+
 // Tests that new "proof with deletion" feature
-func TestProofWithDeletion(t *testing.T) {
+func TestTrieProofWithDeletion(t *testing.T) {
 	tr, _ := New(common.Hash{}, NewDatabase((memorydb.New())))
 	key1 := zkt.NewByte32FromBytesPaddingZero(append(bytes.Repeat([]byte("k"), 10), bytes.Repeat([]byte("l"), 21)...)).Bytes()
 	key2 := zkt.NewByte32FromBytesPaddingZero(append(bytes.Repeat([]byte("m"), 10), bytes.Repeat([]byte("n"), 21)...)).Bytes()
@@ -215,6 +358,35 @@ func TestProofWithDeletion(t *testing.T) {
 	assert.NoError(t, err)
 
 	sibling1, err := tr.ProveWithDeletion(key1, 0, proof)
+	assert.NoError(t, err)
+	nd, err := tr.TryGet(key2)
+	assert.NoError(t, err)
+	l := len(sibling1)
+	// a hacking to grep the value part directly from the encoded leaf node,
+	// notice the sibling of key1 is just the leaf of key2
+	assert.Equal(t, sibling1[l-33:l-1], nd)
+
+	notKey := zkt.NewByte32FromBytesPaddingZero(bytes.Repeat([]byte{'x'}, 31)).Bytes()
+	sibling2, err := tr.ProveWithDeletion(notKey, 0, proof)
+	assert.NoError(t, err)
+	assert.Nil(t, sibling2)
+}
+
+func TestSecureTrieProofWithDeletion(t *testing.T) {
+	tr, _ := NewSecure(common.Hash{}, NewDatabase((memorydb.New())))
+	key1 := zkt.NewByte32FromBytesPaddingZero(append(bytes.Repeat([]byte("k"), 10), bytes.Repeat([]byte("l"), 21)...)).Bytes()
+	key2 := zkt.NewByte32FromBytesPaddingZero(append(bytes.Repeat([]byte("m"), 10), bytes.Repeat([]byte("n"), 21)...)).Bytes()
+	secureKey1 := toProveKey(key1)
+
+	err := tr.TryUpdate(key1, bytes.Repeat([]byte("v"), 32))
+	assert.NoError(t, err)
+	err = tr.TryUpdate(key2, bytes.Repeat([]byte("v"), 32))
+	assert.NoError(t, err)
+
+	proof := memorydb.New()
+	assert.NoError(t, err)
+
+	sibling1, err := tr.ProveWithDeletion(secureKey1, 0, proof)
 	assert.NoError(t, err)
 	nd, err := tr.TryGet(key2)
 	assert.NoError(t, err)
