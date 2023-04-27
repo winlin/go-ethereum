@@ -41,7 +41,7 @@ func toProveKey(b []byte) []byte {
 	if k, err := itypes.ToSecureKey(b); err != nil {
 		return nil
 	} else {
-		return itypes.NewHashFromBigInt(k)[:]
+		return HashKeyToKeybytes(itypes.NewHashFromBigInt(k))
 	}
 }
 

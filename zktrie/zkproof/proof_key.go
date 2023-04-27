@@ -6,6 +6,7 @@ import (
 	itypes "github.com/scroll-tech/zktrie/types"
 
 	"github.com/scroll-tech/go-ethereum/log"
+	"github.com/scroll-tech/go-ethereum/zktrie"
 )
 
 func ToProveKey(b []byte) []byte {
@@ -13,6 +14,6 @@ func ToProveKey(b []byte) []byte {
 		log.Error(fmt.Sprintf("unhandled error: %v", err))
 		return nil
 	} else {
-		return itypes.NewHashFromBigInt(k)[:]
+		return zktrie.HashKeyToKeybytes(itypes.NewHashFromBigInt(k))
 	}
 }

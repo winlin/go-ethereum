@@ -92,7 +92,7 @@ func New(root common.Hash, db *Database) (*Trie, error) {
 // Get returns the value for key stored in the trie.
 // The value bytes must not be modified by the caller.
 func (t *Trie) Get(key []byte) []byte {
-	res, err := t.impl.TryGet(bytesToHash(key))
+	res, err := t.impl.TryGet(KeybytesToHashKey(key))
 	if err != nil {
 		log.Error(fmt.Sprintf("Unhandled trie error: %v", err))
 	}
@@ -100,7 +100,7 @@ func (t *Trie) Get(key []byte) []byte {
 }
 
 func (t *Trie) TryGet(key []byte) ([]byte, error) {
-	return t.impl.TryGet(bytesToHash(key))
+	return t.impl.TryGet(KeybytesToHashKey(key))
 }
 
 // Update associates key with value in the trie. Subsequent calls to
@@ -125,22 +125,22 @@ func (t *Trie) UpdateAccount(key []byte, account *types.StateAccount) {
 // secure trie.
 func (t *Trie) TryUpdateAccount(key []byte, acc *types.StateAccount) error {
 	value, flag := acc.MarshalFields()
-	return t.impl.TryUpdate(bytesToHash(key), flag, value)
+	return t.impl.TryUpdate(KeybytesToHashKey(key), flag, value)
 }
 
 // NOTE: value is restricted to length of bytes32.
 // we override the underlying itrie's TryUpdate method
 func (t *Trie) TryUpdate(key, value []byte) error {
-	return t.impl.TryUpdate(bytesToHash(key), 1, []itypes.Byte32{*itypes.NewByte32FromBytes(value)})
+	return t.impl.TryUpdate(KeybytesToHashKey(key), 1, []itypes.Byte32{*itypes.NewByte32FromBytes(value)})
 }
 
 func (t *Trie) TryDelete(key []byte) error {
-	return t.impl.TryDelete(bytesToHash(key))
+	return t.impl.TryDelete(KeybytesToHashKey(key))
 }
 
 // Delete removes any existing value for key from the trie.
 func (t *Trie) Delete(key []byte) {
-	if err := t.impl.TryDelete(bytesToHash(key)); err != nil {
+	if err := t.impl.TryDelete(KeybytesToHashKey(key)); err != nil {
 		log.Error(fmt.Sprintf("Unhandled trie error: %v", err))
 	}
 }

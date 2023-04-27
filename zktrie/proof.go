@@ -27,6 +27,7 @@ func (t *SecureTrie) Prove(key []byte, fromLevel uint, proofDb ethdb.KeyValueWri
 func (t *SecureTrie) ProveWithDeletion(key []byte, fromLevel uint, proofDb ethdb.KeyValueWriter) (sibling []byte, err error) {
 	// standardize the key format, which is the same as trie interface
 	key = itypes.ReverseByteOrder(key)
+	reverseBitInPlace(key)
 	err = t.trie.ProveWithDeletion(key, fromLevel,
 		func(n *itrie.Node) error {
 			nodeHash, err := n.NodeHash()
@@ -82,6 +83,7 @@ func (t *Trie) Prove(key []byte, fromLevel uint, proofDb ethdb.KeyValueWriter) e
 func (t *Trie) ProveWithDeletion(key []byte, fromLevel uint, proofDb ethdb.KeyValueWriter) (sibling []byte, err error) {
 	// standardize the key format, which is the same as trie interface
 	key = itypes.ReverseByteOrder(key)
+	reverseBitInPlace(key)
 	err = t.tr.ProveWithDeletion(key, fromLevel,
 		func(n *itrie.Node) error {
 			nodeHash, err := n.NodeHash()
@@ -126,7 +128,7 @@ func VerifyProof(rootHash common.Hash, key []byte, proofDb ethdb.KeyValueReader)
 		case itrie.NodeTypeEmpty:
 			return n.Data(), nil
 		case itrie.NodeTypeLeaf:
-			if bytes.Equal(key, n.NodeKey[:]) {
+			if bytes.Equal(key, HashKeyToKeybytes(n.NodeKey)) {
 				return n.Data(), nil
 			}
 			// We found a leaf whose entry didn't match hIndex

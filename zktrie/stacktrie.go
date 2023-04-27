@@ -203,7 +203,7 @@ func (st *StackTrie) hash() {
 		st.children[0] = nil
 		st.children[1] = nil
 	case leafNode:
-		n = itrie.NewLeafNode(bytesToHash(st.key.ToKeyBytes()), st.flag, st.val)
+		n = itrie.NewLeafNode(KeybytesToHashKey(st.key.ToKeyBytes()), st.flag, st.val)
 	case emptyNode:
 		n = itrie.NewEmptyNode()
 	default:
@@ -244,4 +244,19 @@ func (st *StackTrie) Commit() (common.Hash, error) {
 	}
 	st.hash()
 	return common.BytesToHash(st.nodeHash.Bytes()), nil
+}
+
+func (st *StackTrie) String() string {
+	switch st.nodeType {
+	case parentNode:
+		return fmt.Sprintf("Parent(%s, %s)", st.children[0], st.children[1])
+	case leafNode:
+		return fmt.Sprintf("Leaf(%s)", keyBytesToHex(st.key.ToKeyBytes()))
+	case hashedNode:
+		return fmt.Sprintf("Hashed(%s)", st.nodeHash.Hex())
+	case emptyNode:
+		return fmt.Sprintf("Empty")
+	default:
+		panic("unknown node type")
+	}
 }
