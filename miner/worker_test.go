@@ -168,6 +168,7 @@ func newTestWorkerBackend(t *testing.T, chainConfig *params.ChainConfig, engine 
 
 func (b *testWorkerBackend) BlockChain() *core.BlockChain { return b.chain }
 func (b *testWorkerBackend) TxPool() *core.TxPool         { return b.txPool }
+func (b *testWorkerBackend) ChainDb() ethdb.Database      { return b.db }
 
 func (b *testWorkerBackend) newRandomUncle() *types.Block {
 	var parent *types.Block
@@ -525,3 +526,5 @@ func testAdjustInterval(t *testing.T, chainConfig *params.ChainConfig, engine co
 		t.Error("interval reset timeout")
 	}
 }
+
+// todo: test l1message innclusion

@@ -30,6 +30,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/consensus"
 	"github.com/scroll-tech/go-ethereum/consensus/misc"
 	"github.com/scroll-tech/go-ethereum/core"
+	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/state"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/event"
@@ -908,6 +909,17 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 	return false
 }
 
+func (w *worker) collectPendingL1Messages() []types.L1MessageTx {
+	nextQueueIndex := rawdb.ReadFirstQueueIndexNotInL2Block(w.eth.ChainDb(), w.chain.CurrentHeader().Hash())
+	if nextQueueIndex == nil {
+		log.Crit("Failed to read last L1 message in L2 block", "l2BlockHash", w.chain.CurrentHeader().Hash(), " last L1 message is nil")
+	}
+
+	first := *nextQueueIndex
+	last := first + w.chainConfig.Scroll.L1Config.NumL1MessagesPerBlock - 1
+	return rawdb.ReadL1MessagesInRange(w.eth.ChainDb(), first, last, false)
+}
+
 // commitNewWork generates several new sealing tasks based on the parent block.
 func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) {
 	w.mu.RLock()
@@ -1008,7 +1020,22 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	if !noempty && atomic.LoadUint32(&w.noempty) == 0 {
 		w.commit(uncles, nil, false, tstart)
 	}
-
+	// fetch l1Txs
+	l1Txs := make(map[common.Address]types.Transactions)
+	if w.chainConfig.Scroll.L1MsgEnabled() {
+		l1Messages := w.collectPendingL1Messages()
+		for _, l1msg := range l1Messages {
+			tx := types.NewTx(&l1msg)
+			sender := l1msg.Sender
+			senderTxs, ok := l1Txs[sender]
+			if ok {
+				senderTxs = append(senderTxs, tx)
+				l1Txs[sender] = senderTxs
+			} else {
+				l1Txs[sender] = types.Transactions{tx}
+			}
+		}
+	}
 	// Fill the block with all available pending transactions.
 	pending := w.eth.TxPool().Pending(true)
 	// Short circuit if there is no available pending transactions.
@@ -1024,6 +1051,12 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 		if txs := remoteTxs[account]; len(txs) > 0 {
 			delete(remoteTxs, account)
 			localTxs[account] = txs
+		}
+	}
+	if w.chainConfig.Scroll.L1MsgEnabled() && len(l1Txs) > 0 {
+		txs := types.NewTransactionsByPriceAndNonce(w.current.signer, l1Txs, header.BaseFee)
+		if w.commitTransactions(txs, w.coinbase, interrupt) {
+			return
 		}
 	}
 	if len(localTxs) > 0 {
