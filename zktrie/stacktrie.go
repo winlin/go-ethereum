@@ -212,11 +212,8 @@ func (st *StackTrie) hash() {
 	st.nodeType = hashedNode
 	st.nodeHash, err = n.NodeHash()
 	if err != nil {
-		fmt.Printf("err: %v", err)
 		log.Error(fmt.Sprintf("Unhandled stack trie error: %v", err))
 		return
-	} else if st.nodeHash == nil {
-		fmt.Println("empty node hash???")
 	}
 
 	if st.db != nil {
@@ -231,11 +228,6 @@ func (st *StackTrie) hash() {
 // Hash returns the hash of the current node
 func (st *StackTrie) Hash() common.Hash {
 	st.hash()
-	if st.nodeHash == nil {
-		fmt.Println("???")
-	}
-	fmt.Println("???")
-	log.Warn(fmt.Sprintf("raw node hash: %v", st.nodeHash[:]))
 	return common.BytesToHash(st.nodeHash.Bytes())
 }
 
