@@ -1,6 +1,7 @@
 package zktrie
 
 import (
+	itrie "github.com/scroll-tech/zktrie/trie"
 	itypes "github.com/scroll-tech/zktrie/types"
 
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
@@ -64,6 +65,16 @@ func KeybytesToHashKey(b []byte) *itypes.Hash {
 	copy(h[:], b)
 	reverseBitInPlace(h[:])
 	return &h
+}
+
+func KeybytesToHashKeyAndCheck(b []byte) (*itypes.Hash, error) {
+	var h itypes.Hash
+	copy(h[:], b)
+	reverseBitInPlace(h[:])
+	if !itypes.CheckBigIntInField(h.BigInt()) {
+		return nil, itrie.ErrInvalidField
+	}
+	return &h, nil
 }
 
 func HashKeyToKeybytes(h *itypes.Hash) []byte {

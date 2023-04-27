@@ -87,6 +87,10 @@ func NewStackTrie(db ethdb.KeyValueWriter) *StackTrie {
 }
 
 func (st *StackTrie) TryUpdate(key, value []byte) error {
+	if _, err := KeybytesToHashKeyAndCheck(key); err != nil {
+		return err
+	}
+
 	path := NewBinaryPathFromKeyBytes(key)
 	if len(value) == 0 {
 		panic("deletion not supported")
@@ -102,6 +106,11 @@ func (st *StackTrie) Update(key, value []byte) {
 }
 
 func (st *StackTrie) TryUpdateAccount(key []byte, account *types.StateAccount) error {
+	//TODO: cache the hash!
+	if _, err := KeybytesToHashKeyAndCheck(key); err != nil {
+		return err
+	}
+
 	path := NewBinaryPathFromKeyBytes(key)
 	value, flag := account.MarshalFields()
 	st.insert(path, flag, value)
