@@ -34,9 +34,8 @@ var (
 	// emptyRoot is the known root hash of an empty trie.
 	emptyRoot = common.Hash{}
 
-	//TODO
 	// emptyState is the known hash of an empty state trie entry.
-	emptyState = common.HexToHash("implement me!!")
+	//emptyState = common.HexToHash("implement me!!")
 )
 
 // LeafCallback is a callback type invoked when a trie operation reaches a leaf
@@ -171,9 +170,16 @@ func (t *Trie) Hash() common.Hash {
 	return hash
 }
 
+func (t *Trie) root() (*itrie.Node, error) {
+	return t.impl.GetNode(t.impl.Root())
+}
+
+func (t *Trie) getNodeByHash(hash *itypes.Hash) (*itrie.Node, error) {
+	return t.impl.GetNode(hash)
+}
+
 // NodeIterator returns an iterator that returns nodes of the underlying trie. Iteration
 // starts at the key after the given start key.
 func (t *Trie) NodeIterator(start []byte) trie.NodeIterator {
-	/// FIXME
-	panic("not implemented")
+	return newNodeIterator(t, start)
 }
