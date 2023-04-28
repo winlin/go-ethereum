@@ -7,42 +7,35 @@ import (
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
 )
 
-type BinaryPath struct {
-	d    []byte
-	size int
-}
-
 func keyBytesToHex(b []byte) string {
 	return hexutil.Encode(b)
 }
 
-func NewBinaryPathFromKeyBytes(b []byte) *BinaryPath {
-	d := make([]byte, len(b))
-	copy(d, b)
-	return &BinaryPath{
-		size: len(b) * 8,
-		d:    d,
+func keybytesToBinary(b []byte) []byte {
+	d := make([]byte, 0, 8*len(b))
+	for i := 0; i < len(b); i++ {
+		for j := 0; j < 8; j++ {
+			if b[i]&(1<<(7-j)) == 0 {
+				d = append(d, 0)
+			} else {
+				d = append(d, 1)
+			}
+		}
 	}
+	return d
 }
 
-func (bp *BinaryPath) Size() int {
-	return bp.size
-}
-
-func (bp *BinaryPath) Pos(i int) int8 {
-	if (bp.d[i/8] & (1 << (7 - (i % 8)))) != 0 {
-		return 1
-	} else {
-		return 0
-	}
-}
-
-func (bp *BinaryPath) ToKeyBytes() []byte {
-	if bp.size%8 != 0 {
+func BinaryToKeybytes(b []byte) []byte {
+	if len(b)%8 != 0 {
 		panic("can't convert binary key whose size is not multiple of 8")
 	}
-	d := make([]byte, len(bp.d))
-	copy(d, bp.d)
+	d := make([]byte, len(b)/8)
+	for i := 0; i < len(b)/8; i++ {
+		d[i] = 0
+		for j := 0; j < 8; j++ {
+			d[i] |= b[i*8+j] << (7 - j)
+		}
+	}
 	return d
 }
 
@@ -82,4 +75,9 @@ func HashKeyToKeybytes(h *itypes.Hash) []byte {
 	copy(b, h[:])
 	reverseBitInPlace(b)
 	return b
+}
+
+func HashKeyToBinary(h *itypes.Hash) []byte {
+	kb := HashKeyToKeybytes(h)
+	return keybytesToBinary(kb)
 }

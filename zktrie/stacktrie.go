@@ -67,9 +67,9 @@ type StackTrie struct {
 	db       ethdb.KeyValueWriter // Pointer to the commit db, can be nil
 
 	// properties for leaf node
-	val  []itypes.Byte32
-	flag uint32
-	key  *BinaryPath
+	val       []itypes.Byte32
+	flag      uint32
+	binaryKey []byte
 
 	// properties for parent node
 	children [2]*StackTrie
@@ -91,11 +91,11 @@ func (st *StackTrie) TryUpdate(key, value []byte) error {
 		return err
 	}
 
-	path := NewBinaryPathFromKeyBytes(key)
+	binary := keybytesToBinary(key)
 	if len(value) == 0 {
 		panic("deletion not supported")
 	}
-	st.insert(path, 1, []itypes.Byte32{*itypes.NewByte32FromBytes(value)})
+	st.insert(binary, 1, []itypes.Byte32{*itypes.NewByte32FromBytes(value)})
 	return nil
 }
 
@@ -111,9 +111,9 @@ func (st *StackTrie) TryUpdateAccount(key []byte, account *types.StateAccount) e
 		return err
 	}
 
-	path := NewBinaryPathFromKeyBytes(key)
+	binary := keybytesToBinary(key)
 	value, flag := account.MarshalFields()
-	st.insert(path, flag, value)
+	st.insert(binary, flag, value)
 	return nil
 }
 
@@ -125,7 +125,7 @@ func (st *StackTrie) UpdateAccount(key []byte, account *types.StateAccount) {
 
 func (st *StackTrie) Reset() {
 	st.db = nil
-	st.key = nil
+	st.binaryKey = nil
 	st.val = nil
 	st.depth = 0
 	st.nodeHash = nil
@@ -135,14 +135,14 @@ func (st *StackTrie) Reset() {
 	st.nodeType = emptyNode
 }
 
-func newLeafNode(depth int, key *BinaryPath, flag uint32, value []itypes.Byte32, db ethdb.KeyValueWriter) *StackTrie {
+func newLeafNode(depth int, binaryKey []byte, flag uint32, value []itypes.Byte32, db ethdb.KeyValueWriter) *StackTrie {
 	return &StackTrie{
-		nodeType: leafNode,
-		depth:    depth,
-		key:      key,
-		flag:     flag,
-		val:      value,
-		db:       db,
+		nodeType:  leafNode,
+		depth:     depth,
+		binaryKey: binaryKey,
+		flag:      flag,
+		val:       value,
+		db:        db,
 	}
 }
 
@@ -153,38 +153,38 @@ func newEmptyNode(depth int, db ethdb.KeyValueWriter) *StackTrie {
 	}
 }
 
-func (st *StackTrie) insert(path *BinaryPath, flag uint32, value []itypes.Byte32) {
+func (st *StackTrie) insert(binary []byte, flag uint32, value []itypes.Byte32) {
 	switch st.nodeType {
 	case parentNode:
-		idx := path.Pos(st.depth)
+		idx := binary[st.depth]
 		if idx == 1 {
 			st.children[0].hash()
 		}
-		st.children[idx].insert(path, flag, value)
+		st.children[idx].insert(binary, flag, value)
 	case leafNode:
-		if st.depth == st.key.Size() {
+		if st.depth == len(st.binaryKey) {
 			panic("Trying to insert into existing key")
 		}
 
-		origLeaf := newLeafNode(st.depth+1, st.key, flag, st.val, st.db)
-		origIdx := st.key.Pos(st.depth)
+		origLeaf := newLeafNode(st.depth+1, st.binaryKey, flag, st.val, st.db)
+		origIdx := st.binaryKey[st.depth]
 
 		st.nodeType = parentNode
-		st.key = nil
+		st.binaryKey = nil
 		st.val = nil
 		st.children[origIdx] = origLeaf
 		st.children[origIdx^1] = newEmptyNode(st.depth+1, st.db)
 
-		newIdx := path.Pos(st.depth)
+		newIdx := binary[st.depth]
 		if origIdx == newIdx {
-			st.children[newIdx].insert(path, flag, value)
+			st.children[newIdx].insert(binary, flag, value)
 		} else {
-			st.children[newIdx] = newLeafNode(st.depth+1, path, flag, value, st.db)
+			st.children[newIdx] = newLeafNode(st.depth+1, binary, flag, value, st.db)
 		}
 	case emptyNode:
 		st.nodeType = leafNode
 		st.flag = flag
-		st.key = path
+		st.binaryKey = binary
 		st.val = value
 	case hashedNode:
 		panic("trying to insert into hashed node")
@@ -212,7 +212,8 @@ func (st *StackTrie) hash() {
 		st.children[0] = nil
 		st.children[1] = nil
 	case leafNode:
-		n = itrie.NewLeafNode(KeybytesToHashKey(st.key.ToKeyBytes()), st.flag, st.val)
+		//TODO: convert binary to hash key directly
+		n = itrie.NewLeafNode(KeybytesToHashKey(BinaryToKeybytes(st.binaryKey)), st.flag, st.val)
 	case emptyNode:
 		n = itrie.NewEmptyNode()
 	default:
@@ -260,7 +261,7 @@ func (st *StackTrie) String() string {
 	case parentNode:
 		return fmt.Sprintf("Parent(%s, %s)", st.children[0], st.children[1])
 	case leafNode:
-		return fmt.Sprintf("Leaf(%s)", keyBytesToHex(st.key.ToKeyBytes()))
+		return fmt.Sprintf("Leaf(%s)", keyBytesToHex(BinaryToKeybytes(st.binaryKey)))
 	case hashedNode:
 		return fmt.Sprintf("Hashed(%s)", st.nodeHash.Hex())
 	case emptyNode:

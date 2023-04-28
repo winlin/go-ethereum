@@ -113,9 +113,9 @@ func (t *Trie) ProveWithDeletion(key []byte, fromLevel uint, proofDb ethdb.KeyVa
 // key in a trie with the given root hash. VerifyProof returns an error if the
 // proof contains invalid trie nodes or the wrong value.
 func VerifyProof(rootHash common.Hash, key []byte, proofDb ethdb.KeyValueReader) (value []byte, err error) {
-	path := NewBinaryPathFromKeyBytes(key)
+	path := keybytesToBinary(key)
 	wantHash := zktNodeHash(rootHash)
-	for i := 0; i < path.Size(); i++ {
+	for i := 0; i < len(path); i++ {
 		buf, _ := proofDb.Get(wantHash[:])
 		if buf == nil {
 			return nil, fmt.Errorf("proof node %d (hash %064x) missing", i, wantHash)
@@ -134,7 +134,7 @@ func VerifyProof(rootHash common.Hash, key []byte, proofDb ethdb.KeyValueReader)
 			// We found a leaf whose entry didn't match hIndex
 			return nil, nil
 		case itrie.NodeTypeParent:
-			if path.Pos(i) > 0 {
+			if path[i] > 0 {
 				wantHash = n.ChildR
 			} else {
 				wantHash = n.ChildL
