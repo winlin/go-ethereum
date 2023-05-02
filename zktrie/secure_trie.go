@@ -33,6 +33,9 @@ var magicHash []byte = []byte("THIS IS THE MAGIC INDEX FOR ZKTRIE")
 type SecureTrie struct {
 	trie *itrie.ZkTrie
 	db   *Database
+
+	// trieForIterator is constructed for iterator
+	trieForIterator *Trie
 }
 
 func sanityCheckKeyBytes(b []byte, accountAddress bool, storageKey bool) {
@@ -48,11 +51,16 @@ func NewSecure(root common.Hash, db *Database) (*SecureTrie, error) {
 	if db == nil {
 		panic("zktrie.NewSecure called without a database")
 	}
-	t, err := itrie.NewZkTrie(*itypes.NewByte32FromBytes(root.Bytes()), db)
+	trie, err := itrie.NewZkTrie(*itypes.NewByte32FromBytes(root.Bytes()), db)
 	if err != nil {
 		return nil, err
 	}
-	return &SecureTrie{trie: t, db: db}, nil
+
+	trieForIterator, err := New(root, db)
+	if err != nil {
+		return nil, err
+	}
+	return &SecureTrie{trie: trie, db: db, trieForIterator: trieForIterator}, nil
 }
 
 // Get returns the value for key stored in the trie.
@@ -155,6 +163,5 @@ func (t *SecureTrie) Copy() *SecureTrie {
 // NodeIterator returns an iterator that returns nodes of the underlying trie. Iteration
 // starts at the key after the given start key.
 func (t *SecureTrie) NodeIterator(start []byte) NodeIterator {
-	/// FIXME
-	panic("not implemented")
+	return newNodeIterator(t.trieForIterator, start)
 }
