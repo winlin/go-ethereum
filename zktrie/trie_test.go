@@ -87,33 +87,33 @@ func TestMissingNode(t *testing.T) {
 	triedb := NewDatabase(diskdb)
 
 	trie, _ := New(common.Hash{}, triedb)
-	updateString(trie, "120000", "qwerqwerqwerqwerqwerqwerqwerqwer")
-	updateString(trie, "123456", "asdfasdfasdfasdfasdfasdfasdfasdf")
+	updateString(trie, "12000000000000000000000000000000", "qwerqwerqwerqwerqwerqwerqwerqwer")
+	updateString(trie, "12345600000000000000000000000000", "asdfasdfasdfasdfasdfasdfasdfasdf")
 	root, _, _ := trie.Commit(nil)
 	triedb.Commit(root, true, nil)
 
 	trie, _ = New(root, triedb)
-	_, err := trie.TryGet([]byte("120000"))
+	_, err := trie.TryGet([]byte("12000000000000000000000000000000"))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	trie, _ = New(root, triedb)
-	_, err = trie.TryGet([]byte("120099"))
+	_, err = trie.TryGet([]byte("12009900000000000000000000000000"))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	trie, _ = New(root, triedb)
-	_, err = trie.TryGet([]byte("123456"))
+	_, err = trie.TryGet([]byte("12345600000000000000000000000000"))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	trie, _ = New(root, triedb)
-	err = trie.TryUpdate([]byte("120099"), []byte("zxcvzxcvzxcvzxcvzxcvzxcvzxcvzxcv"))
+	err = trie.TryUpdate([]byte("12009900000000000000000000000000"), []byte("zxcvzxcvzxcvzxcvzxcvzxcvzxcvzxcv"))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	trie, _ = New(root, triedb)
-	err = trie.TryDelete([]byte("123456"))
+	err = trie.TryDelete([]byte("12345600000000000000000000000000"))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -131,20 +131,20 @@ func TestMissingNode(t *testing.T) {
 func TestInsert(t *testing.T) {
 	trie := newEmpty()
 
-	updateString(trie, "doe", "reindeer")
-	updateString(trie, "dog", "puppy")
-	updateString(trie, "dogglesworth", "cat")
+	updateString(trie, "doe00000000000000000000000000000", "reindeer")
+	updateString(trie, "dog00000000000000000000000000000", "puppy")
+	updateString(trie, "dogglesworth00000000000000000000", "cat")
 
-	exp := common.HexToHash("1bed2fdc784ba5498d7afb5c5271d1f61e41474ccaa5e87d6ac53ae5d89272d0")
+	exp := common.HexToHash("19c4352b0146c60b62d17a2195ec4e0d73fc241c4c49f7c0213bfe81bebf3180")
 	root := trie.Hash()
 	if root != exp {
 		t.Errorf("case 1: exp %x got %x", exp, root)
 	}
 
 	trie = newEmpty()
-	updateString(trie, "A", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+	updateString(trie, "A0000000000000000000000000000000", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 
-	exp = common.HexToHash("1c2bd070be11039b003a833cdb14cee99a304c3c98331b70f1463522da9372d8")
+	exp = common.HexToHash("02770c4fa404a639a009590050da26aa360930dddfa4c7d789f9bb6cdff5ef03")
 	root, _, err := trie.Commit(nil)
 	if err != nil {
 		t.Fatalf("commit error: %v", err)
@@ -158,12 +158,12 @@ func TestGet(t *testing.T) {
 	trie := newEmpty()
 	// zk-trie modifies pass-in value to be 32-byte long
 	var value32bytes = "xxxxxxxxxxxxxxxxxxxxxxxxxxxpuppy"
-	updateString(trie, "doe", "reindeer")
-	updateString(trie, "dog", value32bytes)
-	updateString(trie, "dogglesworth", "cat")
+	updateString(trie, "doe00000000000000000000000000000", "reindeer")
+	updateString(trie, "dog00000000000000000000000000000", value32bytes)
+	updateString(trie, "dogglesworth00000000000000000000", "cat")
 
 	for i := 0; i < 2; i++ {
-		res := getString(trie, "dog")
+		res := getString(trie, "dog00000000000000000000000000000")
 		if !bytes.Equal(res, []byte(value32bytes)) {
 			t.Errorf("expected %x got %x", value32bytes, res)
 		}
@@ -183,14 +183,14 @@ func TestGet(t *testing.T) {
 func TestDelete(t *testing.T) {
 	trie := newEmpty()
 	vals := []struct{ k, v string }{
-		{"do", "verb"},
-		{"ether", "wookiedoo"},
-		{"horse", "stallion"},
-		{"shaman", "horse"},
-		{"doge", "coin"},
-		{"ether", ""},
-		{"dog", "puppy"},
-		{"shaman", ""},
+		{"do000000000000000000000000000000", "verb"},
+		{"ether000000000000000000000000000", "wookiedoo"},
+		{"horse000000000000000000000000000", "stallion"},
+		{"shaman00000000000000000000000000", "horse"},
+		{"doge0000000000000000000000000000", "coin"},
+		{"ether000000000000000000000000000", ""},
+		{"dog00000000000000000000000000000", "puppy"},
+		{"shaman00000000000000000000000000", ""},
 	}
 	for _, val := range vals {
 		if val.v != "" {
@@ -201,7 +201,7 @@ func TestDelete(t *testing.T) {
 	}
 
 	hash := trie.Hash()
-	exp := common.HexToHash("11b8e80a5a824c6df980fe97d3902ea931771d2b63d0804ee10ffdf09840a6af")
+	exp := common.HexToHash("135b24c8e837dc5fd30d53217fe92a24073435adec97e24dd58cb7f1b4a4044e")
 	if hash != exp {
 		t.Errorf("expected %x got %x", exp, hash)
 	}
@@ -211,21 +211,21 @@ func TestEmptyValues(t *testing.T) {
 	trie := newEmpty()
 
 	vals := []struct{ k, v string }{
-		{"do", "verb"},
-		{"ether", "wookiedoo"},
-		{"horse", "stallion"},
-		{"shaman", "horse"},
-		{"doge", "coin"},
-		{"ether", ""},
-		{"dog", "puppy"},
-		{"shaman", ""},
+		{"do000000000000000000000000000000", "verb"},
+		{"ether000000000000000000000000000", "wookiedoo"},
+		{"horse000000000000000000000000000", "stallion"},
+		{"shaman00000000000000000000000000", "horse"},
+		{"doge0000000000000000000000000000", "coin"},
+		{"ether000000000000000000000000000", ""},
+		{"dog00000000000000000000000000000", "puppy"},
+		{"shaman00000000000000000000000000", ""},
 	}
 	for _, val := range vals {
 		updateString(trie, val.k, val.v)
 	}
 
 	hash := trie.Hash()
-	exp := common.HexToHash("271bcfa4af8b43d178fe1a5f55a2812ad8d146ff92ad01d496674a6fd5ab0d19")
+	exp := common.HexToHash("1638289eef5e066f49744706057781b954c5d9ef9f19fa49e2c8df3b6adbfe87")
 	if hash != exp {
 		t.Errorf("expected %x got %x", exp, hash)
 	}
@@ -234,13 +234,13 @@ func TestEmptyValues(t *testing.T) {
 func TestReplication(t *testing.T) {
 	trie := newEmpty()
 	vals := []struct{ k, v string }{
-		{"do", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxverb"},
-		{"ether", "xxxxxxxxxxxxxxxxxxxxxxxwookiedoo"},
-		{"horse", "xxxxxxxxxxxxxxxxxxxxxxxxstallion"},
-		{"shaman", "xxxxxxxxxxxxxxxxxxxxxxxxxxxhorse"},
-		{"doge", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxcoin"},
-		{"dog", "xxxxxxxxxxxxxxxxxxxxxxxxxxxpuppy"},
-		{"somethingveryoddindeedthis is", "xxxxxxxxxxxxxxxxxmyothernodedata"},
+		{"do000000000000000000000000000000", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxverb"},
+		{"ether000000000000000000000000000", "xxxxxxxxxxxxxxxxxxxxxxxwookiedoo"},
+		{"horse000000000000000000000000000", "xxxxxxxxxxxxxxxxxxxxxxxxstallion"},
+		{"shaman00000000000000000000000000", "xxxxxxxxxxxxxxxxxxxxxxxxxxxhorse"},
+		{"doge0000000000000000000000000000", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxcoin"},
+		{"dog00000000000000000000000000000", "xxxxxxxxxxxxxxxxxxxxxxxxxxxpuppy"},
+		{"somethingveryoddindeedthis is000", "xxxxxxxxxxxxxxxxxmyothernodedata"},
 	}
 	for _, val := range vals {
 		updateString(trie, val.k, val.v)
