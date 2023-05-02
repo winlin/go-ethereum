@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"container/heap"
 	"errors"
-	"fmt"
 
 	itrie "github.com/scroll-tech/zktrie/trie"
 	itypes "github.com/scroll-tech/zktrie/types"
@@ -160,10 +159,6 @@ func newNodeIterator(trie *Trie, start []byte) NodeIterator {
 	for len(tmp)%8 != 0 {
 		tmp = append(tmp, 0)
 	}
-	fmt.Printf("start %q, seek path %s, path len: %d, stack len: %d\n", start, BinaryToKeybytes(tmp), len(it.binaryPath), len(it.stack))
-	if len(it.stack) > 0 {
-		fmt.Printf("type: %d\n", it.currentNode().Type)
-	}
 	return it
 }
 
@@ -286,7 +281,6 @@ func (it *nodeIterator) seek(key []byte) error {
 
 	for {
 		state, path, err := it.peekSeek(binaryKey)
-		//fmt.Printf("%q vs %q: %b", BinaryToKeybytes(path), BinaryToKeybytes(key), bytes.Compare(path, key))
 		if err != nil {
 			return seekError{key, err}
 		} else if state == nil || bytes.Compare(path, binaryKey) >= 0 {
@@ -322,10 +316,8 @@ func (it *nodeIterator) peek(descend bool) (*nodeIteratorState, []byte, error) {
 	}
 
 	// Continue iteration to the next child
-	fmt.Printf("peek enter, stack: %d\n", len(it.stack))
 	for len(it.stack) > 0 {
 		parent := it.stack[len(it.stack)-1]
-		fmt.Println(parent.hash, parent.pathlen, len(it.binaryPath))
 		if parent.node.Type == itrie.NodeTypeParent && parent.index < 2 {
 			nodeHash := parent.node.ChildL
 			if parent.index == 1 {
@@ -347,14 +339,11 @@ func (it *nodeIterator) peek(descend bool) (*nodeIteratorState, []byte, error) {
 			if node.Type == itrie.NodeTypeLeaf {
 				binaryPath = HashKeyToBinary(node.NodeKey)
 			} else {
-				//fmt.Printf("from: %v\n", len(it.binaryPath))
 				binaryPath = append(it.binaryPath, parent.index)
-				//fmt.Printf("to: %v\n", len(binaryPath))
 			}
 			return state, binaryPath, nil
 		}
 		// No more child nodes, move back up.
-		fmt.Println("pop")
 		it.pop()
 	}
 	return nil, nil, errIteratorEnd
