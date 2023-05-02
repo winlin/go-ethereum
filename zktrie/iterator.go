@@ -296,7 +296,7 @@ func (it *nodeIterator) init() (*nodeIteratorState, []byte, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	state := &nodeIteratorState{node: root, index: 0}
+	state := &nodeIteratorState{hash: it.trie.Hash(), node: root, index: 0}
 	if root.Type == itrie.NodeTypeLeaf {
 		return state, HashKeyToBinary(root.NodeKey), nil
 	}
