@@ -57,8 +57,8 @@ type LeafCallback func(paths [][]byte, hexpath []byte, leaf []byte, parent commo
 type Trie struct {
 	db   *Database
 	impl *itrie.ZkTrieImpl
-	// tr is constructed for ZkTrie.ProofWithDeletion calling
-	tr *itrie.ZkTrie
+	// secureTrie is constructed for ZkTrie.ProofWithDeletion calling
+	secureTrie *itrie.ZkTrie
 }
 
 func unsafeSetImpl(zkTrie *itrie.ZkTrie, impl *itrie.ZkTrieImpl) {
@@ -75,17 +75,24 @@ func New(root common.Hash, db *Database) (*Trie, error) {
 		panic("zktrie.New called without a database")
 	}
 
-	// for proof generation
 	impl, err := itrie.NewZkTrieImplWithRoot(db, zktNodeHash(root), itrie.NodeKeyValidBytes*8)
 	if err != nil {
 		return nil, err
+	}
+
+	return NewTrieWithImpl(impl, db), nil
+}
+
+func NewTrieWithImpl(impl *itrie.ZkTrieImpl, db *Database) *Trie {
+	if db == nil {
+		panic("zktrie.New called without a database")
 	}
 
 	tr := &itrie.ZkTrie{}
 	//TODO: it is ugly and dangerous, fix it in the zktrie repo later!
 	unsafeSetImpl(tr, impl)
 
-	return &Trie{impl: impl, tr: tr, db: db}, nil
+	return &Trie{impl: impl, secureTrie: tr, db: db}
 }
 
 // Get returns the value for key stored in the trie.

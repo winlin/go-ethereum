@@ -88,7 +88,7 @@ func (t *Trie) ProveWithDeletion(key []byte, fromLevel uint, proofDb ethdb.KeyVa
 	// standardize the key format, which is the same as trie interface
 	key = itypes.ReverseByteOrder(key)
 	reverseBitInPlace(key)
-	err = t.tr.ProveWithDeletion(key, fromLevel,
+	err = t.secureTrie.ProveWithDeletion(key, fromLevel,
 		func(n *itrie.Node) error {
 			nodeHash, err := n.NodeHash()
 			if err != nil {

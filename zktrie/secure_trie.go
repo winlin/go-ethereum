@@ -51,16 +51,15 @@ func NewSecure(root common.Hash, db *Database) (*SecureTrie, error) {
 	if db == nil {
 		panic("zktrie.NewSecure called without a database")
 	}
-	trie, err := itrie.NewZkTrie(*itypes.NewByte32FromBytes(root.Bytes()), db)
+
+	// for proof generation
+	impl, err := itrie.NewZkTrieImplWithRoot(db, zktNodeHash(root), itrie.NodeKeyValidBytes*8)
 	if err != nil {
 		return nil, err
 	}
 
-	trieForIterator, err := New(root, db)
-	if err != nil {
-		return nil, err
-	}
-	return &SecureTrie{trie: trie, db: db, trieForIterator: trieForIterator}, nil
+	trie := NewTrieWithImpl(impl, db)
+	return &SecureTrie{trie: trie.secureTrie, db: db, trieForIterator: trie}, nil
 }
 
 // Get returns the value for key stored in the trie.
