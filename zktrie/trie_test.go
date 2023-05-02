@@ -135,7 +135,7 @@ func TestInsert(t *testing.T) {
 	updateString(trie, "dog", "puppy")
 	updateString(trie, "dogglesworth", "cat")
 
-	exp := common.HexToHash("19f5517d8365c9b9179aa7ed659a8832731a841597655212f7511b35a061279b")
+	exp := common.HexToHash("1bed2fdc784ba5498d7afb5c5271d1f61e41474ccaa5e87d6ac53ae5d89272d0")
 	root := trie.Hash()
 	if root != exp {
 		t.Errorf("case 1: exp %x got %x", exp, root)
@@ -144,7 +144,7 @@ func TestInsert(t *testing.T) {
 	trie = newEmpty()
 	updateString(trie, "A", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 
-	exp = common.HexToHash("11e210f575f9d150f1e878795551150219c4c80550bdc9dd29233f7cd87efe17")
+	exp = common.HexToHash("1c2bd070be11039b003a833cdb14cee99a304c3c98331b70f1463522da9372d8")
 	root, _, err := trie.Commit(nil)
 	if err != nil {
 		t.Fatalf("commit error: %v", err)
@@ -201,7 +201,7 @@ func TestDelete(t *testing.T) {
 	}
 
 	hash := trie.Hash()
-	exp := common.HexToHash("15eac0c283c26710dc9303aff3d4a90dabef1a55989335bb9e970a4d27870d1b")
+	exp := common.HexToHash("11b8e80a5a824c6df980fe97d3902ea931771d2b63d0804ee10ffdf09840a6af")
 	if hash != exp {
 		t.Errorf("expected %x got %x", exp, hash)
 	}
@@ -225,7 +225,7 @@ func TestEmptyValues(t *testing.T) {
 	}
 
 	hash := trie.Hash()
-	exp := common.HexToHash("1162454b37d69ef1bca0a8968e90ca88942c5bb95dcb2fe6bf35a8ea1056d8df")
+	exp := common.HexToHash("271bcfa4af8b43d178fe1a5f55a2812ad8d146ff92ad01d496674a6fd5ab0d19")
 	if hash != exp {
 		t.Errorf("expected %x got %x", exp, hash)
 	}
@@ -489,7 +489,7 @@ func TestCommitAfterHash(t *testing.T) {
 	trie.Hash()
 	trie.Commit(nil)
 	root := trie.Hash()
-	exp := common.HexToHash("14b8f675075f485d1b0b3e3a19410dc1b16ab24f4dce952536f70a9874e29d1d")
+	exp := common.HexToHash("2ed0586dd148735d1345859e44f2961b8adf7c139c88dafe5f3e4eab556e93e8")
 	if exp != root {
 		t.Errorf("got %x, exp %x", root, exp)
 	}
