@@ -33,3 +33,19 @@ type MissingNodeError struct {
 func (err *MissingNodeError) Error() string {
 	return fmt.Sprintf("missing trie node %x (path %x)", err.NodeHash, err.Path)
 }
+
+type InvalidKeyLengthError struct {
+	Key    []byte
+	Expect int
+}
+
+func (err *InvalidKeyLengthError) Error() string {
+	return fmt.Sprintf("invalid key length, expect %d, got %d, key: [%q]", err.Expect, len(err.Key), err.Key)
+}
+
+func CheckKeyLength(key []byte, expect int) error {
+	if len(key) != expect {
+		return &InvalidKeyLengthError{Key: key, Expect: expect}
+	}
+	return nil
+}

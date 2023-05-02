@@ -91,7 +91,7 @@ func New(root common.Hash, db *Database) (*Trie, error) {
 // Get returns the value for key stored in the trie.
 // The value bytes must not be modified by the caller.
 func (t *Trie) Get(key []byte) []byte {
-	res, err := t.impl.TryGet(KeybytesToHashKey(key))
+	res, err := t.TryGet(key)
 	if err != nil {
 		log.Error(fmt.Sprintf("Unhandled trie error: %v", err))
 	}
@@ -99,6 +99,9 @@ func (t *Trie) Get(key []byte) []byte {
 }
 
 func (t *Trie) TryGet(key []byte) ([]byte, error) {
+	if err := CheckKeyLength(key, 32); err != nil {
+		return nil, err
+	}
 	return t.impl.TryGet(KeybytesToHashKey(key))
 }
 
@@ -123,6 +126,9 @@ func (t *Trie) UpdateAccount(key []byte, account *types.StateAccount) {
 // TryUpdateAccount will abstract the write of an account to the
 // secure trie.
 func (t *Trie) TryUpdateAccount(key []byte, acc *types.StateAccount) error {
+	if err := CheckKeyLength(key, 32); err != nil {
+		return err
+	}
 	value, flag := acc.MarshalFields()
 	return t.impl.TryUpdate(KeybytesToHashKey(key), flag, value)
 }
@@ -130,6 +136,9 @@ func (t *Trie) TryUpdateAccount(key []byte, acc *types.StateAccount) error {
 // NOTE: value is restricted to length of bytes32.
 // we override the underlying itrie's TryUpdate method
 func (t *Trie) TryUpdate(key, value []byte) error {
+	if err := CheckKeyLength(key, 32); err != nil {
+		return err
+	}
 	return t.impl.TryUpdate(KeybytesToHashKey(key), 1, []itypes.Byte32{*itypes.NewByte32FromBytes(value)})
 }
 

@@ -87,6 +87,9 @@ func NewStackTrie(db ethdb.KeyValueWriter) *StackTrie {
 }
 
 func (st *StackTrie) TryUpdate(key, value []byte) error {
+	if err := CheckKeyLength(key, 32); err != nil {
+		return err
+	}
 	if _, err := KeybytesToHashKeyAndCheck(key); err != nil {
 		return err
 	}
@@ -106,6 +109,9 @@ func (st *StackTrie) Update(key, value []byte) {
 }
 
 func (st *StackTrie) TryUpdateAccount(key []byte, account *types.StateAccount) error {
+	if err := CheckKeyLength(key, 32); err != nil {
+		return err
+	}
 	//TODO: cache the hash!
 	if _, err := KeybytesToHashKeyAndCheck(key); err != nil {
 		return err
