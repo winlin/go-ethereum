@@ -120,11 +120,21 @@ func (t *SecureTrie) TryDelete(key []byte) error {
 
 // GetKey returns the preimage of a hashed key that was
 // previously used to store a value.
-func (t *SecureTrie) GetKey(kHashBytes []byte) []byte {
+func (t *SecureTrie) GetKey(key []byte) []byte {
 	// TODO: use a kv cache in memory
-	k, err := itypes.NewBigIntFromHashBytes(kHashBytes)
+	if err := CheckKeyLength(key, 32); err != nil {
+		log.Error(fmt.Sprintf("Unhandled trie error: %v", err))
+		return nil
+	}
+	hash, err := KeybytesToHashKeyAndCheck(key)
 	if err != nil {
 		log.Error(fmt.Sprintf("Unhandled trie error: %v", err))
+		return nil
+	}
+	k, err := itypes.NewBigIntFromHashBytes(hash.Bytes())
+	if err != nil {
+		log.Error(fmt.Sprintf("Unhandled trie error: %v", err))
+		return nil
 	}
 	if t.db.preimages != nil {
 		return t.db.preimages.preimage(common.BytesToHash(k.Bytes()))
