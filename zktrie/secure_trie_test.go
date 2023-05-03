@@ -19,6 +19,7 @@ package zktrie
 import (
 	"bytes"
 	"encoding/binary"
+	itypes "github.com/scroll-tech/zktrie/types"
 	"io/ioutil"
 	"os"
 	"runtime"
@@ -27,12 +28,19 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	itypes "github.com/scroll-tech/zktrie/types"
-
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/ethdb/leveldb"
 	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
 )
+
+// convert key representation from Trie to SecureTrie
+func toSecureKey(b []byte) []byte {
+	if k, err := itypes.ToSecureKey(b); err != nil {
+		return nil
+	} else {
+		return HashKeyToKeybytes(itypes.NewHashFromBigInt(k))
+	}
+}
 
 func newEmptySecureTrie() *SecureTrie {
 	trie, _ := NewSecure(
@@ -102,19 +110,20 @@ func TestTrieDelete(t *testing.T) {
 
 func TestTrieGetKey(t *testing.T) {
 	trie := newEmptySecureTrie()
-	key := []byte("0a1b2c3d4e5f6g7h8i9j0a1b2c3d4e5f")
-	value := []byte("9j8i7h6g5f4e3d2c1b0a9j8i7h6g5f4e")
-	trie.Update(key, value)
+	for i := byte(1); i < 255; i++ {
+		key := common.RightPadBytes([]byte{i}, 32)
+		value := common.LeftPadBytes([]byte{i}, 32)
+		err := trie.TryUpdate(key, value)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	kPreimage := itypes.NewByte32FromBytesPaddingZero(key)
-	kHash, err := kPreimage.Hash()
-	assert.Nil(t, err)
-
-	if !bytes.Equal(trie.Get(key), value) {
-		t.Errorf("Get did not return bar")
-	}
-	if k := trie.GetKey(kHash.Bytes()); !bytes.Equal(k, key) {
-		t.Errorf("GetKey returned %q, want %q", k, key)
+		if !bytes.Equal(trie.Get(key), value) {
+			t.Errorf("Get did not return bar")
+		}
+		if k := trie.GetKey(toSecureKey(key)); !bytes.Equal(k, key) {
+			t.Errorf("GetKey returned %q, want %q", k, key)
+		}
 	}
 }
 

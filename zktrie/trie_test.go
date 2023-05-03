@@ -52,6 +52,40 @@ func newEmpty() *Trie {
 	return trie
 }
 
+// makeTestTrie create a sample test trie to test node-wise reconstruction.
+func makeTestTrie(t *testing.T) (*Database, *Trie, map[string][]byte) {
+	// Create an empty trie
+	triedb := NewDatabase(memorydb.New())
+	trie, _ := New(common.Hash{}, triedb)
+
+	// Fill it with some arbitrary data
+	content := make(map[string][]byte)
+	for i := byte(0); i < 255; i++ {
+		// Map the same data under multiple keys
+		key, val := common.RightPadBytes([]byte{1, i}, 32), []byte{i}
+		content[string(key)] = val
+		trie.Update(key, val)
+
+		key, val = common.RightPadBytes([]byte{2, i}, 32), []byte{i}
+		content[string(key)] = val
+		trie.Update(key, val)
+
+		// Add some other data to inflate the trie
+		for j := byte(3); j < 13; j++ {
+			key, val = common.RightPadBytes([]byte{j, i}, 32), []byte{j, i}
+			content[string(key)] = val
+			trie.Update(key, val)
+		}
+	}
+	_, _, err := trie.Commit(nil)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// Return the generated trie
+	return triedb, trie, content
+}
+
 func TestEmptyTrie(t *testing.T) {
 	var trie Trie
 	res := trie.Hash()

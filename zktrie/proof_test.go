@@ -25,7 +25,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	itypes "github.com/scroll-tech/zktrie/types"
 	zkt "github.com/scroll-tech/zktrie/types"
 
 	"github.com/scroll-tech/go-ethereum/common"
@@ -34,15 +33,6 @@ import (
 
 func init() {
 	mrand.Seed(time.Now().Unix())
-}
-
-// convert key representation from Trie to SecureTrie
-func toProveKey(b []byte) []byte {
-	if k, err := itypes.ToSecureKey(b); err != nil {
-		return nil
-	} else {
-		return HashKeyToKeybytes(itypes.NewHashFromBigInt(k))
-	}
 }
 
 // makeProvers creates Merkle trie provers based on different implementations to
@@ -112,7 +102,7 @@ func TestSecureTrieOneElementProof(t *testing.T) {
 	err := tr.TryUpdate(key, bytes.Repeat([]byte("v"), 32))
 	assert.Nil(t, err)
 	for i, prover := range makeSecureTrieProvers(tr) {
-		secureKey := toProveKey(key)
+		secureKey := toSecureKey(key)
 		proof := prover(secureKey)
 		if proof == nil {
 			t.Fatalf("prover %d: nil proof", i)
@@ -155,7 +145,7 @@ func TestSecureTrieProof(t *testing.T) {
 	root := tr.Hash()
 	for i, prover := range makeSecureTrieProvers(tr) {
 		for _, kv := range vals {
-			secureKey := toProveKey(kv.k)
+			secureKey := toSecureKey(kv.k)
 			proof := prover(secureKey)
 			if proof == nil {
 				t.Fatalf("prover %d: missing key %x while constructing proof", i, secureKey)
@@ -203,7 +193,7 @@ func TestSecureTrieBadProof(t *testing.T) {
 	tr, vals := randomSecureTrie(t, 500)
 	for i, prover := range makeSecureTrieProvers(tr) {
 		for _, kv := range vals {
-			secureKey := toProveKey(kv.k)
+			secureKey := toSecureKey(kv.k)
 			proof := prover(secureKey)
 			if proof == nil {
 				t.Fatalf("prover %d: nil proof", i)
@@ -265,7 +255,7 @@ func TestSecureTrieMissingKeyProof(t *testing.T) {
 
 	for i, key := range []string{"a", "j", "l", "z"} {
 		keyBytes := bytes.Repeat([]byte(key), 32)
-		secureKey := toProveKey(keyBytes)
+		secureKey := toSecureKey(keyBytes)
 		proof := prover(secureKey)
 
 		if proof.Len() != 2 {
@@ -279,6 +269,64 @@ func TestSecureTrieMissingKeyProof(t *testing.T) {
 			t.Fatalf("test %d: verified value mismatch: have %x, want nil", i, val)
 		}
 	}
+}
+
+// Tests that new "proof with deletion" feature
+func TestTrieProofWithDeletion(t *testing.T) {
+	tr, _ := New(common.Hash{}, NewDatabase((memorydb.New())))
+	key1 := zkt.NewByte32FromBytesPaddingZero(append(bytes.Repeat([]byte("k"), 10), bytes.Repeat([]byte("l"), 21)...)).Bytes()
+	key2 := zkt.NewByte32FromBytesPaddingZero(append(bytes.Repeat([]byte("m"), 10), bytes.Repeat([]byte("n"), 21)...)).Bytes()
+
+	err := tr.TryUpdate(key1, bytes.Repeat([]byte("v"), 32))
+	assert.NoError(t, err)
+	err = tr.TryUpdate(key2, bytes.Repeat([]byte("v"), 32))
+	assert.NoError(t, err)
+
+	proof := memorydb.New()
+	assert.NoError(t, err)
+
+	sibling1, err := tr.ProveWithDeletion(key1, 0, proof)
+	assert.NoError(t, err)
+	nd, err := tr.TryGet(key2)
+	assert.NoError(t, err)
+	l := len(sibling1)
+	// a hacking to grep the value part directly from the encoded leaf node,
+	// notice the sibling of key1 is just the leaf of key2
+	assert.Equal(t, sibling1[l-33:l-1], nd)
+
+	notKey := zkt.NewByte32FromBytesPaddingZero(bytes.Repeat([]byte{'x'}, 31)).Bytes()
+	sibling2, err := tr.ProveWithDeletion(notKey, 0, proof)
+	assert.NoError(t, err)
+	assert.Nil(t, sibling2)
+}
+
+func TestSecureTrieProofWithDeletion(t *testing.T) {
+	tr, _ := NewSecure(common.Hash{}, NewDatabase((memorydb.New())))
+	key1 := zkt.NewByte32FromBytesPaddingZero(append(bytes.Repeat([]byte("k"), 10), bytes.Repeat([]byte("l"), 21)...)).Bytes()
+	key2 := zkt.NewByte32FromBytesPaddingZero(append(bytes.Repeat([]byte("m"), 10), bytes.Repeat([]byte("n"), 21)...)).Bytes()
+	secureKey1 := toSecureKey(key1)
+
+	err := tr.TryUpdate(key1, bytes.Repeat([]byte("v"), 32))
+	assert.NoError(t, err)
+	err = tr.TryUpdate(key2, bytes.Repeat([]byte("v"), 32))
+	assert.NoError(t, err)
+
+	proof := memorydb.New()
+	assert.NoError(t, err)
+
+	sibling1, err := tr.ProveWithDeletion(secureKey1, 0, proof)
+	assert.NoError(t, err)
+	nd, err := tr.TryGet(key2)
+	assert.NoError(t, err)
+	l := len(sibling1)
+	// a hacking to grep the value part directly from the encoded leaf node,
+	// notice the sibling of key1 is just the leaf of key2
+	assert.Equal(t, sibling1[l-33:l-1], nd)
+
+	notKey := zkt.NewByte32FromBytesPaddingZero(bytes.Repeat([]byte{'x'}, 31)).Bytes()
+	sibling2, err := tr.ProveWithDeletion(notKey, 0, proof)
+	assert.NoError(t, err)
+	assert.Nil(t, sibling2)
 }
 
 func randBytes(n int) []byte {
@@ -341,62 +389,4 @@ func randomSecureTrie(t *testing.T, n int) (*SecureTrie, map[string]*kv) {
 	}
 
 	return tr, vals
-}
-
-// Tests that new "proof with deletion" feature
-func TestTrieProofWithDeletion(t *testing.T) {
-	tr, _ := New(common.Hash{}, NewDatabase((memorydb.New())))
-	key1 := zkt.NewByte32FromBytesPaddingZero(append(bytes.Repeat([]byte("k"), 10), bytes.Repeat([]byte("l"), 21)...)).Bytes()
-	key2 := zkt.NewByte32FromBytesPaddingZero(append(bytes.Repeat([]byte("m"), 10), bytes.Repeat([]byte("n"), 21)...)).Bytes()
-
-	err := tr.TryUpdate(key1, bytes.Repeat([]byte("v"), 32))
-	assert.NoError(t, err)
-	err = tr.TryUpdate(key2, bytes.Repeat([]byte("v"), 32))
-	assert.NoError(t, err)
-
-	proof := memorydb.New()
-	assert.NoError(t, err)
-
-	sibling1, err := tr.ProveWithDeletion(key1, 0, proof)
-	assert.NoError(t, err)
-	nd, err := tr.TryGet(key2)
-	assert.NoError(t, err)
-	l := len(sibling1)
-	// a hacking to grep the value part directly from the encoded leaf node,
-	// notice the sibling of key1 is just the leaf of key2
-	assert.Equal(t, sibling1[l-33:l-1], nd)
-
-	notKey := zkt.NewByte32FromBytesPaddingZero(bytes.Repeat([]byte{'x'}, 31)).Bytes()
-	sibling2, err := tr.ProveWithDeletion(notKey, 0, proof)
-	assert.NoError(t, err)
-	assert.Nil(t, sibling2)
-}
-
-func TestSecureTrieProofWithDeletion(t *testing.T) {
-	tr, _ := NewSecure(common.Hash{}, NewDatabase((memorydb.New())))
-	key1 := zkt.NewByte32FromBytesPaddingZero(append(bytes.Repeat([]byte("k"), 10), bytes.Repeat([]byte("l"), 21)...)).Bytes()
-	key2 := zkt.NewByte32FromBytesPaddingZero(append(bytes.Repeat([]byte("m"), 10), bytes.Repeat([]byte("n"), 21)...)).Bytes()
-	secureKey1 := toProveKey(key1)
-
-	err := tr.TryUpdate(key1, bytes.Repeat([]byte("v"), 32))
-	assert.NoError(t, err)
-	err = tr.TryUpdate(key2, bytes.Repeat([]byte("v"), 32))
-	assert.NoError(t, err)
-
-	proof := memorydb.New()
-	assert.NoError(t, err)
-
-	sibling1, err := tr.ProveWithDeletion(secureKey1, 0, proof)
-	assert.NoError(t, err)
-	nd, err := tr.TryGet(key2)
-	assert.NoError(t, err)
-	l := len(sibling1)
-	// a hacking to grep the value part directly from the encoded leaf node,
-	// notice the sibling of key1 is just the leaf of key2
-	assert.Equal(t, sibling1[l-33:l-1], nd)
-
-	notKey := zkt.NewByte32FromBytesPaddingZero(bytes.Repeat([]byte{'x'}, 31)).Bytes()
-	sibling2, err := tr.ProveWithDeletion(notKey, 0, proof)
-	assert.NoError(t, err)
-	assert.Nil(t, sibling2)
 }
