@@ -113,6 +113,13 @@ func (t *Trie) TryGet(key []byte) ([]byte, error) {
 	return t.impl.TryGet(KeybytesToHashKey(key))
 }
 
+func (t *Trie) UpdateWithKind(kind string, key, value []byte) {
+	if err := t.TryUpdateWithKind(kind, key, value); err != nil {
+		log.Error(fmt.Sprintf("Unhandled trie error: %v", err))
+	}
+	return
+}
+
 func (t *Trie) TryUpdateWithKind(kind string, key, value []byte) error {
 	if kind == "account" {
 		var account types.StateAccount

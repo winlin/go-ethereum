@@ -21,7 +21,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/VictoriaMetrics/fastcache"
@@ -311,14 +310,8 @@ func (dl *diskLayer) proveRange(stats *generatorStats, root common.Hash, prefix 
 	if origin == nil && !diskMore {
 		stackTr := zktrie.NewStackTrie(nil)
 		for i, key := range keys {
-			if kind == "storage" {
-				stackTr.TryUpdate(key, vals[i])
-			} else {
-				var account types.StateAccount
-				if err := rlp.DecodeBytes(vals[i], &account); err != nil {
-					panic(fmt.Sprintf("decode full account into state.account failed: %v", err))
-				}
-				stackTr.TryUpdateAccount(key, &account)
+			if err := stackTr.TryUpdateWithKind(kind, key, vals[i]); err != nil {
+				return nil, fmt.Errorf("update stack trie failed: %w", err)
 			}
 		}
 		if gotRoot := stackTr.Hash(); gotRoot != root {
@@ -445,14 +438,8 @@ func (dl *diskLayer) generateRange(root common.Hash, prefix []byte, kind string,
 		snapTrieDb := zktrie.NewDatabase(snapNodeCache)
 		snapTrie, _ := zktrie.New(common.Hash{}, snapTrieDb)
 		for i, key := range result.keys {
-			if kind == "storage" {
-				snapTrie.Update(key, result.vals[i])
-			} else {
-				var account types.StateAccount
-				if err := rlp.DecodeBytes(result.vals[i], &account); err != nil {
-					panic(fmt.Sprintf("decode full account into state.account failed: %v", err))
-				}
-				snapTrie.UpdateAccount(key, &account)
+			if err := snapTrie.TryUpdateWithKind(kind, key, result.vals[i]); err != nil {
+				return false, nil, err
 			}
 		}
 		root, _, _ := snapTrie.Commit(nil)
@@ -630,15 +617,8 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 			return nil
 		}
 		// Retrieve the current account and flatten it into the internal format
-		var acc struct {
-			Nonce            uint64
-			Balance          *big.Int
-			Root             common.Hash
-			KeccakCodeHash   []byte
-			PoseidonCodeHash []byte
-			CodeSize         uint64
-		}
-		if err := rlp.DecodeBytes(val, &acc); err != nil {
+		acc, err := types.UnmarshalStateAccount(val)
+		if err != nil {
 			log.Crit("Invalid account encountered during snapshot creation", "err", err)
 		}
 		// If the account is not yet in-progress, write it out
