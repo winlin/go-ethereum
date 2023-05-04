@@ -9,8 +9,10 @@ import (
 	itypes "github.com/scroll-tech/zktrie/types"
 
 	"github.com/scroll-tech/go-ethereum/common"
+	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
+	"github.com/scroll-tech/go-ethereum/rlp"
 )
 
 type Resolver func(*itypes.Hash) (*itrie.Node, error)
@@ -243,65 +245,53 @@ func hasRightElement(node *itrie.Node, key []byte, resolveNode Resolver) bool {
 	return false
 }
 
-func unset(n *itrie.Node, l []byte, r []byte, pos int, resolveNode Resolver, cache ethdb.KeyValueStore) (*itrie.Node, error) {
+func unset(h *itypes.Hash, l []byte, r []byte, pos int, resolveNode Resolver, cache ethdb.KeyValueStore) (*itypes.Hash, error) {
+	if l == nil && r == nil {
+		return &itypes.HashZero, nil
+	}
+	n, err := resolveNode(h)
+	if err != nil {
+		return nil, err
+	}
+
 	switch n.Type {
 	case itrie.NodeTypeEmpty:
-		return n, nil
+		return h, nil
 	case itrie.NodeTypeLeaf:
 		if (l != nil && bytes.Compare(HashKeyToBinary(n.NodeKey), l) < 0) ||
 			(r != nil && bytes.Compare(HashKeyToBinary(n.NodeKey), r) > 0) {
-			return n, nil
+			return h, nil
 		}
-		return itrie.NewEmptyNode(), nil
+		return &itypes.HashZero, nil
 	case itrie.NodeTypeParent:
-		if l == nil && r == nil {
-			return itrie.NewEmptyNode(), nil
-		}
-		var err error
-		ln, rn := itrie.NewEmptyNode(), itrie.NewEmptyNode()
-		if l != nil && r != nil && l[pos] != r[pos] {
-			if ln, err = resolveNode(n.ChildL); err != nil {
-				return nil, err
-			} else if ln, err = unset(ln, l, nil, pos+1, resolveNode, cache); err != nil {
-				return nil, err
-			}
-			if rn, err = resolveNode(n.ChildR); err != nil {
-				return nil, err
-			} else if rn, err = unset(rn, nil, r, pos+1, resolveNode, cache); err != nil {
-				return nil, err
-			}
-		} else if (l != nil && l[pos] == 0) || (r != nil && r[pos] == 0) {
-			if ln, err = resolveNode(n.ChildL); err != nil {
-				return nil, err
-			}
+		lhash, rhash := n.ChildL, n.ChildR
+		if l == nil || l[pos] == 0 {
 			var rr []byte = nil
 			if r != nil && r[pos] == 0 {
 				rr = r
 			}
-			if ln, err = unset(ln, l, rr, pos+1, resolveNode, cache); err != nil {
+			if lhash, err = unset(n.ChildL, l, rr, pos+1, resolveNode, cache); err != nil {
 				return nil, err
 			}
-		} else if (l != nil && l[pos] == 1) || (r != nil && r[pos] == 1) {
-			if rn, err = resolveNode(n.ChildR); err != nil {
-				return nil, err
-			}
+		}
+		if r == nil || r[pos] == 1 {
 			var ll []byte = nil
 			if l != nil && l[pos] == 1 {
 				ll = l
 			}
-			if rn, err = unset(rn, ll, r, pos+1, resolveNode, cache); err != nil {
+			if rhash, err = unset(n.ChildR, ll, r, pos+1, resolveNode, cache); err != nil {
 				return nil, err
 			}
 		}
-		lhash, _ := ln.NodeHash()
-		rhash, _ := rn.NodeHash()
-		newNode := itrie.NewParentNode(lhash, rhash)
-		if hash, err := newNode.NodeHash(); err != nil {
+		newParent := itrie.NewParentNode(lhash, rhash)
+		if hash, err := newParent.NodeHash(); err != nil {
 			return nil, fmt.Errorf("new node hash failed: %v", err)
 		} else {
-			cache.Put(hash[:], newNode.CanonicalValue())
+			if err := cache.Put(hash[:], newParent.CanonicalValue()); err != nil {
+				return nil, err
+			}
+			return hash, nil
 		}
-		return newNode, nil
 	default:
 		panic(fmt.Sprintf("%T: invalid node: %v", n, n)) // hashnode
 	}
@@ -318,9 +308,9 @@ func unset(n *itrie.Node, l []byte, r []byte, pos int, resolveNode Resolver, cac
 //
 // Note we have the assumption here the given boundary keys are different
 // and right is larger than left.
-func unsetInternal(n *itrie.Node, left []byte, right []byte, cache ethdb.KeyValueStore) (*itrie.Node, error) {
+func unsetInternal(h *itypes.Hash, left []byte, right []byte, cache ethdb.KeyValueStore) (*itypes.Hash, error) {
 	left, right = keybytesToBinary(left), keybytesToBinary(right)
-	return unset(n, left, right, 0, nodeResolver(cache), cache)
+	return unset(h, left, right, 0, nodeResolver(cache), cache)
 }
 
 func nodeResolver(proof ethdb.KeyValueReader) Resolver {
@@ -371,7 +361,7 @@ func nodeResolver(proof ethdb.KeyValueReader) Resolver {
 // Note: This method does not verify that the proof is of minimal form. If the input
 // proofs are 'bloated' with neighbour leaves or random data, aside from the 'useful'
 // data, then the proof will still be accepted.
-func VerifyRangeProof(rootHash common.Hash, firstKey []byte, lastKey []byte, keys [][]byte, values [][]byte, proof ethdb.KeyValueReader) (bool, error) {
+func VerifyRangeProof(rootHash common.Hash, kind string, firstKey []byte, lastKey []byte, keys [][]byte, values [][]byte, proof ethdb.KeyValueReader) (bool, error) {
 	if len(keys) != len(values) {
 		return false, fmt.Errorf("inconsistent proof data, keys: %d, values: %d", len(keys), len(values))
 	}
@@ -453,22 +443,30 @@ func VerifyRangeProof(rootHash common.Hash, firstKey []byte, lastKey []byte, key
 	}
 	// Remove all internal references. All the removed parts should
 	// be re-filled(or re-constructed) by the given leaves range.
-	root, err = unsetInternal(root, firstKey, lastKey, trieCache)
+	unsetRootHash, err := unsetInternal(zktNodeHash(rootHash), firstKey, lastKey, trieCache)
 	if err != nil {
 		return false, err
 	}
 	// Rebuild the trie with the leaf stream, the shape of trie
 	// should be same with the original one.
-	trRootHash, err := root.NodeHash()
-	if err != nil {
-		return false, err
-	}
-	tr, err := New(common.BytesToHash(trRootHash.Bytes()), NewDatabase(trieCache))
+	tr, err := New(common.BytesToHash(unsetRootHash.Bytes()), NewDatabase(trieCache))
 	if err != nil {
 		return false, err
 	}
 	for index, key := range keys {
-		tr.TryUpdate(key, values[index])
+		if kind == "account" {
+			var account types.StateAccount
+			if err := rlp.DecodeBytes(values[index], &account); err != nil {
+				panic(fmt.Sprintf("decode full account into state.account failed: %v", err))
+			}
+			if err := tr.TryUpdateAccount(key, &account); err != nil {
+				return false, err
+			}
+		} else {
+			if err := tr.TryUpdate(key, values[index]); err != nil {
+				return false, err
+			}
+		}
 	}
 	if tr.Hash() != rootHash {
 		return false, fmt.Errorf("invalid proof, want hash %x, got %x", rootHash, tr.Hash())

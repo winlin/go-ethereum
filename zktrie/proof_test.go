@@ -19,7 +19,10 @@ package zktrie
 import (
 	"bytes"
 	crand "crypto/rand"
+	"encoding/binary"
+	"fmt"
 	mrand "math/rand"
+	"sort"
 	"testing"
 	"time"
 
@@ -389,4 +392,59 @@ func randomSecureTrie(t *testing.T, n int) (*SecureTrie, map[string]*kv) {
 	}
 
 	return tr, vals
+}
+
+type entrySlice []*kv
+
+func (p entrySlice) Len() int           { return len(p) }
+func (p entrySlice) Less(i, j int) bool { return bytes.Compare(p[i].k, p[j].k) < 0 }
+func (p entrySlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+
+func TestSimpleProofValidRange(t *testing.T) {
+	trie, kvs := nonRandomTrie(5)
+	var entries entrySlice
+	for _, kv := range kvs {
+		entries = append(entries, kv)
+		fmt.Printf("%v\n", kv)
+	}
+	sort.Sort(entries)
+
+	proof := memorydb.New()
+	if err := trie.Prove(entries[1].k, 0, proof); err != nil {
+		t.Fatalf("Failed to prove the first node %v", err)
+	}
+	if err := trie.Prove(entries[3].k, 0, proof); err != nil {
+		t.Fatalf("Failed to prove the last node %v", err)
+	}
+
+	var keys [][]byte
+	var vals [][]byte
+	for i := 1; i <= 3; i++ {
+		keys = append(keys, entries[i].k)
+		vals = append(vals, entries[i].v)
+	}
+	_, err := VerifyRangeProof(trie.Hash(), "storage", keys[0], keys[len(keys)-1], keys, vals, proof)
+	if err != nil {
+		t.Fatalf("Verification of range proof failed!\n%v\n", err)
+	}
+}
+
+func nonRandomTrie(n int) (*Trie, map[string]*kv) {
+	trie, err := New(common.Hash{}, NewDatabase((memorydb.New())))
+	if err != nil {
+		panic(err)
+	}
+	vals := make(map[string]*kv)
+	max := uint64(0xffffffffffffffff)
+	for i := uint64(0); i < uint64(n); i++ {
+		value := make([]byte, 32)
+		key := make([]byte, 32)
+		binary.LittleEndian.PutUint64(key, i)
+		binary.LittleEndian.PutUint64(value, i-max)
+		//value := &kv{common.LeftPadBytes([]byte{i}, 32), []byte{i}, false}
+		elem := &kv{key, value, false}
+		trie.Update(elem.k, elem.v)
+		vals[string(elem.k)] = elem
+	}
+	return trie, vals
 }

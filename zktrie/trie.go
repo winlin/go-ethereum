@@ -146,7 +146,10 @@ func (t *Trie) TryUpdate(key, value []byte) error {
 	if err := CheckKeyLength(key, 32); err != nil {
 		return err
 	}
-	return t.impl.TryUpdate(KeybytesToHashKey(key), 1, []itypes.Byte32{*itypes.NewByte32FromBytes(value)})
+	if err := t.impl.TryUpdate(KeybytesToHashKey(key), 1, []itypes.Byte32{*itypes.NewByte32FromBytes(value)}); err != nil {
+		return fmt.Errorf("zktrie update failed: %w", err)
+	}
+	return nil
 }
 
 func (t *Trie) TryDelete(key []byte) error {
