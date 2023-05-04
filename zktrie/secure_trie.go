@@ -150,9 +150,7 @@ func (t *SecureTrie) GetKey(key []byte) []byte {
 func (t *SecureTrie) Commit(onleaf LeafCallback) (common.Hash, int, error) {
 	// in current implmentation, every update of trie already writes into database
 	// so Commmit does nothing
-	if onleaf != nil {
-		log.Warn("secure trie commit with onleaf callback is skipped!")
-	}
+	// TODO: apply the corresponding onleaf callback!
 	return t.Hash(), 0, nil
 }
 
