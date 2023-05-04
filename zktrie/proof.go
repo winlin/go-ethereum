@@ -427,6 +427,9 @@ func VerifyRangeProof(rootHash common.Hash, kind string, firstKey []byte, lastKe
 	if len(firstKey) != len(lastKey) {
 		return false, errors.New("inconsistent edge keys")
 	}
+	if !(bytes.Compare(firstKey, keys[0]) <= 0 && bytes.Compare(keys[len(keys)-1], lastKey) <= 0) {
+		return false, errors.New("keys are out of range [firstKey, lastKey]")
+	}
 	// Convert the edge proofs to edge trie paths. Then we can
 	// have the same tree architecture with the original one.
 	// For the first edge proof, non-existent proof is allowed.
