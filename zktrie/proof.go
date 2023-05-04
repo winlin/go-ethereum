@@ -9,10 +9,8 @@ import (
 	itypes "github.com/scroll-tech/zktrie/types"
 
 	"github.com/scroll-tech/go-ethereum/common"
-	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
-	"github.com/scroll-tech/go-ethereum/rlp"
 )
 
 type Resolver func(*itypes.Hash) (*itrie.Node, error)
@@ -381,7 +379,9 @@ func VerifyRangeProof(rootHash common.Hash, kind string, firstKey []byte, lastKe
 	if proof == nil {
 		tr := NewStackTrie(nil)
 		for index, key := range keys {
-			tr.TryUpdate(key, values[index])
+			if err := tr.TryUpdateWithKind(kind, key, values[index]); err != nil {
+				return false, err
+			}
 		}
 		if have, want := tr.Hash(), rootHash; have != want {
 			return false, fmt.Errorf("invalid proof, want hash %x, got %x", want, have)
@@ -454,18 +454,8 @@ func VerifyRangeProof(rootHash common.Hash, kind string, firstKey []byte, lastKe
 		return false, err
 	}
 	for index, key := range keys {
-		if kind == "account" {
-			var account types.StateAccount
-			if err := rlp.DecodeBytes(values[index], &account); err != nil {
-				panic(fmt.Sprintf("decode full account into state.account failed: %v", err))
-			}
-			if err := tr.TryUpdateAccount(key, &account); err != nil {
-				return false, err
-			}
-		} else {
-			if err := tr.TryUpdate(key, values[index]); err != nil {
-				return false, err
-			}
+		if err := tr.TryUpdateWithKind(kind, key, values[index]); err != nil {
+			return false, err
 		}
 	}
 	if tr.Hash() != rootHash {

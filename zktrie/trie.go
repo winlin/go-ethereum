@@ -27,6 +27,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/log"
+	"github.com/scroll-tech/go-ethereum/rlp"
 	"github.com/scroll-tech/go-ethereum/trie"
 )
 
@@ -110,6 +111,20 @@ func (t *Trie) TryGet(key []byte) ([]byte, error) {
 		return nil, err
 	}
 	return t.impl.TryGet(KeybytesToHashKey(key))
+}
+
+func (t *Trie) TryUpdateWithKind(kind string, key, value []byte) error {
+	if kind == "account" {
+		var account types.StateAccount
+		if err := rlp.DecodeBytes(value, &account); err != nil {
+			panic(fmt.Sprintf("decode full account into state.account failed: %v", err))
+		}
+		return t.TryUpdateAccount(key, &account)
+	} else if kind == "storage" {
+		return t.TryUpdate(key, value)
+	} else {
+		return InvalidUpdateKindError
+	}
 }
 
 // Update associates key with value in the trie. Subsequent calls to

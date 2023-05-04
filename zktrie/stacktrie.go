@@ -28,6 +28,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/log"
+	"github.com/scroll-tech/go-ethereum/rlp"
 )
 
 var ErrCommitDisabled = errors.New("no database for committing")
@@ -83,6 +84,20 @@ func NewStackTrie(db ethdb.KeyValueWriter) *StackTrie {
 	return &StackTrie{
 		nodeType: emptyNode,
 		db:       db,
+	}
+}
+
+func (st *StackTrie) TryUpdateWithKind(kind string, key, value []byte) error {
+	if kind == "account" {
+		var account types.StateAccount
+		if err := rlp.DecodeBytes(value, &account); err != nil {
+			panic(fmt.Sprintf("decode full account into state.account failed: %v", err))
+		}
+		return st.TryUpdateAccount(key, &account)
+	} else if kind == "storage" {
+		return st.TryUpdate(key, value)
+	} else {
+		return InvalidUpdateKindError
 	}
 }
 

@@ -17,9 +17,14 @@
 package zktrie
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/scroll-tech/go-ethereum/common"
+)
+
+var (
+	InvalidUpdateKindError = errors.New("invalid trie update kind, expect 'account' or 'storage'")
 )
 
 // MissingNodeError is returned by the trie functions (TryGet, TryUpdate, TryDelete)
