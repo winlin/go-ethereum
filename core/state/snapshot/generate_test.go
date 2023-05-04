@@ -31,7 +31,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/rlp"
-	"github.com/scroll-tech/go-ethereum/trie"
+	"github.com/scroll-tech/go-ethereum/zktrie"
 )
 
 // Tests that snapshot generation from an empty database.
@@ -41,15 +41,15 @@ func TestGeneration(t *testing.T) {
 	// two of which also has the same 3-slot storage trie attached.
 	var (
 		diskdb = memorydb.New()
-		triedb = trie.NewDatabase(diskdb)
+		triedb = zktrie.NewDatabase(diskdb)
 	)
-	stTrie, _ := trie.NewSecure(common.Hash{}, triedb)
+	stTrie, _ := zktrie.NewSecure(common.Hash{}, triedb)
 	stTrie.Update([]byte("key-1"), []byte("val-1")) // 0x1314700b81afc49f94db3623ef1df38f3ed18b73a1b7ea2f6c095118cf6118a0
 	stTrie.Update([]byte("key-2"), []byte("val-2")) // 0x18a0f4d79cff4459642dd7604f303886ad9d77c30cf3d7d7cedb3a693ab6d371
 	stTrie.Update([]byte("key-3"), []byte("val-3")) // 0x51c71a47af0695957647fb68766d0becee77e953df17c29b3c2f25436f055c78
 	stTrie.Commit(nil)                              // Root: 0xddefcd9376dd029653ef384bd2f0a126bb755fe84fdcc9e7cf421ba454f2bc67
 
-	accTrie, _ := trie.NewSecure(common.Hash{}, triedb)
+	accTrie, _ := zktrie.NewSecure(common.Hash{}, triedb)
 	acc := &Account{Balance: big.NewInt(1), Root: stTrie.Hash().Bytes(), KeccakCodeHash: emptyKeccakCode.Bytes(), PoseidonCodeHash: emptyPoseidonCode.Bytes(), CodeSize: 0}
 	val, _ := rlp.EncodeToBytes(acc)
 	accTrie.Update([]byte("acc-1"), val) // 0x9250573b9c18c664139f3b6a7a8081b7d8f8916a8fcc5d94feec6c29f5fd4e9e
@@ -98,15 +98,15 @@ func TestGenerateExistentState(t *testing.T) {
 	// two of which also has the same 3-slot storage trie attached.
 	var (
 		diskdb = memorydb.New()
-		triedb = trie.NewDatabase(diskdb)
+		triedb = zktrie.NewDatabase(diskdb)
 	)
-	stTrie, _ := trie.NewSecure(common.Hash{}, triedb)
+	stTrie, _ := zktrie.NewSecure(common.Hash{}, triedb)
 	stTrie.Update([]byte("key-1"), []byte("val-1")) // 0x1314700b81afc49f94db3623ef1df38f3ed18b73a1b7ea2f6c095118cf6118a0
 	stTrie.Update([]byte("key-2"), []byte("val-2")) // 0x18a0f4d79cff4459642dd7604f303886ad9d77c30cf3d7d7cedb3a693ab6d371
 	stTrie.Update([]byte("key-3"), []byte("val-3")) // 0x51c71a47af0695957647fb68766d0becee77e953df17c29b3c2f25436f055c78
 	stTrie.Commit(nil)                              // Root: 0xddefcd9376dd029653ef384bd2f0a126bb755fe84fdcc9e7cf421ba454f2bc67
 
-	accTrie, _ := trie.NewSecure(common.Hash{}, triedb)
+	accTrie, _ := zktrie.NewSecure(common.Hash{}, triedb)
 	acc := &Account{Balance: big.NewInt(1), Root: stTrie.Hash().Bytes(), KeccakCodeHash: emptyKeccakCode.Bytes(), PoseidonCodeHash: emptyPoseidonCode.Bytes(), CodeSize: 0}
 	val, _ := rlp.EncodeToBytes(acc)
 	accTrie.Update([]byte("acc-1"), val) // 0x9250573b9c18c664139f3b6a7a8081b7d8f8916a8fcc5d94feec6c29f5fd4e9e
@@ -173,14 +173,14 @@ func checkSnapRoot(t *testing.T, snap *diskLayer, trieRoot common.Hash) {
 
 type testHelper struct {
 	diskdb  *memorydb.Database
-	triedb  *trie.Database
-	accTrie *trie.SecureTrie
+	triedb  *zktrie.Database
+	accTrie *zktrie.SecureTrie
 }
 
 func newHelper() *testHelper {
 	diskdb := memorydb.New()
-	triedb := trie.NewDatabase(diskdb)
-	accTrie, _ := trie.NewSecure(common.Hash{}, triedb)
+	triedb := zktrie.NewDatabase(diskdb)
+	accTrie, _ := zktrie.NewSecure(common.Hash{}, triedb)
 	return &testHelper{
 		diskdb:  diskdb,
 		triedb:  triedb,
@@ -212,7 +212,7 @@ func (t *testHelper) addSnapStorage(accKey string, keys []string, vals []string)
 }
 
 func (t *testHelper) makeStorageTrie(keys []string, vals []string) []byte {
-	stTrie, _ := trie.NewSecure(common.Hash{}, t.triedb)
+	stTrie, _ := zktrie.NewSecure(common.Hash{}, t.triedb)
 	for i, k := range keys {
 		stTrie.Update([]byte(k), []byte(vals[i]))
 	}
@@ -381,9 +381,9 @@ func TestGenerateCorruptAccountTrie(t *testing.T) {
 	// without any storage slots to keep the test smaller.
 	var (
 		diskdb = memorydb.New()
-		triedb = trie.NewDatabase(diskdb)
+		triedb = zktrie.NewDatabase(diskdb)
 	)
-	tr, _ := trie.NewSecure(common.Hash{}, triedb)
+	tr, _ := zktrie.NewSecure(common.Hash{}, triedb)
 	acc := &Account{Balance: big.NewInt(1), Root: emptyRoot.Bytes(), KeccakCodeHash: emptyKeccakCode.Bytes(), PoseidonCodeHash: emptyPoseidonCode.Bytes(), CodeSize: 0}
 	val, _ := rlp.EncodeToBytes(acc)
 	tr.Update([]byte("acc-1"), val) // 0xc7a30f39aff471c95d8a837497ad0e49b65be475cc0953540f80cfcdbdcd9074
@@ -425,15 +425,15 @@ func TestGenerateMissingStorageTrie(t *testing.T) {
 	// two of which also has the same 3-slot storage trie attached.
 	var (
 		diskdb = memorydb.New()
-		triedb = trie.NewDatabase(diskdb)
+		triedb = zktrie.NewDatabase(diskdb)
 	)
-	stTrie, _ := trie.NewSecure(common.Hash{}, triedb)
+	stTrie, _ := zktrie.NewSecure(common.Hash{}, triedb)
 	stTrie.Update([]byte("key-1"), []byte("val-1")) // 0x1314700b81afc49f94db3623ef1df38f3ed18b73a1b7ea2f6c095118cf6118a0
 	stTrie.Update([]byte("key-2"), []byte("val-2")) // 0x18a0f4d79cff4459642dd7604f303886ad9d77c30cf3d7d7cedb3a693ab6d371
 	stTrie.Update([]byte("key-3"), []byte("val-3")) // 0x51c71a47af0695957647fb68766d0becee77e953df17c29b3c2f25436f055c78
 	stTrie.Commit(nil)                              // Root: 0xddefcd9376dd029653ef384bd2f0a126bb755fe84fdcc9e7cf421ba454f2bc67
 
-	accTrie, _ := trie.NewSecure(common.Hash{}, triedb)
+	accTrie, _ := zktrie.NewSecure(common.Hash{}, triedb)
 	acc := &Account{Balance: big.NewInt(1), Root: stTrie.Hash().Bytes(), KeccakCodeHash: emptyKeccakCode.Bytes(), PoseidonCodeHash: emptyPoseidonCode.Bytes(), CodeSize: 0}
 	val, _ := rlp.EncodeToBytes(acc)
 	accTrie.Update([]byte("acc-1"), val) // 0x963f96eb81a3b19322afa7044cf396f4bfba698f5887be4778086f1fa5bfe45f
@@ -484,15 +484,15 @@ func TestGenerateCorruptStorageTrie(t *testing.T) {
 	// two of which also has the same 3-slot storage trie attached.
 	var (
 		diskdb = memorydb.New()
-		triedb = trie.NewDatabase(diskdb)
+		triedb = zktrie.NewDatabase(diskdb)
 	)
-	stTrie, _ := trie.NewSecure(common.Hash{}, triedb)
+	stTrie, _ := zktrie.NewSecure(common.Hash{}, triedb)
 	stTrie.Update([]byte("key-1"), []byte("val-1")) // 0x1314700b81afc49f94db3623ef1df38f3ed18b73a1b7ea2f6c095118cf6118a0
 	stTrie.Update([]byte("key-2"), []byte("val-2")) // 0x18a0f4d79cff4459642dd7604f303886ad9d77c30cf3d7d7cedb3a693ab6d371
 	stTrie.Update([]byte("key-3"), []byte("val-3")) // 0x51c71a47af0695957647fb68766d0becee77e953df17c29b3c2f25436f055c78
 	stTrie.Commit(nil)                              // Root: 0xddefcd9376dd029653ef384bd2f0a126bb755fe84fdcc9e7cf421ba454f2bc67
 
-	accTrie, _ := trie.NewSecure(common.Hash{}, triedb)
+	accTrie, _ := zktrie.NewSecure(common.Hash{}, triedb)
 	acc := &Account{Balance: big.NewInt(1), Root: stTrie.Hash().Bytes(), KeccakCodeHash: emptyKeccakCode.Bytes(), PoseidonCodeHash: emptyPoseidonCode.Bytes(), CodeSize: 0}
 	val, _ := rlp.EncodeToBytes(acc)
 	accTrie.Update([]byte("acc-1"), val) // 0x963f96eb81a3b19322afa7044cf396f4bfba698f5887be4778086f1fa5bfe45f
@@ -535,8 +535,8 @@ func TestGenerateCorruptStorageTrie(t *testing.T) {
 	<-stop
 }
 
-func getStorageTrie(n int, triedb *trie.Database) *trie.SecureTrie {
-	stTrie, _ := trie.NewSecure(common.Hash{}, triedb)
+func getStorageTrie(n int, triedb *zktrie.Database) *zktrie.SecureTrie {
+	stTrie, _ := zktrie.NewSecure(common.Hash{}, triedb)
 	for i := 0; i < n; i++ {
 		k := fmt.Sprintf("key-%d", i)
 		v := fmt.Sprintf("val-%d", i)
@@ -550,10 +550,10 @@ func getStorageTrie(n int, triedb *trie.Database) *trie.SecureTrie {
 func TestGenerateWithExtraAccounts(t *testing.T) {
 	var (
 		diskdb = memorydb.New()
-		triedb = trie.NewDatabase(diskdb)
+		triedb = zktrie.NewDatabase(diskdb)
 		stTrie = getStorageTrie(5, triedb)
 	)
-	accTrie, _ := trie.NewSecure(common.Hash{}, triedb)
+	accTrie, _ := zktrie.NewSecure(common.Hash{}, triedb)
 	{ // Account one in the trie
 		acc := &Account{Balance: big.NewInt(1), Root: stTrie.Hash().Bytes(), KeccakCodeHash: emptyKeccakCode.Bytes(), PoseidonCodeHash: emptyPoseidonCode.Bytes(), CodeSize: 0}
 		val, _ := rlp.EncodeToBytes(acc)
@@ -614,10 +614,10 @@ func TestGenerateWithManyExtraAccounts(t *testing.T) {
 	}
 	var (
 		diskdb = memorydb.New()
-		triedb = trie.NewDatabase(diskdb)
+		triedb = zktrie.NewDatabase(diskdb)
 		stTrie = getStorageTrie(3, triedb)
 	)
-	accTrie, _ := trie.NewSecure(common.Hash{}, triedb)
+	accTrie, _ := zktrie.NewSecure(common.Hash{}, triedb)
 	{ // Account one in the trie
 		acc := &Account{Balance: big.NewInt(1), Root: stTrie.Hash().Bytes(), KeccakCodeHash: emptyKeccakCode.Bytes(), PoseidonCodeHash: emptyPoseidonCode.Bytes(), CodeSize: 0}
 		val, _ := rlp.EncodeToBytes(acc)
@@ -631,7 +631,7 @@ func TestGenerateWithManyExtraAccounts(t *testing.T) {
 	}
 	{ // 100 accounts exist only in snapshot
 		for i := 0; i < 1000; i++ {
-			//acc := &Account{Balance: big.NewInt(int64(i)), Root: stTrie.Hash().Bytes(), PoseidonCodeHash: emptyPoseidonCode.Bytes()}
+			//acc := &Account{Balance: big.NewInt(int64(i)), root: stTrie.Hash().Bytes(), PoseidonCodeHash: emptyPoseidonCode.Bytes()}
 			acc := &Account{Balance: big.NewInt(int64(i)), Root: emptyRoot.Bytes(), KeccakCodeHash: emptyKeccakCode.Bytes(), PoseidonCodeHash: emptyPoseidonCode.Bytes(), CodeSize: 0}
 			val, _ := rlp.EncodeToBytes(acc)
 			key := hashData([]byte(fmt.Sprintf("acc-%d", i)))
@@ -673,9 +673,9 @@ func TestGenerateWithExtraBeforeAndAfter(t *testing.T) {
 	}
 	var (
 		diskdb = memorydb.New()
-		triedb = trie.NewDatabase(diskdb)
+		triedb = zktrie.NewDatabase(diskdb)
 	)
-	accTrie, _ := trie.New(common.Hash{}, triedb)
+	accTrie, _ := zktrie.New(common.Hash{}, triedb)
 	{
 		acc := &Account{Balance: big.NewInt(1), Root: emptyRoot.Bytes(), KeccakCodeHash: emptyKeccakCode.Bytes(), PoseidonCodeHash: emptyPoseidonCode.Bytes(), CodeSize: 0}
 		val, _ := rlp.EncodeToBytes(acc)
@@ -719,9 +719,9 @@ func TestGenerateWithMalformedSnapdata(t *testing.T) {
 	}
 	var (
 		diskdb = memorydb.New()
-		triedb = trie.NewDatabase(diskdb)
+		triedb = zktrie.NewDatabase(diskdb)
 	)
-	accTrie, _ := trie.New(common.Hash{}, triedb)
+	accTrie, _ := zktrie.New(common.Hash{}, triedb)
 	{
 		acc := &Account{Balance: big.NewInt(1), Root: emptyRoot.Bytes(), KeccakCodeHash: emptyKeccakCode.Bytes(), PoseidonCodeHash: emptyPoseidonCode.Bytes(), CodeSize: 0}
 		val, _ := rlp.EncodeToBytes(acc)
@@ -770,7 +770,7 @@ func TestGenerateFromEmptySnap(t *testing.T) {
 			&Account{Balance: big.NewInt(1), Root: stRoot, KeccakCodeHash: emptyKeccakCode.Bytes(), PoseidonCodeHash: emptyPoseidonCode.Bytes(), CodeSize: 0})
 	}
 	root, snap := helper.Generate()
-	t.Logf("Root: %#x\n", root) // Root: 0x6f7af6d2e1a1bf2b84a3beb3f8b64388465fbc1e274ca5d5d3fc787ca78f59e4
+	t.Logf("root: %#x\n", root) // root: 0x6f7af6d2e1a1bf2b84a3beb3f8b64388465fbc1e274ca5d5d3fc787ca78f59e4
 
 	select {
 	case <-snap.genPending:
@@ -817,7 +817,7 @@ func TestGenerateWithIncompleteStorage(t *testing.T) {
 	}
 
 	root, snap := helper.Generate()
-	t.Logf("Root: %#x\n", root) // Root: 0xca73f6f05ba4ca3024ef340ef3dfca8fdabc1b677ff13f5a9571fd49c16e67ff
+	t.Logf("root: %#x\n", root) // root: 0xca73f6f05ba4ca3024ef340ef3dfca8fdabc1b677ff13f5a9571fd49c16e67ff
 
 	select {
 	case <-snap.genPending:

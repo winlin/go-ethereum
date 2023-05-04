@@ -40,7 +40,7 @@ func (t *SecureTrie) ProveWithDeletion(key []byte, fromLevel uint, proofDb ethdb
 			}
 
 			if n.Type == itrie.NodeTypeLeaf {
-				preImage := t.GetKey(n.NodeKey.Bytes())
+				preImage := t.GetKey(HashKeyToKeybytes(n.NodeKey))
 				if len(preImage) > 0 {
 					n.KeyPreimage = &itypes.Byte32{}
 					copy(n.KeyPreimage[:], preImage)
@@ -243,53 +243,65 @@ func hasRightElement(node *itrie.Node, key []byte, resolveNode Resolver) bool {
 	return false
 }
 
-func unset(n *itrie.Node, l []byte, r []byte, resolveNode Resolver) (*itrie.Node, error) {
+func unset(n *itrie.Node, l []byte, r []byte, pos int, resolveNode Resolver, cache ethdb.KeyValueStore) (*itrie.Node, error) {
 	switch n.Type {
 	case itrie.NodeTypeEmpty:
 		return n, nil
+	case itrie.NodeTypeLeaf:
+		if (l != nil && bytes.Compare(HashKeyToBinary(n.NodeKey), l) < 0) ||
+			(r != nil && bytes.Compare(HashKeyToBinary(n.NodeKey), r) > 0) {
+			return n, nil
+		}
+		return itrie.NewEmptyNode(), nil
 	case itrie.NodeTypeParent:
 		if l == nil && r == nil {
 			return itrie.NewEmptyNode(), nil
 		}
 		var err error
 		ln, rn := itrie.NewEmptyNode(), itrie.NewEmptyNode()
-		if l != nil && r != nil && l[0] != r[0] {
+		if l != nil && r != nil && l[pos] != r[pos] {
 			if ln, err = resolveNode(n.ChildL); err != nil {
 				return nil, err
-			} else if ln, err = unset(ln, l[1:], nil, resolveNode); err != nil {
+			} else if ln, err = unset(ln, l, nil, pos+1, resolveNode, cache); err != nil {
 				return nil, err
 			}
 			if rn, err = resolveNode(n.ChildR); err != nil {
 				return nil, err
-			} else if rn, err = unset(rn, nil, r[1:], resolveNode); err != nil {
+			} else if rn, err = unset(rn, nil, r, pos+1, resolveNode, cache); err != nil {
 				return nil, err
 			}
-		} else if (l != nil && l[0] == 0) || (r != nil && r[0] == 0) {
+		} else if (l != nil && l[pos] == 0) || (r != nil && r[pos] == 0) {
 			if ln, err = resolveNode(n.ChildL); err != nil {
 				return nil, err
 			}
 			var rr []byte = nil
-			if r != nil && r[0] == 0 {
-				rr = r[1:]
+			if r != nil && r[pos] == 0 {
+				rr = r
 			}
-			if ln, err = unset(ln, l[1:], rr, resolveNode); err != nil {
+			if ln, err = unset(ln, l, rr, pos+1, resolveNode, cache); err != nil {
 				return nil, err
 			}
-		} else if (l != nil && l[0] == 1) || (r != nil && r[0] == 1) {
+		} else if (l != nil && l[pos] == 1) || (r != nil && r[pos] == 1) {
 			if rn, err = resolveNode(n.ChildR); err != nil {
 				return nil, err
 			}
 			var ll []byte = nil
-			if l != nil && l[0] == 1 {
-				ll = l[1:]
+			if l != nil && l[pos] == 1 {
+				ll = l
 			}
-			if rn, err = unset(rn, ll, r[1:], resolveNode); err != nil {
+			if rn, err = unset(rn, ll, r, pos+1, resolveNode, cache); err != nil {
 				return nil, err
 			}
 		}
 		lhash, _ := ln.NodeHash()
 		rhash, _ := rn.NodeHash()
-		return itrie.NewParentNode(lhash, rhash), nil
+		newNode := itrie.NewParentNode(lhash, rhash)
+		if hash, err := newNode.NodeHash(); err != nil {
+			return nil, fmt.Errorf("new node hash failed: %v", err)
+		} else {
+			cache.Put(hash[:], newNode.CanonicalValue())
+		}
+		return newNode, nil
 	default:
 		panic(fmt.Sprintf("%T: invalid node: %v", n, n)) // hashnode
 	}
@@ -306,9 +318,9 @@ func unset(n *itrie.Node, l []byte, r []byte, resolveNode Resolver) (*itrie.Node
 //
 // Note we have the assumption here the given boundary keys are different
 // and right is larger than left.
-func unsetInternal(n *itrie.Node, left []byte, right []byte, resolveNode Resolver) (*itrie.Node, error) {
+func unsetInternal(n *itrie.Node, left []byte, right []byte, cache ethdb.KeyValueStore) (*itrie.Node, error) {
 	left, right = keybytesToBinary(left), keybytesToBinary(right)
-	return unset(n, left, right, resolveNode)
+	return unset(n, left, right, 0, nodeResolver(cache), cache)
 }
 
 func nodeResolver(proof ethdb.KeyValueReader) Resolver {
@@ -441,13 +453,16 @@ func VerifyRangeProof(rootHash common.Hash, firstKey []byte, lastKey []byte, key
 	}
 	// Remove all internal references. All the removed parts should
 	// be re-filled(or re-constructed) by the given leaves range.
-	root, err = unsetInternal(root, firstKey, lastKey, nodeResolver(trieCache))
+	root, err = unsetInternal(root, firstKey, lastKey, trieCache)
 	if err != nil {
 		return false, err
 	}
 	// Rebuild the trie with the leaf stream, the shape of trie
 	// should be same with the original one.
-	trRootHash, _ := root.NodeHash()
+	trRootHash, err := root.NodeHash()
+	if err != nil {
+		return false, err
+	}
 	tr, err := New(common.BytesToHash(trRootHash.Bytes()), NewDatabase(trieCache))
 	if err != nil {
 		return false, err

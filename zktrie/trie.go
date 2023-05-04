@@ -77,7 +77,7 @@ func New(root common.Hash, db *Database) (*Trie, error) {
 
 	impl, err := itrie.NewZkTrieImplWithRoot(db, zktNodeHash(root), itrie.NodeKeyValidBytes*8)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("new trie failed: %w", err)
 	}
 
 	return NewTrieWithImpl(impl, db), nil
