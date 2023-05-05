@@ -299,8 +299,8 @@ func traverseState(ctx *cli.Context) error {
 	accIter := zktrie.NewIterator(t.NodeIterator(nil))
 	for accIter.Next() {
 		accounts += 1
-		var acc types.StateAccount
-		if err := rlp.DecodeBytes(accIter.Value, &acc); err != nil {
+		acc, err := types.UnmarshalStateAccount(accIter.Value)
+		if err != nil {
 			log.Error("Invalid account encountered during traversal", "err", err)
 			return err
 		}

@@ -51,8 +51,8 @@ func reverseBitInPlace(b []byte) {
 		}
 		b[i] = tmp
 	}
-
 }
+
 func KeybytesToHashKey(b []byte) *itypes.Hash {
 	var h itypes.Hash
 	copy(h[:], b)

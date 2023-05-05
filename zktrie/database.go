@@ -2,6 +2,8 @@ package zktrie
 
 import (
 	"math/big"
+	"reflect"
+	"runtime"
 	"sync"
 	"time"
 
@@ -38,6 +40,10 @@ var (
 	memcacheCommitTimeTimer  = metrics.NewRegisteredResettingTimer("zktrie/memcache/commit/time", nil)
 	memcacheCommitNodesMeter = metrics.NewRegisteredMeter("zktrie/memcache/commit/nodes", nil)
 	memcacheCommitSizeMeter  = metrics.NewRegisteredMeter("zktrie/memcache/commit/size", nil)
+)
+
+var (
+	cachedNodeSize = int(reflect.TypeOf(trie.KV{}).Size())
 )
 
 // Database Database adaptor imple zktrie.ZktrieDatbase
@@ -199,18 +205,38 @@ func (db *Database) EmptyRoot() common.Hash {
 	return emptyRoot
 }
 
+// saveCache saves clean state cache to given directory path
+// using specified CPU cores.
+func (db *Database) saveCache(dir string, threads int) error {
+	//TODO: impelement it?
+	return nil
+}
+
 // SaveCachePeriodically atomically saves fast cache data to the given dir with
 // the specified interval. All dump operation will only use a single CPU core.
 func (db *Database) SaveCachePeriodically(dir string, interval time.Duration, stopCh <-chan struct{}) {
-	panic("not implemented")
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			db.saveCache(dir, 1)
+		case <-stopCh:
+			return
+		}
+	}
 }
 
 func (db *Database) Size() (common.StorageSize, common.StorageSize) {
-	panic("not implemented")
+	db.lock.RLock()
+	defer db.lock.RUnlock()
+
+	return common.StorageSize(len(db.rawDirties) * cachedNodeSize), db.preimages.size()
 }
 
-func (db *Database) SaveCache(journal string) {
-	panic("not implemented")
+func (db *Database) SaveCache(dir string) error {
+	return db.saveCache(dir, runtime.GOMAXPROCS(0))
 }
 
 func (db *Database) Node(hash common.Hash) ([]byte, error) {
