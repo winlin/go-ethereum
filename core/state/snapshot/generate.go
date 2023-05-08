@@ -21,6 +21,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/VictoriaMetrics/fastcache"
@@ -29,7 +30,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
 	"github.com/scroll-tech/go-ethereum/common/math"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
-	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/crypto/codehash"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
@@ -506,7 +506,13 @@ func (dl *diskLayer) generateRange(root common.Hash, prefix []byte, kind string,
 			break
 		}
 		istart := time.Now()
-		if err := onState(iter.Key, iter.Value, write, false); err != nil {
+		value := iter.Value
+		if kind == "account" {
+			if value, err = iter.AccountRLP(); err != nil {
+				return false, nil, err
+			}
+		}
+		if err := onState(iter.Key, value, write, false); err != nil {
 			return false, nil, err
 		}
 		internal += time.Since(istart)
@@ -617,8 +623,15 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 			return nil
 		}
 		// Retrieve the current account and flatten it into the internal format
-		acc, err := types.UnmarshalStateAccount(val)
-		if err != nil {
+		var acc struct {
+			Nonce            uint64
+			Balance          *big.Int
+			Root             common.Hash
+			KeccakCodeHash   []byte
+			PoseidonCodeHash []byte
+			CodeSize         uint64
+		}
+		if err := rlp.DecodeBytes(val, &acc); err != nil {
 			log.Crit("Invalid account encountered during snapshot creation", "err", err)
 		}
 		// If the account is not yet in-progress, write it out

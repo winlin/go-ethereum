@@ -25,7 +25,9 @@ import (
 	itypes "github.com/scroll-tech/zktrie/types"
 
 	"github.com/scroll-tech/go-ethereum/common"
+	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/ethdb"
+	"github.com/scroll-tech/go-ethereum/rlp"
 )
 
 // Iterator is a key-value trie iterator that traverses a Trie.
@@ -65,6 +67,14 @@ func (it *Iterator) Next() bool {
 // positioned on.
 func (it *Iterator) Prove() [][]byte {
 	return it.nodeIt.LeafProof()
+}
+
+func (it *Iterator) AccountRLP() ([]byte, error) {
+	account, err := types.UnmarshalStateAccount(it.Value)
+	if err != nil {
+		return nil, err
+	}
+	return rlp.EncodeToBytes(account)
 }
 
 // NodeIterator is an iterator to traverse the trie pre-order.
