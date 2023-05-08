@@ -191,7 +191,7 @@ func (it *nodeIterator) Leaf() bool {
 func (it *nodeIterator) LeafKey() []byte {
 	if last := it.currentNode(); last != nil {
 		if last.Type == itrie.NodeTypeLeaf {
-			return HashKeyToKeybytes(last.NodeKey)
+			return hashKeyToKeybytes(last.NodeKey)
 		}
 	}
 	panic("not at leaf")
@@ -266,7 +266,7 @@ func (it *nodeIterator) currentNode() *itrie.Node {
 func (it *nodeIterator) currentKey() []byte {
 	if last := it.currentNode(); last != nil {
 		if last.Type == itrie.NodeTypeLeaf {
-			return keybytesToBinary(HashKeyToKeybytes(last.NodeKey))
+			return keybytesToBinary(hashKeyToKeybytes(last.NodeKey))
 		} else {
 			return it.binaryPath
 		}
@@ -298,7 +298,7 @@ func (it *nodeIterator) init() (*nodeIteratorState, []byte, error) {
 	}
 	state := &nodeIteratorState{hash: it.trie.Hash(), node: root, index: 0}
 	if root.Type == itrie.NodeTypeLeaf {
-		return state, HashKeyToBinary(root.NodeKey), nil
+		return state, hashKeyToBinary(root.NodeKey), nil
 	}
 	return state, nil, nil
 }
@@ -337,7 +337,7 @@ func (it *nodeIterator) peek(descend bool) (*nodeIteratorState, []byte, error) {
 
 			var binaryPath []byte
 			if node.Type == itrie.NodeTypeLeaf {
-				binaryPath = HashKeyToBinary(node.NodeKey)
+				binaryPath = hashKeyToBinary(node.NodeKey)
 			} else {
 				binaryPath = append(it.binaryPath, parent.index)
 			}
@@ -379,7 +379,7 @@ func (it *nodeIterator) peekSeek(seekBinaryKey []byte) (*nodeIteratorState, []by
 		}
 		var binaryPath []byte
 		if node.Type == itrie.NodeTypeLeaf {
-			binaryPath = HashKeyToBinary(node.NodeKey)
+			binaryPath = hashKeyToBinary(node.NodeKey)
 		} else {
 			binaryPath = append(it.binaryPath, parent.index)
 		}

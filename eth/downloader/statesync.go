@@ -318,7 +318,8 @@ func (s *stateSync) run() {
 	if s.d.snapSync {
 		s.err = s.d.SnapSyncer.Sync(s.root, s.cancel)
 	} else {
-		s.err = s.loop()
+		panic("fast sync is disabled currently, using snap sync instead")
+		//s.err = s.loop()
 	}
 	close(s.done)
 }

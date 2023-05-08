@@ -105,7 +105,7 @@ func (st *StackTrie) TryUpdate(key, value []byte) error {
 	if err := CheckKeyLength(key, 32); err != nil {
 		return err
 	}
-	if _, err := KeybytesToHashKeyAndCheck(key); err != nil {
+	if _, err := keybytesToHashKeyAndCheck(key); err != nil {
 		return err
 	}
 
@@ -128,7 +128,7 @@ func (st *StackTrie) TryUpdateAccount(key []byte, account *types.StateAccount) e
 		return err
 	}
 	//TODO: cache the hash!
-	if _, err := KeybytesToHashKeyAndCheck(key); err != nil {
+	if _, err := keybytesToHashKeyAndCheck(key); err != nil {
 		return err
 	}
 
@@ -234,7 +234,7 @@ func (st *StackTrie) hash() {
 		st.children[1] = nil
 	case leafNode:
 		//TODO: convert binary to hash key directly
-		n = itrie.NewLeafNode(KeybytesToHashKey(BinaryToKeybytes(st.binaryKey)), st.flag, st.val)
+		n = itrie.NewLeafNode(keybytesToHashKey(binaryToKeybytes(st.binaryKey)), st.flag, st.val)
 	case emptyNode:
 		n = itrie.NewEmptyNode()
 	default:
@@ -282,7 +282,7 @@ func (st *StackTrie) String() string {
 	case parentNode:
 		return fmt.Sprintf("Parent(%s, %s)", st.children[0], st.children[1])
 	case leafNode:
-		return fmt.Sprintf("Leaf(%s)", keyBytesToHex(BinaryToKeybytes(st.binaryKey)))
+		return fmt.Sprintf("Leaf(%q)", binaryToKeybytes(st.binaryKey))
 	case hashedNode:
 		return fmt.Sprintf("Hashed(%s)", st.nodeHash.Hex())
 	case emptyNode:

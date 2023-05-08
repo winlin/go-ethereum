@@ -20,13 +20,14 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	itypes "github.com/scroll-tech/zktrie/types"
 	"io/ioutil"
 	"math/rand"
 	"os"
 	"runtime"
 	"sync"
 	"testing"
+
+	itypes "github.com/scroll-tech/zktrie/types"
 
 	"github.com/stretchr/testify/assert"
 
@@ -40,7 +41,7 @@ func toSecureKey(b []byte) []byte {
 	if k, err := itypes.ToSecureKey(b); err != nil {
 		return nil
 	} else {
-		return HashKeyToKeybytes(itypes.NewHashFromBigInt(k))
+		return hashKeyToKeybytes(itypes.NewHashFromBigInt(k))
 	}
 }
 

@@ -2742,8 +2742,8 @@ func (s *Syncer) onHealByteCodes(peer SyncPeer, id uint64, bytecodes [][]byte) e
 // Note it's not concurrent safe, please handle the concurrent issue outside.
 func (s *Syncer) onHealState(paths [][]byte, value []byte) error {
 	if len(paths) == 1 {
-		var account types.StateAccount
-		if err := rlp.DecodeBytes(value, &account); err != nil {
+		account, err := types.UnmarshalStateAccount(value)
+		if err != nil {
 			return nil
 		}
 		blob := snapshot.SlimAccountRLP(account.Nonce, account.Balance, account.Root, account.KeccakCodeHash, account.PoseidonCodeHash, account.CodeSize)

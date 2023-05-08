@@ -32,7 +32,7 @@ func (t *SecureTrie) ProveWithDeletion(key []byte, fromLevel uint, proofDb ethdb
 	// standardize the key format, which is the same as trie interface
 	key = itypes.ReverseByteOrder(key)
 	reverseBitInPlace(key)
-	err = t.trie.ProveWithDeletion(key, fromLevel,
+	err = t.zktrie.ProveWithDeletion(key, fromLevel,
 		func(n *itrie.Node) error {
 			nodeHash, err := n.NodeHash()
 			if err != nil {
@@ -40,7 +40,7 @@ func (t *SecureTrie) ProveWithDeletion(key []byte, fromLevel uint, proofDb ethdb
 			}
 
 			if n.Type == itrie.NodeTypeLeaf {
-				preImage := t.GetKey(HashKeyToKeybytes(n.NodeKey))
+				preImage := t.GetKey(hashKeyToKeybytes(n.NodeKey))
 				if len(preImage) > 0 {
 					n.KeyPreimage = &itypes.Byte32{}
 					copy(n.KeyPreimage[:], preImage)
@@ -132,7 +132,7 @@ func VerifyProof(rootHash common.Hash, key []byte, proofDb ethdb.KeyValueReader)
 		case itrie.NodeTypeEmpty:
 			return n.Data(), nil
 		case itrie.NodeTypeLeaf:
-			if bytes.Equal(key, HashKeyToKeybytes(n.NodeKey)) {
+			if bytes.Equal(key, hashKeyToKeybytes(n.NodeKey)) {
 				return n.Data(), nil
 			}
 			// We found a leaf whose entry didn't match hIndex
@@ -204,7 +204,7 @@ func proofToPath(
 			}
 			path = path[1:]
 		case itrie.NodeTypeLeaf:
-			if bytes.Equal(key, HashKeyToKeybytes(current.NodeKey)) {
+			if bytes.Equal(key, hashKeyToKeybytes(current.NodeKey)) {
 				return root, current.Data(), nil
 			} else {
 				if allowNonExistent {
@@ -235,7 +235,7 @@ func hasRightElement(node *itrie.Node, key []byte, resolveNode Resolver) bool {
 			node, _ = resolveNode(hash)
 			pos += 1
 		case itrie.NodeTypeLeaf:
-			return bytes.Compare(HashKeyToKeybytes(node.NodeKey), key) > 0
+			return bytes.Compare(hashKeyToKeybytes(node.NodeKey), key) > 0
 		default:
 			panic(fmt.Sprintf("%T: invalid node: %v", node, node)) // hashnode
 		}
@@ -256,8 +256,8 @@ func unset(h *itypes.Hash, l []byte, r []byte, pos int, resolveNode Resolver, ca
 	case itrie.NodeTypeEmpty:
 		return h, nil
 	case itrie.NodeTypeLeaf:
-		if (l != nil && bytes.Compare(HashKeyToBinary(n.NodeKey), l) < 0) ||
-			(r != nil && bytes.Compare(HashKeyToBinary(n.NodeKey), r) > 0) {
+		if (l != nil && bytes.Compare(hashKeyToBinary(n.NodeKey), l) < 0) ||
+			(r != nil && bytes.Compare(hashKeyToBinary(n.NodeKey), r) > 0) {
 			return h, nil
 		}
 		return &itypes.HashZero, nil

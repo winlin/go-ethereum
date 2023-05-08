@@ -31,11 +31,11 @@ var magicHash []byte = []byte("THIS IS THE MAGIC INDEX FOR ZKTRIE")
 
 // SecureTrie is a wrapper of Trie which make the key secure
 type SecureTrie struct {
-	trie *itrie.ZkTrie
-	db   *Database
+	zktrie *itrie.ZkTrie
+	db     *Database
 
-	// trieForIterator is constructed for iterator
-	trieForIterator *Trie
+	// trie is constructed for inner trie method invoke
+	trie *Trie
 }
 
 func sanityCheckKeyBytes(b []byte, accountAddress bool, storageKey bool) {
@@ -59,7 +59,7 @@ func NewSecure(root common.Hash, db *Database) (*SecureTrie, error) {
 	}
 
 	trie := NewTrieWithImpl(impl, db)
-	return &SecureTrie{trie: trie.secureTrie, db: db, trieForIterator: trie}, nil
+	return &SecureTrie{zktrie: trie.secureTrie, db: db, trie: trie}, nil
 }
 
 // Get returns the value for key stored in the trie.
@@ -74,18 +74,18 @@ func (t *SecureTrie) Get(key []byte) []byte {
 
 func (t *SecureTrie) TryGet(key []byte) ([]byte, error) {
 	sanityCheckKeyBytes(key, true, true)
-	return t.trie.TryGet(key)
+	return t.zktrie.TryGet(key)
 }
 
 func (t *SecureTrie) TryGetNode(path []byte) ([]byte, int, error) {
-	panic("implement me!")
+	return t.trie.TryGetNode(path)
 }
 
 // TryUpdateAccount will update the account value in trie
 func (t *SecureTrie) TryUpdateAccount(key []byte, account *types.StateAccount) error {
 	sanityCheckKeyBytes(key, true, false)
 	value, flag := account.MarshalFields()
-	return t.trie.TryUpdate(key, flag, value)
+	return t.zktrie.TryUpdate(key, flag, value)
 }
 
 // Update associates key with value in the trie. Subsequent calls to
@@ -103,7 +103,7 @@ func (t *SecureTrie) Update(key, value []byte) {
 // TryUpdate will update the storage value in trie. value is restricted to length of bytes32.
 func (t *SecureTrie) TryUpdate(key, value []byte) error {
 	sanityCheckKeyBytes(key, false, true)
-	return t.trie.TryUpdate(key, 1, []itypes.Byte32{*itypes.NewByte32FromBytes(value)})
+	return t.zktrie.TryUpdate(key, 1, []itypes.Byte32{*itypes.NewByte32FromBytes(value)})
 }
 
 // Delete removes any existing value for key from the trie.
@@ -115,7 +115,7 @@ func (t *SecureTrie) Delete(key []byte) {
 
 func (t *SecureTrie) TryDelete(key []byte) error {
 	sanityCheckKeyBytes(key, true, true)
-	return t.trie.TryDelete(key)
+	return t.zktrie.TryDelete(key)
 }
 
 // GetKey returns the preimage of a hashed key that was
@@ -126,7 +126,7 @@ func (t *SecureTrie) GetKey(key []byte) []byte {
 		log.Error(fmt.Sprintf("Unhandled trie error: %v", err))
 		return nil
 	}
-	hash, err := KeybytesToHashKeyAndCheck(key)
+	hash, err := keybytesToHashKeyAndCheck(key)
 	if err != nil {
 		log.Error(fmt.Sprintf("Unhandled trie error: %v", err))
 		return nil
@@ -158,17 +158,17 @@ func (t *SecureTrie) Commit(onleaf LeafCallback) (common.Hash, int, error) {
 // database and can be used even if the trie doesn't have one.
 func (t *SecureTrie) Hash() common.Hash {
 	var hash common.Hash
-	hash.SetBytes(t.trie.Hash())
+	hash.SetBytes(t.zktrie.Hash())
 	return hash
 }
 
 // Copy returns a copy of SecureBinaryTrie.
 func (t *SecureTrie) Copy() *SecureTrie {
-	return &SecureTrie{trie: t.trie.Copy(), db: t.db}
+	return &SecureTrie{zktrie: t.zktrie.Copy(), db: t.db}
 }
 
 // NodeIterator returns an iterator that returns nodes of the underlying trie. Iteration
 // starts at the key after the given start key.
 func (t *SecureTrie) NodeIterator(start []byte) NodeIterator {
-	return newNodeIterator(t.trieForIterator, start)
+	return newNodeIterator(t.trie, start)
 }

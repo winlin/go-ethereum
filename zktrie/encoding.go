@@ -3,12 +3,39 @@ package zktrie
 import (
 	itrie "github.com/scroll-tech/zktrie/trie"
 	itypes "github.com/scroll-tech/zktrie/types"
-
-	"github.com/scroll-tech/go-ethereum/common/hexutil"
 )
 
-func keyBytesToHex(b []byte) string {
-	return hexutil.Encode(b)
+func binaryToCompact(b []byte) []byte {
+	compact := make([]byte, 0, (len(b)+7)/8+1)
+	compact = append(compact, byte(len(b)%8))
+	var v byte
+	for i := 0; i < len(b); i += 8 {
+		v = 0
+		for j := 0; j < 8 && i+j < len(b); j++ {
+			v = (v << 1) | b[i+j]
+		}
+		compact = append(compact, v)
+	}
+	return compact
+}
+
+func compactToBinary(c []byte) []byte {
+	remainder := int(c[0])
+	b := make([]byte, 0, (len(c)-1)*8+remainder)
+	for i, cc := range c {
+		if i == 0 {
+			continue
+		}
+		num := 8
+		if i+1 == len(c) && remainder > 0 {
+			num = remainder
+		}
+		for num > 0 {
+			num -= 1
+			b = append(b, (cc>>num)&1)
+		}
+	}
+	return b
 }
 
 func keybytesToBinary(b []byte) []byte {
@@ -25,7 +52,7 @@ func keybytesToBinary(b []byte) []byte {
 	return d
 }
 
-func BinaryToKeybytes(b []byte) []byte {
+func binaryToKeybytes(b []byte) []byte {
 	if len(b)%8 != 0 {
 		panic("can't convert binary key whose size is not multiple of 8")
 	}
@@ -53,31 +80,31 @@ func reverseBitInPlace(b []byte) {
 	}
 }
 
-func KeybytesToHashKey(b []byte) *itypes.Hash {
+// internal trie hash key related method
+
+func keybytesToHashKey(b []byte) *itypes.Hash {
 	var h itypes.Hash
 	copy(h[:], b)
 	reverseBitInPlace(h[:])
 	return &h
 }
 
-func KeybytesToHashKeyAndCheck(b []byte) (*itypes.Hash, error) {
-	var h itypes.Hash
-	copy(h[:], b)
-	reverseBitInPlace(h[:])
+func keybytesToHashKeyAndCheck(b []byte) (*itypes.Hash, error) {
+	h := keybytesToHashKey(b)
 	if !itypes.CheckBigIntInField(h.BigInt()) {
 		return nil, itrie.ErrInvalidField
 	}
-	return &h, nil
+	return h, nil
 }
 
-func HashKeyToKeybytes(h *itypes.Hash) []byte {
+func hashKeyToKeybytes(h *itypes.Hash) []byte {
 	b := make([]byte, itypes.HashByteLen)
 	copy(b, h[:])
 	reverseBitInPlace(b)
 	return b
 }
 
-func HashKeyToBinary(h *itypes.Hash) []byte {
-	kb := HashKeyToKeybytes(h)
+func hashKeyToBinary(h *itypes.Hash) []byte {
+	kb := hashKeyToKeybytes(h)
 	return keybytesToBinary(kb)
 }

@@ -110,7 +110,7 @@ func (t *Trie) TryGet(key []byte) ([]byte, error) {
 	if err := CheckKeyLength(key, 32); err != nil {
 		return nil, err
 	}
-	return t.impl.TryGet(KeybytesToHashKey(key))
+	return t.impl.TryGet(keybytesToHashKey(key))
 }
 
 func (t *Trie) UpdateWithKind(kind string, key, value []byte) {
@@ -159,7 +159,7 @@ func (t *Trie) TryUpdateAccount(key []byte, acc *types.StateAccount) error {
 		return err
 	}
 	value, flag := acc.MarshalFields()
-	return t.impl.TryUpdate(KeybytesToHashKey(key), flag, value)
+	return t.impl.TryUpdate(keybytesToHashKey(key), flag, value)
 }
 
 // NOTE: value is restricted to length of bytes32.
@@ -168,25 +168,55 @@ func (t *Trie) TryUpdate(key, value []byte) error {
 	if err := CheckKeyLength(key, 32); err != nil {
 		return err
 	}
-	if err := t.impl.TryUpdate(KeybytesToHashKey(key), 1, []itypes.Byte32{*itypes.NewByte32FromBytes(value)}); err != nil {
+	if err := t.impl.TryUpdate(keybytesToHashKey(key), 1, []itypes.Byte32{*itypes.NewByte32FromBytes(value)}); err != nil {
 		return fmt.Errorf("zktrie update failed: %w", err)
 	}
 	return nil
 }
 
 func (t *Trie) TryDelete(key []byte) error {
-	return t.impl.TryDelete(KeybytesToHashKey(key))
+	return t.impl.TryDelete(keybytesToHashKey(key))
 }
 
 // Delete removes any existing value for key from the trie.
 func (t *Trie) Delete(key []byte) {
-	if err := t.impl.TryDelete(KeybytesToHashKey(key)); err != nil {
+	if err := t.impl.TryDelete(keybytesToHashKey(key)); err != nil {
 		log.Error(fmt.Sprintf("Unhandled trie error: %v", err))
 	}
 }
 
+// TryGetNode attempts to retrieve a trie node by compact-encoded path. It is not
+// possible to use keybyte-encoding as the path might contain odd nibbles.
 func (t *Trie) TryGetNode(path []byte) ([]byte, int, error) {
-	panic("not implemented")
+	hash := t.impl.Root()
+	binary := compactToBinary(path)
+
+	var (
+		n     *itrie.Node
+		loads = 0
+		err   error
+	)
+	for _, p := range binary {
+		loads += 1
+		if n, err = t.impl.GetNode(hash); err != nil {
+			return nil, loads, err
+		}
+		switch n.Type {
+		case itrie.NodeTypeParent:
+			if p == 0 {
+				hash = n.ChildL
+			} else {
+				hash = n.ChildR
+			}
+		default:
+			return nil, loads, nil
+		}
+	}
+	loads += 1
+	if n, err = t.impl.GetNode(hash); err != nil {
+		return nil, loads, err
+	}
+	return n.CanonicalValue(), loads, nil
 }
 
 // Commit writes all nodes and the secure hash pre-images to the trie's database.
