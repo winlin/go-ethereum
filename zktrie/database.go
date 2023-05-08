@@ -51,7 +51,6 @@ type Database struct {
 	diskdb ethdb.KeyValueStore // Persistent storage for matured trie nodes
 	prefix []byte
 
-	//TODO: useless?
 	cleans     *fastcache.Cache // GC friendly memory cache of clean node RLPs
 	rawDirties trie.KvMap
 
@@ -105,23 +104,23 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 		return value, nil
 	}
 
-	//if db.cleans != nil {
-	//	if enc := db.cleans.Get(nil, concatKey); enc != nil {
-	//		memcacheCleanHitMeter.Mark(1)
-	//		memcacheCleanReadMeter.Mark(int64(len(enc)))
-	//		return enc, nil
-	//	}
-	//}
+	if db.cleans != nil {
+		if enc := db.cleans.Get(nil, concatKey); enc != nil {
+			memcacheCleanHitMeter.Mark(1)
+			memcacheCleanReadMeter.Mark(int64(len(enc)))
+			return enc, nil
+		}
+	}
 
 	v, err := db.diskdb.Get(concatKey)
 	if err == leveldb.ErrNotFound {
 		return nil, zktrie.ErrKeyNotFound
 	}
-	//if db.cleans != nil {
-	//	db.cleans.Set(concatKey[:], v)
-	//	memcacheCleanMissMeter.Mark(1)
-	//	memcacheCleanWriteMeter.Mark(int64(len(v)))
-	//}
+	if db.cleans != nil {
+		db.cleans.Set(concatKey[:], v)
+		memcacheCleanMissMeter.Mark(1)
+		memcacheCleanWriteMeter.Mark(int64(len(v)))
+	}
 	return v, err
 }
 
