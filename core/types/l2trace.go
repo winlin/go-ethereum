@@ -144,21 +144,20 @@ type StorageWrapper struct {
 }
 
 type TransactionData struct {
-	Type       uint8           `json:"type"`
-	Nonce      uint64          `json:"nonce"`
-	TxHash     string          `json:"txHash"`
-	Gas        uint64          `json:"gas"`
-	GasPrice   *hexutil.Big    `json:"gasPrice"`
-	From       common.Address  `json:"from"`
-	To         *common.Address `json:"to"`
-	ChainId    *hexutil.Big    `json:"chainId"`
-	Value      *hexutil.Big    `json:"value"`
-	Data       string          `json:"data"`
-	IsCreate   bool            `json:"isCreate"`
-	V          *hexutil.Big    `json:"v"`
-	R          *hexutil.Big    `json:"r"`
-	S          *hexutil.Big    `json:"s"`
-	QueueIndex uint64          `json:"queueIndex"`
+	Type     uint8           `json:"type"`
+	Nonce    uint64          `json:"nonce"`
+	TxHash   string          `json:"txHash"`
+	Gas      uint64          `json:"gas"`
+	GasPrice *hexutil.Big    `json:"gasPrice"`
+	From     common.Address  `json:"from"`
+	To       *common.Address `json:"to"`
+	ChainId  *hexutil.Big    `json:"chainId"`
+	Value    *hexutil.Big    `json:"value"`
+	Data     string          `json:"data"`
+	IsCreate bool            `json:"isCreate"`
+	V        *hexutil.Big    `json:"v"`
+	R        *hexutil.Big    `json:"r"`
+	S        *hexutil.Big    `json:"s"`
 }
 
 // NewTransactionData returns a transaction that will serialize to the trace
@@ -167,22 +166,27 @@ func NewTransactionData(tx *Transaction, blockNumber uint64, config *params.Chai
 	signer := MakeSigner(config, big.NewInt(0).SetUint64(blockNumber))
 	from, _ := Sender(signer, tx)
 	v, r, s := tx.RawSignatureValues()
+
+	nonce := tx.Nonce()
+	if tx.IsL1MessageTx() {
+		nonce = tx.QueueIndex()
+	}
+
 	result := &TransactionData{
-		Type:       tx.Type(),
-		TxHash:     tx.Hash().String(),
-		Nonce:      tx.Nonce(),
-		ChainId:    (*hexutil.Big)(tx.ChainId()),
-		From:       from,
-		Gas:        tx.Gas(),
-		GasPrice:   (*hexutil.Big)(tx.GasPrice()),
-		To:         tx.To(),
-		Value:      (*hexutil.Big)(tx.Value()),
-		Data:       hexutil.Encode(tx.Data()),
-		IsCreate:   tx.To() == nil,
-		V:          (*hexutil.Big)(v),
-		R:          (*hexutil.Big)(r),
-		S:          (*hexutil.Big)(s),
-		QueueIndex: tx.QueueIndex(),
+		Type:     tx.Type(),
+		TxHash:   tx.Hash().String(),
+		Nonce:    nonce,
+		ChainId:  (*hexutil.Big)(tx.ChainId()),
+		From:     from,
+		Gas:      tx.Gas(),
+		GasPrice: (*hexutil.Big)(tx.GasPrice()),
+		To:       tx.To(),
+		Value:    (*hexutil.Big)(tx.Value()),
+		Data:     hexutil.Encode(tx.Data()),
+		IsCreate: tx.To() == nil,
+		V:        (*hexutil.Big)(v),
+		R:        (*hexutil.Big)(r),
+		S:        (*hexutil.Big)(s),
 	}
 	return result
 }
