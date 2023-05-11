@@ -19,12 +19,13 @@ package zktrie
 import (
 	"bytes"
 	"fmt"
-	"github.com/scroll-tech/go-ethereum/common"
-	"github.com/scroll-tech/go-ethereum/ethdb"
-	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
 	"math/rand"
 	"strings"
 	"testing"
+
+	"github.com/scroll-tech/go-ethereum/common"
+	"github.com/scroll-tech/go-ethereum/ethdb"
+	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
 )
 
 func TestIterator(t *testing.T) {

@@ -240,7 +240,6 @@ func hasRightElement(node *itrie.Node, key []byte, resolveNode Resolver) bool {
 			panic(fmt.Sprintf("%T: invalid node: %v", node, node)) // hashnode
 		}
 	}
-	return false
 }
 
 func unset(h *itypes.Hash, l []byte, r []byte, pos int, resolveNode Resolver, cache ethdb.KeyValueStore) (*itypes.Hash, error) {

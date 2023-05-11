@@ -19,16 +19,17 @@ package trie
 import (
 	"bytes"
 	"encoding/binary"
-	"github.com/scroll-tech/go-ethereum/ethdb/leveldb"
-	"github.com/stretchr/testify/assert"
 	"math/rand"
 	"os"
 	"runtime"
 	"sync"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/crypto"
+	"github.com/scroll-tech/go-ethereum/ethdb/leveldb"
 	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
 )
 

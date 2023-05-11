@@ -285,7 +285,7 @@ func (st *StackTrie) String() string {
 	case hashedNode:
 		return fmt.Sprintf("Hashed(%s)", st.nodeHash.Hex())
 	case emptyNode:
-		return fmt.Sprintf("Empty")
+		return "Empty"
 	default:
 		panic("unknown node type")
 	}

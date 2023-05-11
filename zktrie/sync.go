@@ -163,7 +163,7 @@ func (s *Sync) AddSubTrie(root common.Hash, path []byte, parent common.Hash, cal
 		// Bloom filter says this might be a duplicate, double check.
 		// If database says yes, then at least the trie node is present
 		// and we hold the assumption that it's NOT legacy contract code.
-		blob := rawdb.ReadTrieNode(s.database, root)
+		blob := rawdb.ReadZKTrieNode(s.database, root)
 		if len(blob) > 0 {
 			return
 		}
@@ -311,7 +311,7 @@ func (s *Sync) Process(result SyncResult) error {
 func (s *Sync) Commit(dbw ethdb.Batch) error {
 	// Dump the membatch into a database dbw
 	for key, value := range s.membatch.nodes {
-		rawdb.WriteTrieNode(dbw, key, value)
+		rawdb.WriteZKTrieNode(dbw, key, value)
 		if s.bloom != nil {
 			s.bloom.Add(key[:])
 		}
@@ -440,7 +440,7 @@ func (s *Sync) processNode(req *request, node []byte) ([]*request, error) {
 			// Bloom filter says this might be a duplicate, double check.
 			// If database says yes, then at least the trie node is present
 			// and we hold the assumption that it's NOT legacy contract code.
-			if blob := rawdb.ReadTrieNode(s.database, hash); len(blob) > 0 {
+			if blob := rawdb.ReadZKTrieNode(s.database, hash); len(blob) > 0 {
 				continue
 			}
 			// False positive, bump fault meter

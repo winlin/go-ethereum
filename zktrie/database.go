@@ -26,22 +26,22 @@ var (
 	memcacheCleanReadMeter  = metrics.NewRegisteredMeter("zktrie/memcache/clean/read", nil)
 	memcacheCleanWriteMeter = metrics.NewRegisteredMeter("zktrie/memcache/clean/write", nil)
 
-	memcacheDirtyHitMeter   = metrics.NewRegisteredMeter("zktrie/memcache/dirty/hit", nil)
-	memcacheDirtyMissMeter  = metrics.NewRegisteredMeter("zktrie/memcache/dirty/miss", nil)
-	memcacheDirtyReadMeter  = metrics.NewRegisteredMeter("zktrie/memcache/dirty/read", nil)
-	memcacheDirtyWriteMeter = metrics.NewRegisteredMeter("zktrie/memcache/dirty/write", nil)
+	memcacheDirtyHitMeter  = metrics.NewRegisteredMeter("zktrie/memcache/dirty/hit", nil)
+	memcacheDirtyMissMeter = metrics.NewRegisteredMeter("zktrie/memcache/dirty/miss", nil)
+	memcacheDirtyReadMeter = metrics.NewRegisteredMeter("zktrie/memcache/dirty/read", nil)
+	//memcacheDirtyWriteMeter = metrics.NewRegisteredMeter("zktrie/memcache/dirty/write", nil)
 
-	memcacheFlushTimeTimer  = metrics.NewRegisteredResettingTimer("zktrie/memcache/flush/time", nil)
-	memcacheFlushNodesMeter = metrics.NewRegisteredMeter("zktrie/memcache/flush/nodes", nil)
-	memcacheFlushSizeMeter  = metrics.NewRegisteredMeter("zktrie/memcache/flush/size", nil)
+	//memcacheFlushTimeTimer  = metrics.NewRegisteredResettingTimer("zktrie/memcache/flush/time", nil)
+	//memcacheFlushNodesMeter = metrics.NewRegisteredMeter("zktrie/memcache/flush/nodes", nil)
+	//memcacheFlushSizeMeter  = metrics.NewRegisteredMeter("zktrie/memcache/flush/size", nil)
 
-	memcacheGCTimeTimer  = metrics.NewRegisteredResettingTimer("zktrie/memcache/gc/time", nil)
-	memcacheGCNodesMeter = metrics.NewRegisteredMeter("zktrie/memcache/gc/nodes", nil)
-	memcacheGCSizeMeter  = metrics.NewRegisteredMeter("zktrie/memcache/gc/size", nil)
+	//memcacheGCTimeTimer  = metrics.NewRegisteredResettingTimer("zktrie/memcache/gc/time", nil)
+	//memcacheGCNodesMeter = metrics.NewRegisteredMeter("zktrie/memcache/gc/nodes", nil)
+	//memcacheGCSizeMeter  = metrics.NewRegisteredMeter("zktrie/memcache/gc/size", nil)
 
-	memcacheCommitTimeTimer  = metrics.NewRegisteredResettingTimer("zktrie/memcache/commit/time", nil)
-	memcacheCommitNodesMeter = metrics.NewRegisteredMeter("zktrie/memcache/commit/nodes", nil)
-	memcacheCommitSizeMeter  = metrics.NewRegisteredMeter("zktrie/memcache/commit/size", nil)
+	//memcacheCommitTimeTimer  = metrics.NewRegisteredResettingTimer("zktrie/memcache/commit/time", nil)
+	//memcacheCommitNodesMeter = metrics.NewRegisteredMeter("zktrie/memcache/commit/nodes", nil)
+	//memcacheCommitSizeMeter  = metrics.NewRegisteredMeter("zktrie/memcache/commit/size", nil)
 )
 
 var (
@@ -290,7 +290,7 @@ func (db *Database) Node(hash common.Hash) ([]byte, error) {
 	memcacheDirtyMissMeter.Mark(1)
 
 	// Content unavailable in memory, attempt to retrieve from disk
-	enc := rawdb.ReadTrieNode(db.diskdb, hash)
+	enc := rawdb.ReadZKTrieNode(db.diskdb, hash)
 	if len(enc) != 0 {
 		if db.cleans != nil {
 			db.cleans.Set(concatKey, enc)
@@ -308,6 +308,5 @@ func (db *Database) Node(hash common.Hash) ([]byte, error) {
 // Note, this method is a non-synchronized mutator. It is unsafe to call this
 // concurrently with other mutators.
 func (db *Database) Cap(size common.StorageSize) {
-	// nothing to do
-	return
+	//TODO: implement it when database is refactor
 }
