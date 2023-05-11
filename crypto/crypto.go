@@ -35,6 +35,7 @@ import (
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/common/math"
+	"github.com/scroll-tech/go-ethereum/crypto/poseidon"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/rlp"
 )
@@ -54,6 +55,10 @@ var (
 )
 
 var errInvalidPubkey = errors.New("invalid secp256k1 public key")
+
+func init() {
+	itypes.InitHashScheme(poseidon.HashFixed)
+}
 
 // KeccakState wraps sha3.state. In addition to the usual hash methods, it also supports
 // Read to get a variable amount of data from the hash state. Read is faster than Sum
@@ -123,6 +128,7 @@ func reverseBitInPlace(b []byte) {
 func PoseidonSecure(data []byte) []byte {
 	sk, err := itypes.ToSecureKey(data)
 	if err != nil {
+		fmt.Printf("err: %v", err)
 		log.Error(fmt.Sprintf("make data secure failed: %v", err))
 		return nil
 	}

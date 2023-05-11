@@ -1,6 +1,7 @@
 package zktrie
 
 import (
+	"errors"
 	"math/big"
 	"reflect"
 	"runtime"
@@ -13,6 +14,7 @@ import (
 	zktrie "github.com/scroll-tech/zktrie/trie"
 
 	"github.com/scroll-tech/go-ethereum/common"
+	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/metrics"
 	"github.com/scroll-tech/go-ethereum/trie"
@@ -51,8 +53,8 @@ type Database struct {
 	diskdb ethdb.KeyValueStore // Persistent storage for matured trie nodes
 	prefix []byte
 
-	cleans     *fastcache.Cache // GC friendly memory cache of clean node RLPs
-	rawDirties trie.KvMap
+	cleans  *fastcache.Cache // GC friendly memory cache of clean node RLPs
+	dirties trie.KvMap
 
 	preimages *preimageStore
 
@@ -75,10 +77,10 @@ func NewDatabaseWithConfig(diskdb ethdb.KeyValueStore, config *Config) *Database
 		cleans = fastcache.New(config.Cache * 1024 * 1024)
 	}
 	db := &Database{
-		diskdb:     diskdb,
-		prefix:     []byte{},
-		cleans:     cleans,
-		rawDirties: make(trie.KvMap),
+		diskdb:  diskdb,
+		prefix:  []byte{},
+		cleans:  cleans,
+		dirties: make(trie.KvMap),
 	}
 	if config != nil && config.Preimages {
 		db.preimages = newPreimageStore(diskdb)
@@ -89,7 +91,7 @@ func NewDatabaseWithConfig(diskdb ethdb.KeyValueStore, config *Config) *Database
 // Put saves a key:value into the Storage
 func (db *Database) Put(k, v []byte) error {
 	db.lock.Lock()
-	db.rawDirties.Put(trie.Concat(db.prefix, k[:]), v)
+	db.dirties.Put(trie.Concat(db.prefix, k[:]), v)
 	db.lock.Unlock()
 	return nil
 }
@@ -98,7 +100,7 @@ func (db *Database) Put(k, v []byte) error {
 func (db *Database) Get(key []byte) ([]byte, error) {
 	concatKey := trie.Concat(db.prefix, key[:])
 	db.lock.RLock()
-	value, ok := db.rawDirties.Get(concatKey)
+	value, ok := db.dirties.Get(concatKey)
 	db.lock.RUnlock()
 	if ok {
 		return value, nil
@@ -147,6 +149,22 @@ func (db *Database) Iterate(f func([]byte, []byte) (bool, error)) error {
 	return iter.Error()
 }
 
+// Nodes retrieves the hashes of all the nodes cached within the memory database.
+// This method is extremely expensive and should only be used to validate internal
+// states in test code.
+func (db *Database) Nodes() []common.Hash {
+	db.lock.RLock()
+	defer db.lock.RUnlock()
+
+	var hashes = make([]common.Hash, 0, len(db.dirties))
+	for hash := range db.dirties {
+		if hash != (common.Hash{}) { // Special case for "root" references/nodes
+			hashes = append(hashes, hash)
+		}
+	}
+	return hashes
+}
+
 func (db *Database) Reference(child common.Hash, parent common.Hash) {
 	panic("not implemented")
 }
@@ -180,17 +198,25 @@ func (db *Database) Commit(node common.Hash, report bool, callback func(common.H
 	batch := db.diskdb.NewBatch()
 
 	db.lock.Lock()
-	for _, v := range db.rawDirties {
+	for _, v := range db.dirties {
 		batch.Put(v.K, v.V)
 	}
-	for k := range db.rawDirties {
-		delete(db.rawDirties, k)
+	for k := range db.dirties {
+		delete(db.dirties, k)
 	}
 	db.lock.Unlock()
 	if err := batch.Write(); err != nil {
 		return err
 	}
 	batch.Reset()
+
+	if (node == common.Hash{}) {
+		return nil
+	}
+
+	if db.preimages != nil {
+		db.preimages.commit(true)
+	}
 	return nil
 }
 
@@ -231,7 +257,7 @@ func (db *Database) Size() (common.StorageSize, common.StorageSize) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	return common.StorageSize(len(db.rawDirties) * cachedNodeSize), db.preimages.size()
+	return common.StorageSize(len(db.dirties) * cachedNodeSize), db.preimages.size()
 }
 
 func (db *Database) SaveCache(dir string) error {
@@ -239,7 +265,41 @@ func (db *Database) SaveCache(dir string) error {
 }
 
 func (db *Database) Node(hash common.Hash) ([]byte, error) {
-	panic("not implemented")
+	if hash == (common.Hash{}) {
+		return nil, errors.New("not found")
+	}
+	concatKey := trie.Concat(db.prefix, zktNodeHash(hash)[:])
+	// Retrieve the node from the clean cache if available
+	if db.cleans != nil {
+		if enc := db.cleans.Get(nil, concatKey); enc != nil {
+			memcacheCleanHitMeter.Mark(1)
+			memcacheCleanReadMeter.Mark(int64(len(enc)))
+			return enc, nil
+		}
+	}
+	// Retrieve the node from the dirty cache if available
+	db.lock.RLock()
+	dirty, _ := db.dirties.Get(concatKey)
+	db.lock.RUnlock()
+
+	if dirty != nil {
+		memcacheDirtyHitMeter.Mark(1)
+		memcacheDirtyReadMeter.Mark(int64(len(dirty)))
+		return dirty, nil
+	}
+	memcacheDirtyMissMeter.Mark(1)
+
+	// Content unavailable in memory, attempt to retrieve from disk
+	enc := rawdb.ReadTrieNode(db.diskdb, hash)
+	if len(enc) != 0 {
+		if db.cleans != nil {
+			db.cleans.Set(concatKey, enc)
+			memcacheCleanMissMeter.Mark(1)
+			memcacheCleanWriteMeter.Mark(int64(len(enc)))
+		}
+		return enc, nil
+	}
+	return nil, errors.New("not found")
 }
 
 // Cap iteratively flushes old but still referenced trie nodes until the total
@@ -248,5 +308,6 @@ func (db *Database) Node(hash common.Hash) ([]byte, error) {
 // Note, this method is a non-synchronized mutator. It is unsafe to call this
 // concurrently with other mutators.
 func (db *Database) Cap(size common.StorageSize) {
-	panic("not implemented")
+	// nothing to do
+	return
 }

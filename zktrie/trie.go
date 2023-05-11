@@ -117,7 +117,6 @@ func (t *Trie) UpdateWithKind(kind string, key, value []byte) {
 	if err := t.TryUpdateWithKind(kind, key, value); err != nil {
 		log.Error(fmt.Sprintf("Unhandled trie error: %v", err))
 	}
-	return
 }
 
 func (t *Trie) TryUpdateWithKind(kind string, key, value []byte) error {

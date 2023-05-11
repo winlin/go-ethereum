@@ -19,7 +19,6 @@ package zktrie
 import (
 	"errors"
 	"fmt"
-	"sync"
 
 	itrie "github.com/scroll-tech/zktrie/trie"
 	itypes "github.com/scroll-tech/zktrie/types"
@@ -34,23 +33,23 @@ import (
 var ErrCommitDisabled = errors.New("no database for committing")
 
 // TODO: using it for optimization
-var stPool = sync.Pool{
-	New: func() interface{} {
-		return NewStackTrie(nil)
-	},
-}
-
-func stackTrieFromPool(depth int, db ethdb.KeyValueWriter) *StackTrie {
-	st := stPool.Get().(*StackTrie)
-	st.depth = depth
-	st.db = db
-	return st
-}
-
-func returnToPool(st *StackTrie) {
-	st.Reset()
-	stPool.Put(st)
-}
+//var stPool = sync.Pool{
+//	New: func() interface{} {
+//		return NewStackTrie(nil)
+//	},
+//}
+//
+//func stackTrieFromPool(depth int, db ethdb.KeyValueWriter) *StackTrie {
+//	st := stPool.Get().(*StackTrie)
+//	st.depth = depth
+//	st.db = db
+//	return st
+//}
+//
+//func returnToPool(st *StackTrie) {
+//	st.Reset()
+//	stPool.Put(st)
+//}
 
 const (
 	emptyNode = iota

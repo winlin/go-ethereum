@@ -18,6 +18,7 @@ package state
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 
 	"github.com/scroll-tech/go-ethereum/common"
@@ -37,6 +38,7 @@ func TestNodeIteratorCoverage(t *testing.T) {
 	// Gather all the node hashes found by the iterator
 	hashes := make(map[common.Hash]struct{})
 	for it := NewNodeIterator(state); it.Next(); {
+		fmt.Printf("hash: %v\n", it.Hash)
 		if it.Hash != (common.Hash{}) {
 			hashes[it.Hash] = struct{}{}
 		}
@@ -56,14 +58,18 @@ func TestNodeIteratorCoverage(t *testing.T) {
 		}
 	}
 	it := db.TrieDB().DiskDB().(ethdb.Database).NewIterator(nil, nil)
+	count := 0
 	for it.Next() {
+		count += 1
 		key := it.Key()
 		if bytes.HasPrefix(key, []byte("secure-key-")) {
+			fmt.Printf("key: %q\n", key)
 			continue
 		}
 		if _, ok := hashes[common.BytesToHash(key)]; !ok {
 			t.Errorf("state entry not reported %x", key)
 		}
 	}
+	fmt.Printf("hashs size: %d, diskdb iterator: %d", len(hashes), count)
 	it.Release()
 }
