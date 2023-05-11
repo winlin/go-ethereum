@@ -487,9 +487,20 @@ func (t *Tree) cap(diff *diffLayer, layers int) *diskLayer {
 			// there's a snapshot being generated currently. In that case, the trie
 			// will move from underneath the generator so we **must** merge all the
 			// partial data down into the snapshot and restart the generation.
-			if flattened.parent.(*diskLayer).genAbort == nil {
-				return nil
+			//if flattened.parent.(*diskLayer).genAbort == nil {
+			//	return nil
+			//}
+
+			// Because the current trie does not implement the gc function, it is
+			// acceptable for the trie underneath the generator. In order to prevent
+			// the generation process from being frequently interrupted and affect
+			// performance, we allow accumulation here during the generation process
+			//TODO: fix it when trie gc function is implemented.
+			if flattened.parent.(*diskLayer).genAbort != nil {
+				log.Debug("accumulator layer is working under snapshot generation",
+					"memory", flattened.memory, "limit", aggregatorItemLimit)
 			}
+			return nil
 		}
 	default:
 		panic(fmt.Sprintf("unknown data layer: %T", parent))
