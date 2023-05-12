@@ -225,7 +225,7 @@ func hasRightElement(node *itrie.Node, key []byte, resolveNode Resolver) bool {
 	for {
 		switch node.Type {
 		case itrie.NodeTypeParent:
-			if path[pos] == 0 && node.ChildR != &itypes.HashZero {
+			if path[pos] == 0 && !bytes.Equal(node.ChildR[:], itypes.HashZero[:]) {
 				return true
 			}
 			hash := node.ChildL
