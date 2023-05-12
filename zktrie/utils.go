@@ -17,13 +17,24 @@ func zktNodeHash(node common.Hash) *itypes.Hash {
 	return itypes.NewHashFromBytes(byte32.Bytes())
 }
 
-// NodeHash transform the node content into hash
-func NodeHash(blob []byte) (common.Hash, error) {
+// NodeStoreHash represent the db key of node content for storing
+func NodeStoreHash(blob []byte) (*itypes.Hash, error) {
 	node, err := itrie.NewNodeFromBytes(blob)
 	if err != nil {
-		return common.Hash{}, err
+		return nil, err
 	}
+
 	hash, err := node.NodeHash()
+	if err != nil {
+		return nil, err
+	}
+
+	return hash, nil
+}
+
+// NodeHash represent the hash of node content
+func NodeHash(blob []byte) (common.Hash, error) {
+	hash, err := NodeStoreHash(blob)
 	if err != nil {
 		return common.Hash{}, err
 	}

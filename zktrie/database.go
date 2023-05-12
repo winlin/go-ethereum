@@ -11,7 +11,7 @@ import (
 	"github.com/VictoriaMetrics/fastcache"
 	"github.com/syndtr/goleveldb/leveldb"
 
-	zktrie "github.com/scroll-tech/zktrie/trie"
+	itrie "github.com/scroll-tech/zktrie/trie"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
@@ -116,7 +116,7 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 
 	v, err := db.diskdb.Get(concatKey)
 	if err == leveldb.ErrNotFound {
-		return nil, zktrie.ErrKeyNotFound
+		return nil, itrie.ErrKeyNotFound
 	}
 	if db.cleans != nil {
 		db.cleans.Set(concatKey[:], v)
@@ -166,11 +166,11 @@ func (db *Database) Nodes() []common.Hash {
 }
 
 func (db *Database) Reference(child common.Hash, parent common.Hash) {
-	panic("not implemented")
+	//TODO:
 }
 
 func (db *Database) Dereference(root common.Hash) {
-	panic("not implemented")
+	//TODO:
 }
 
 // Close implements the method Close of the interface Storage
@@ -257,7 +257,11 @@ func (db *Database) Size() (common.StorageSize, common.StorageSize) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	return common.StorageSize(len(db.dirties) * cachedNodeSize), db.preimages.size()
+	var imgSize common.StorageSize = 0
+	if db.preimages != nil {
+		imgSize = db.preimages.size()
+	}
+	return common.StorageSize(len(db.dirties) * cachedNodeSize), imgSize
 }
 
 func (db *Database) SaveCache(dir string) error {
@@ -266,7 +270,7 @@ func (db *Database) SaveCache(dir string) error {
 
 func (db *Database) Node(hash common.Hash) ([]byte, error) {
 	if hash == (common.Hash{}) {
-		return nil, errors.New("not found")
+		return itrie.NewEmptyNode().CanonicalValue(), nil
 	}
 	concatKey := trie.Concat(db.prefix, zktNodeHash(hash)[:])
 	// Retrieve the node from the clean cache if available
@@ -309,4 +313,12 @@ func (db *Database) Node(hash common.Hash) ([]byte, error) {
 // concurrently with other mutators.
 func (db *Database) Cap(size common.StorageSize) {
 	//TODO: implement it when database is refactor
+}
+
+func (db *Database) Has(key []byte) (bool, error) {
+	val, err := db.Get(key)
+	if err != nil {
+		return false, err
+	}
+	return val != nil, nil
 }

@@ -17,6 +17,7 @@
 package zktrie
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 
@@ -406,6 +407,9 @@ func (s *Sync) processNode(req *request, node []byte) ([]*request, error) {
 	switch n.Type {
 	case itrie.NodeTypeParent:
 		for i, h := range []*itypes.Hash{n.ChildL, n.ChildR} {
+			if bytes.Equal(h[:], itypes.HashZero[:]) {
+				continue
+			}
 			children = append(children, child{
 				path: append(append([]byte(nil), req.path...), byte(i)),
 				hash: h,
