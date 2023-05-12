@@ -20,6 +20,9 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"github.com/scroll-tech/go-ethereum/core/types"
+	"github.com/scroll-tech/go-ethereum/rlp"
+	"math/big"
 	mrand "math/rand"
 	"sort"
 	"testing"
@@ -68,6 +71,36 @@ func TestSimpleProofEntireTrie(t *testing.T) {
 	}
 }
 
+func TestSimpleProofEntireTrieAccountTrie(t *testing.T) {
+	trie, kvs := nonRandomAccountTrie(3)
+	var entries entrySlice
+	for _, kv := range kvs {
+		entries = append(entries, kv)
+	}
+	sort.Sort(entries)
+
+	proof := memorydb.New()
+	if err := trie.Prove(entries[0].k, 0, proof); err != nil {
+		t.Fatalf("Failed to prove the first node %v", err)
+	}
+	if err := trie.Prove(entries[2].k, 0, proof); err != nil {
+		t.Fatalf("Failed to prove the last node %v", err)
+	}
+
+	var keys [][]byte
+	var vals [][]byte
+	for i := 0; i <= 2; i++ {
+		keys = append(keys, entries[i].k)
+		account, _ := types.UnmarshalStateAccount(entries[i].v)
+		account_rlp, _ := rlp.EncodeToBytes(account)
+		vals = append(vals, account_rlp)
+	}
+	_, err := VerifyRangeProof(trie.Hash(), "account", keys[0], keys[len(keys)-1], keys, vals, proof)
+	if err != nil {
+		t.Fatalf("Verification of range proof failed!\n%v\n", err)
+	}
+}
+
 // Basic case to test the functionality of the main workflow.
 func TestSimpleProofValidRange(t *testing.T) {
 	trie, kvs := nonRandomTrie(7)
@@ -92,6 +125,37 @@ func TestSimpleProofValidRange(t *testing.T) {
 		vals = append(vals, entries[i].v)
 	}
 	_, err := VerifyRangeProof(trie.Hash(), "storage", keys[0], keys[len(keys)-1], keys, vals, proof)
+	if err != nil {
+		t.Fatalf("Verification of range proof failed!\n%v\n", err)
+	}
+}
+
+// Basic case to test the functionality of the main workflow.
+func TestSimpleProofValidRangeAccountTrie(t *testing.T) {
+	trie, kvs := nonRandomAccountTrie(7)
+	var entries entrySlice
+	for _, kv := range kvs {
+		entries = append(entries, kv)
+	}
+	sort.Sort(entries)
+
+	proof := memorydb.New()
+	if err := trie.Prove(entries[2].k, 0, proof); err != nil {
+		t.Fatalf("Failed to prove the first node %v", err)
+	}
+	if err := trie.Prove(entries[5].k, 0, proof); err != nil {
+		t.Fatalf("Failed to prove the last node %v", err)
+	}
+
+	var keys [][]byte
+	var vals [][]byte
+	for i := 2; i <= 5; i++ {
+		keys = append(keys, entries[i].k)
+		account, _ := types.UnmarshalStateAccount(entries[i].v)
+		account_rlp, _ := rlp.EncodeToBytes(account)
+		vals = append(vals, account_rlp)
+	}
+	_, err := VerifyRangeProof(trie.Hash(), "account", keys[0], keys[len(keys)-1], keys, vals, proof)
 	if err != nil {
 		t.Fatalf("Verification of range proof failed!\n%v\n", err)
 	}
@@ -866,6 +930,30 @@ func nonRandomTrie(n int) (*Trie, map[string]*kv) {
 		//value := &kv{common.LeftPadBytes([]byte{i}, 32), []byte{i}, false}
 		elem := &kv{key, value, false}
 		trie.Update(elem.k, elem.v)
+		vals[string(elem.k)] = elem
+	}
+	return trie, vals
+}
+
+func nonRandomAccountTrie(n int) (*Trie, map[string]*kv) {
+	trie, err := New(common.Hash{}, NewDatabase((memorydb.New())))
+	if err != nil {
+		panic(err)
+	}
+	vals := make(map[string]*kv)
+
+	for i := uint64(1); i <= uint64(n); i++ {
+		account := new(types.StateAccount)
+		account.Nonce = i
+		account.Balance = big.NewInt(int64(i))
+		account.Root = common.Hash{}
+		account.KeccakCodeHash = common.FromHex("678910")
+		account.PoseidonCodeHash = common.FromHex("1112131415")
+
+		key := make([]byte, 32)
+		binary.LittleEndian.PutUint64(key, i)
+		trie.UpdateAccount(key, account)
+		elem := &kv{key, trie.Get(key), false}
 		vals[string(elem.k)] = elem
 	}
 	return trie, vals
