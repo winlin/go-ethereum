@@ -20,13 +20,14 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"github.com/scroll-tech/go-ethereum/core/types"
-	"github.com/scroll-tech/go-ethereum/rlp"
 	"math/big"
 	mrand "math/rand"
 	"sort"
 	"testing"
 	"time"
+
+	"github.com/scroll-tech/go-ethereum/core/types"
+	"github.com/scroll-tech/go-ethereum/rlp"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
