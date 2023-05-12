@@ -236,6 +236,8 @@ func hasRightElement(node *itrie.Node, key []byte, resolveNode Resolver) bool {
 			pos += 1
 		case itrie.NodeTypeLeaf:
 			return bytes.Compare(hashKeyToKeybytes(node.NodeKey), key) > 0
+		case itrie.NodeTypeEmpty:
+			return false
 		default:
 			panic(fmt.Sprintf("%T: invalid node: %v", node, node)) // hashnode
 		}
@@ -463,5 +465,5 @@ func VerifyRangeProof(rootHash common.Hash, kind string, firstKey []byte, lastKe
 	if tr.Hash() != rootHash {
 		return false, fmt.Errorf("invalid proof, want hash %x, got %x", rootHash, tr.Hash())
 	}
-	return hasRightElement(root, keys[len(keys)-1], nodeResolver(trieCache)), nil
+	return hasRightElement(root, keys[len(keys)-1], nodeResolver(tr.db)), nil
 }
