@@ -365,8 +365,9 @@ func (db *Database) Node(hash common.Hash) ([]byte, error) {
 //
 // Note, this method is a non-synchronized mutator. It is unsafe to call this
 // concurrently with other mutators.
-func (db *Database) Cap(size common.StorageSize) {
+func (db *Database) Cap(size common.StorageSize) error {
 	//TODO: implement it when database is refactor
+	return db.Commit(common.Hash{}, true, nil)
 }
 
 func (db *Database) Has(key []byte) (bool, error) {

@@ -17,12 +17,9 @@
 package state
 
 import (
-	"bytes"
-
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/ethdb"
-	"github.com/scroll-tech/go-ethereum/rlp"
 	"github.com/scroll-tech/go-ethereum/zktrie"
 )
 
@@ -44,12 +41,12 @@ func NewStateSync(root common.Hash, database ethdb.KeyValueReader, bloom *zktrie
 				return err
 			}
 		}
-		var obj types.StateAccount
-		if err := rlp.Decode(bytes.NewReader(leaf), &obj); err != nil {
+		acc, err := types.UnmarshalStateAccount(leaf)
+		if err != nil {
 			return err
 		}
-		syncer.AddSubTrie(obj.Root, hexpath, parent, onSlot)
-		syncer.AddCodeEntry(common.BytesToHash(obj.KeccakCodeHash), hexpath, parent)
+		syncer.AddSubTrie(acc.Root, hexpath, parent, onSlot)
+		syncer.AddCodeEntry(common.BytesToHash(acc.KeccakCodeHash), hexpath, parent)
 		return nil
 	}
 	syncer = zktrie.NewSync(root, database, onAccount, bloom)
