@@ -158,7 +158,7 @@ func TestNodeIteratorCoverage(t *testing.T) {
 	}
 	// Cross-check the hashes and the database itself
 	for hash := range hashes {
-		if _, err := db.Get(zktNodeHash(hash)[:]); err != nil {
+		if _, err := db.Get(StoreHashFromNodeHash(hash)[:]); err != nil {
 			t.Errorf("failed to retrieve reported node %x: %v", hash, err)
 		}
 	}
@@ -195,7 +195,7 @@ func TestNodeIteratorCoverageSecureTrie(t *testing.T) {
 	}
 	// Cross-check the hashes and the database itself
 	for hash := range hashes {
-		if _, err := db.Get(zktNodeHash(hash)[:]); err != nil {
+		if _, err := db.Get(StoreHashFromNodeHash(hash)[:]); err != nil {
 			t.Errorf("failed to retrieve reported node %x: %v", hash, err)
 		}
 	}
@@ -390,7 +390,7 @@ func TestIteratorContinueAfterError(t *testing.T) {
 	var diskKeys [][]byte
 	for it := tr.NodeIterator(nil); it.Next(true); {
 		if it.Hash() != (common.Hash{}) {
-			diskKeys = append(diskKeys, zktNodeHash(it.Hash())[:])
+			diskKeys = append(diskKeys, StoreHashFromNodeHash(it.Hash())[:])
 		}
 	}
 
@@ -406,7 +406,7 @@ func TestIteratorContinueAfterError(t *testing.T) {
 		)
 		for {
 			copy(rkey[:], diskKeys[rand.Intn(len(diskKeys))])
-			if !bytes.Equal(rkey[:], zktNodeHash(tr.Hash())[:]) {
+			if !bytes.Equal(rkey[:], StoreHashFromNodeHash(tr.Hash())[:]) {
 				break
 			}
 		}
@@ -449,7 +449,7 @@ func TestIteratorContinueAfterSeekError(t *testing.T) {
 	triedb.Commit(root, true, nil)
 
 	// Delete a random node
-	barsNodeDiskKey := zktNodeHash(common.HexToHash("0076cc317ac42e3fc2dea8bd3869583c74cb7107666c9dc0b57853ea6d80a2bc"))[:]
+	barsNodeDiskKey := StoreHashFromNodeHash(common.HexToHash("0076cc317ac42e3fc2dea8bd3869583c74cb7107666c9dc0b57853ea6d80a2bc"))[:]
 	barsNodeBlob, _ := diskdb.Get(barsNodeDiskKey)
 	diskdb.Delete(barsNodeDiskKey)
 

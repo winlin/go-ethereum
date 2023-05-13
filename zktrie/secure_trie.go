@@ -27,6 +27,24 @@ import (
 	"github.com/scroll-tech/go-ethereum/log"
 )
 
+const (
+	debug            = false
+	storageKeyLength = 32
+	accountKeyLength = 20
+)
+
+func checkKeybyteSize(b []byte, sizes ...int) bool {
+	if !debug {
+		return true
+	}
+	for _, size := range sizes {
+		if len(b) == size {
+			return true
+		}
+	}
+	panic(fmt.Sprintf("invalid keybyte size, got %v, want %v", len(b), sizes))
+}
+
 var magicHash []byte = []byte("THIS IS THE MAGIC INDEX FOR ZKTRIE")
 
 // SecureTrie is a wrapper of Trie which make the key secure
@@ -38,22 +56,13 @@ type SecureTrie struct {
 	trie *Trie
 }
 
-func sanityCheckKeyBytes(b []byte, accountAddress bool, storageKey bool) {
-	if (accountAddress && len(b) == 20) || (storageKey && len(b) == 32) {
-	} else {
-		panic(fmt.Errorf(
-			"bytes length is not supported, accountAddress: %v, storageKey: %v, length: %v",
-			accountAddress, storageKey, len(b)))
-	}
-}
-
 func NewSecure(root common.Hash, db *Database) (*SecureTrie, error) {
 	if db == nil {
 		panic("zktrie.NewSecure called without a database")
 	}
 
 	// for proof generation
-	impl, err := itrie.NewZkTrieImplWithRoot(db, zktNodeHash(root), itrie.NodeKeyValidBytes*8)
+	impl, err := itrie.NewZkTrieImplWithRoot(db, StoreHashFromNodeHash(root), itrie.NodeKeyValidBytes*8)
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +82,7 @@ func (t *SecureTrie) Get(key []byte) []byte {
 }
 
 func (t *SecureTrie) TryGet(key []byte) ([]byte, error) {
-	sanityCheckKeyBytes(key, true, true)
+	checkKeybyteSize(key, accountKeyLength, storageKeyLength)
 	return t.zktrie.TryGet(key)
 }
 
@@ -81,9 +90,15 @@ func (t *SecureTrie) TryGetNode(path []byte) ([]byte, int, error) {
 	return t.trie.TryGetNode(path)
 }
 
+func (t *SecureTrie) UpdateAccount(key []byte, account *types.StateAccount) {
+	if err := t.TryUpdateAccount(key, account); err != nil {
+		log.Error(fmt.Sprintf("Unhandled trie error: %v", err))
+	}
+}
+
 // TryUpdateAccount will update the account value in trie
 func (t *SecureTrie) TryUpdateAccount(key []byte, account *types.StateAccount) error {
-	sanityCheckKeyBytes(key, true, false)
+	checkKeybyteSize(key, accountKeyLength)
 	value, flag := account.MarshalFields()
 	return t.zktrie.TryUpdate(key, flag, value)
 }
@@ -102,7 +117,7 @@ func (t *SecureTrie) Update(key, value []byte) {
 
 // TryUpdate will update the storage value in trie. value is restricted to length of bytes32.
 func (t *SecureTrie) TryUpdate(key, value []byte) error {
-	sanityCheckKeyBytes(key, false, true)
+	checkKeybyteSize(key, storageKeyLength)
 	return t.zktrie.TryUpdate(key, 1, []itypes.Byte32{*itypes.NewByte32FromBytes(value)})
 }
 
@@ -114,7 +129,7 @@ func (t *SecureTrie) Delete(key []byte) {
 }
 
 func (t *SecureTrie) TryDelete(key []byte) error {
-	sanityCheckKeyBytes(key, true, true)
+	checkKeybyteSize(key, accountKeyLength, storageKeyLength)
 	return t.zktrie.TryDelete(key)
 }
 
@@ -171,4 +186,8 @@ func (t *SecureTrie) Copy() *SecureTrie {
 // starts at the key after the given start key.
 func (t *SecureTrie) NodeIterator(start []byte) NodeIterator {
 	return newNodeIterator(t.trie, start)
+}
+
+func (t *SecureTrie) String() string {
+	return t.trie.String()
 }

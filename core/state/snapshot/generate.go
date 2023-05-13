@@ -311,6 +311,14 @@ func (dl *diskLayer) proveRange(stats *generatorStats, root common.Hash, prefix 
 		stackTr := zktrie.NewStackTrie(nil)
 		for i, key := range keys {
 			if err := stackTr.TryUpdateWithKind(kind, key, vals[i]); err != nil {
+				// corrupted snapshot value is possible, let the fallback generation to heal the invalid data
+				if errors.Is(err, zktrie.InvalidStateAccountRLPEncodingError) {
+					return &proofResult{
+						keys:     keys,
+						vals:     vals,
+						proofErr: fmt.Errorf("invalid state data"),
+					}, nil
+				}
 				return nil, fmt.Errorf("update stack trie failed: %w", err)
 			}
 		}
@@ -439,7 +447,12 @@ func (dl *diskLayer) generateRange(root common.Hash, prefix []byte, kind string,
 		snapTrie, _ := zktrie.New(common.Hash{}, snapTrieDb)
 		for i, key := range result.keys {
 			if err := snapTrie.TryUpdateWithKind(kind, key, result.vals[i]); err != nil {
-				return false, nil, err
+				if errors.Is(err, zktrie.InvalidStateAccountRLPEncodingError) {
+					// corrupted snapshot value is possible, skip it
+					continue
+				} else {
+					return false, nil, err
+				}
 			}
 		}
 		root, _, _ := snapTrie.Commit(nil)

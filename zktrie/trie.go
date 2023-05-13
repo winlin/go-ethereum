@@ -78,7 +78,7 @@ func New(root common.Hash, db *Database) (*Trie, error) {
 		panic("zktrie.New called without a database")
 	}
 
-	impl, err := itrie.NewZkTrieImplWithRoot(db, zktNodeHash(root), itrie.NodeKeyValidBytes*8)
+	impl, err := itrie.NewZkTrieImplWithRoot(db, StoreHashFromNodeHash(root), itrie.NodeKeyValidBytes*8)
 	if err != nil {
 		return nil, fmt.Errorf("new trie failed: %w", err)
 	}
@@ -125,7 +125,7 @@ func (t *Trie) TryUpdateWithKind(kind string, key, value []byte) error {
 	if kind == "account" {
 		var account types.StateAccount
 		if err := rlp.DecodeBytes(value, &account); err != nil {
-			panic(fmt.Sprintf("decode full account into state.account failed: %v", err))
+			return InvalidStateAccountRLPEncodingError
 		}
 		return t.TryUpdateAccount(key, &account)
 	} else if kind == "storage" {
@@ -258,10 +258,10 @@ func (t *Trie) NodeIterator(start []byte) trie.NodeIterator {
 
 func shortHex(b []byte) string {
 	h := common.Bytes2Hex(b)
-	if len(h) <= 8 {
+	if len(h) <= 12 {
 		return h
 	}
-	return h[:4] + "..." + h[len(h)-4:]
+	return h[:6] + ".." + h[len(h)-6:]
 }
 
 func (t *Trie) toString(nodeHash *itypes.Hash, depth int) string {

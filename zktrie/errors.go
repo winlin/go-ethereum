@@ -24,7 +24,8 @@ import (
 )
 
 var (
-	InvalidUpdateKindError = errors.New("invalid trie update kind, expect 'account' or 'storage'")
+	InvalidUpdateKindError              = errors.New("invalid trie update kind, expect 'account' or 'storage'")
+	InvalidStateAccountRLPEncodingError = errors.New("invalid account rlp encoding")
 )
 
 // MissingNodeError is returned by the trie functions (TryGet, TryUpdate, TryDelete)

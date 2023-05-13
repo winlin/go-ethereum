@@ -90,7 +90,7 @@ func (st *StackTrie) TryUpdateWithKind(kind string, key, value []byte) error {
 	if kind == "account" {
 		var account types.StateAccount
 		if err := rlp.DecodeBytes(value, &account); err != nil {
-			panic(fmt.Sprintf("decode full account into state.account failed: %v", err))
+			return InvalidStateAccountRLPEncodingError
 		}
 		return st.TryUpdateAccount(key, &account)
 	} else if kind == "storage" {

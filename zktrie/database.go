@@ -1,6 +1,8 @@
 package zktrie
 
 import (
+	"bytes"
+	"crypto/sha256"
 	"errors"
 	"math/big"
 	"reflect"
@@ -16,8 +18,8 @@ import (
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/ethdb"
+	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/metrics"
-	"github.com/scroll-tech/go-ethereum/trie"
 )
 
 var (
@@ -44,17 +46,61 @@ var (
 	//memcacheCommitSizeMeter  = metrics.NewRegisteredMeter("zktrie/memcache/commit/size", nil)
 )
 
+// ErrNotFound is used by the implementations of the interface db.Storage for
+// when a key is not found in the storage
+var ErrNotFound = errors.New("key not found")
+
+// KV contains a key (K) and a value (V)
+type KV struct {
+	K []byte
+	V []byte
+}
+
+// KvMap is a key-value map between a sha256 byte array hash, and a KV struct
+type KvMap map[[sha256.Size]byte]KV
+
+// Get retreives the value respective to a key from the KvMap
+func (m KvMap) Get(k []byte) ([]byte, bool) {
+	v, ok := m[sha256.Sum256(k)]
+	return v.V, ok
+}
+
+// Put stores a key and a value in the KvMap
+func (m KvMap) Put(k, v []byte) {
+	m[sha256.Sum256(k)] = KV{k, v}
+}
+
+// Delete delete the value respective to a key from the KvMap
+func (m KvMap) Delete(k []byte) {
+	delete(m, sha256.Sum256(k))
+}
+
+// Concat concatenates arrays of bytes
+func Concat(vs ...[]byte) []byte {
+	var b bytes.Buffer
+	for _, v := range vs {
+		b.Write(v)
+	}
+	return b.Bytes()
+}
+
+// Clone clones a byte array into a new byte array
+func Clone(b0 []byte) []byte {
+	b1 := make([]byte, len(b0))
+	copy(b1, b0)
+	return b1
+}
+
 var (
-	cachedNodeSize = int(reflect.TypeOf(trie.KV{}).Size())
+	cachedNodeSize = int(reflect.TypeOf(KV{}).Size())
 )
 
 // Database Database adaptor imple zktrie.ZktrieDatbase
 type Database struct {
 	diskdb ethdb.KeyValueStore // Persistent storage for matured trie nodes
-	prefix []byte
 
 	cleans  *fastcache.Cache // GC friendly memory cache of clean node RLPs
-	dirties trie.KvMap
+	dirties KvMap
 
 	preimages *preimageStore
 
@@ -78,9 +124,8 @@ func NewDatabaseWithConfig(diskdb ethdb.KeyValueStore, config *Config) *Database
 	}
 	db := &Database{
 		diskdb:  diskdb,
-		prefix:  []byte{},
 		cleans:  cleans,
-		dirties: make(trie.KvMap),
+		dirties: make(KvMap),
 	}
 	if config != nil && config.Preimages {
 		db.preimages = newPreimageStore(diskdb)
@@ -91,35 +136,34 @@ func NewDatabaseWithConfig(diskdb ethdb.KeyValueStore, config *Config) *Database
 // Put saves a key:value into the Storage
 func (db *Database) Put(k, v []byte) error {
 	db.lock.Lock()
-	db.dirties.Put(trie.Concat(db.prefix, k[:]), v)
+	db.dirties.Put(k, v)
 	db.lock.Unlock()
 	return nil
 }
 
 // Get retrieves a value from a key in the Storage
 func (db *Database) Get(key []byte) ([]byte, error) {
-	concatKey := trie.Concat(db.prefix, key[:])
 	db.lock.RLock()
-	value, ok := db.dirties.Get(concatKey)
+	value, ok := db.dirties.Get(key)
 	db.lock.RUnlock()
 	if ok {
 		return value, nil
 	}
 
 	if db.cleans != nil {
-		if enc := db.cleans.Get(nil, concatKey); enc != nil {
+		if enc := db.cleans.Get(nil, key); enc != nil {
 			memcacheCleanHitMeter.Mark(1)
 			memcacheCleanReadMeter.Mark(int64(len(enc)))
 			return enc, nil
 		}
 	}
 
-	v, err := db.diskdb.Get(concatKey)
+	v, err := db.diskdb.Get(key)
 	if err == leveldb.ErrNotFound {
 		return nil, itrie.ErrKeyNotFound
 	}
 	if db.cleans != nil {
-		db.cleans.Set(concatKey[:], v)
+		db.cleans.Set(key, v)
 		memcacheCleanMissMeter.Mark(1)
 		memcacheCleanWriteMeter.Mark(int64(len(v)))
 	}
@@ -135,10 +179,10 @@ func (db *Database) UpdatePreimage(preimage []byte, hashField *big.Int) {
 
 // Iterate implements the method Iterate of the interface Storage
 func (db *Database) Iterate(f func([]byte, []byte) (bool, error)) error {
-	iter := db.diskdb.NewIterator(db.prefix, nil)
+	iter := db.diskdb.NewIterator(nil, nil)
 	defer iter.Release()
 	for iter.Next() {
-		localKey := iter.Key()[len(db.prefix):]
+		localKey := iter.Key()
 		if cont, err := f(localKey, iter.Value()); err != nil {
 			return err
 		} else if !cont {
@@ -157,7 +201,8 @@ func (db *Database) Nodes() []common.Hash {
 	defer db.lock.RUnlock()
 
 	var hashes = make([]common.Hash, 0, len(db.dirties))
-	for hash := range db.dirties {
+	for _, kv := range db.dirties {
+		hash := NodeHashFromStoreKey(kv.K)
 		if hash != (common.Hash{}) { // Special case for "root" references/nodes
 			hashes = append(hashes, hash)
 		}
@@ -170,7 +215,16 @@ func (db *Database) Reference(child common.Hash, parent common.Hash) {
 }
 
 func (db *Database) Dereference(root common.Hash) {
+	// mimic the logic of database garbage collection behaviour
 	//TODO:
+
+	db.lock.Lock()
+	defer db.lock.Unlock()
+
+	storeKey := StoreHashFromNodeHash(root)
+	db.dirties.Delete(storeKey[:])
+
+	log.Debug("Dereferenced trie from memory database", "root", root)
 }
 
 // Close implements the method Close of the interface Storage
@@ -182,10 +236,10 @@ func (db *Database) Close() {
 }
 
 // List implements the method List of the interface Storage
-func (db *Database) List(limit int) ([]trie.KV, error) {
-	ret := []trie.KV{}
+func (db *Database) List(limit int) ([]KV, error) {
+	ret := []KV{}
 	err := db.Iterate(func(key []byte, value []byte) (bool, error) {
-		ret = append(ret, trie.KV{K: trie.Clone(key), V: trie.Clone(value)})
+		ret = append(ret, KV{K: Clone(key), V: Clone(value)})
 		if len(ret) == limit {
 			return false, nil
 		}
@@ -272,10 +326,10 @@ func (db *Database) Node(hash common.Hash) ([]byte, error) {
 	if hash == (common.Hash{}) {
 		return itrie.NewEmptyNode().CanonicalValue(), nil
 	}
-	concatKey := trie.Concat(db.prefix, zktNodeHash(hash)[:])
+	key := StoreHashFromNodeHash(hash)[:]
 	// Retrieve the node from the clean cache if available
 	if db.cleans != nil {
-		if enc := db.cleans.Get(nil, concatKey); enc != nil {
+		if enc := db.cleans.Get(nil, key); enc != nil {
 			memcacheCleanHitMeter.Mark(1)
 			memcacheCleanReadMeter.Mark(int64(len(enc)))
 			return enc, nil
@@ -283,7 +337,7 @@ func (db *Database) Node(hash common.Hash) ([]byte, error) {
 	}
 	// Retrieve the node from the dirty cache if available
 	db.lock.RLock()
-	dirty, _ := db.dirties.Get(concatKey)
+	dirty, _ := db.dirties.Get(key)
 	db.lock.RUnlock()
 
 	if dirty != nil {
@@ -297,7 +351,7 @@ func (db *Database) Node(hash common.Hash) ([]byte, error) {
 	enc := rawdb.ReadZKTrieNode(db.diskdb, hash)
 	if len(enc) != 0 {
 		if db.cleans != nil {
-			db.cleans.Set(concatKey, enc)
+			db.cleans.Set(key, enc)
 			memcacheCleanMissMeter.Mark(1)
 			memcacheCleanWriteMeter.Mark(int64(len(enc)))
 		}

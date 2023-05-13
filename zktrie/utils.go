@@ -12,9 +12,24 @@ func init() {
 	itypes.InitHashScheme(poseidon.HashFixed)
 }
 
-func zktNodeHash(node common.Hash) *itypes.Hash {
-	byte32 := itypes.NewByte32FromBytes(node.Bytes())
-	return itypes.NewHashFromBytes(byte32.Bytes())
+func reverseBytesInPlace(b []byte) {
+	for i, j := 0, len(b)-1; i < j; i, j = i+1, j-1 {
+		b[i], b[j] = b[j], b[i]
+	}
+}
+
+func StoreHashFromNodeHash(node common.Hash) *itypes.Hash {
+	h := new(itypes.Hash)
+	copy(h[:], node[:])
+	reverseBytesInPlace(h[:])
+	return h
+}
+
+func NodeHashFromStoreKey(key []byte) common.Hash {
+	h := common.Hash{}
+	copy(h[:], key)
+	reverseBytesInPlace(h[:])
+	return h
 }
 
 // NodeStoreHash represent the db key of node content for storing
@@ -41,8 +56,6 @@ func NodeHash(blob []byte) (common.Hash, error) {
 
 	var h common.Hash
 	copy(h[:], hash[:])
-	for i, j := 0, len(h)-1; i < j; i, j = i+1, j-1 {
-		h[i], h[j] = h[j], h[i]
-	}
+	reverseBytesInPlace(h[:])
 	return h, nil
 }

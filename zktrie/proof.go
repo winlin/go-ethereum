@@ -118,7 +118,7 @@ func (t *Trie) ProveWithDeletion(key []byte, fromLevel uint, proofDb ethdb.KeyVa
 // proof contains invalid trie nodes or the wrong value.
 func VerifyProof(rootHash common.Hash, key []byte, proofDb ethdb.KeyValueReader) (value []byte, err error) {
 	path := keybytesToBinary(key)
-	wantHash := zktNodeHash(rootHash)
+	wantHash := StoreHashFromNodeHash(rootHash)
 	for i := 0; i < len(path); i++ {
 		buf, _ := proofDb.Get(wantHash[:])
 		if buf == nil {
@@ -166,7 +166,7 @@ func proofToPath(
 	// If the root node is empty, resolve it first.
 	// Root node must be included in the proof.
 	if root == nil {
-		n, err := resolveNode(zktNodeHash(rootHash))
+		n, err := resolveNode(StoreHashFromNodeHash(rootHash))
 		if err != nil {
 			return nil, nil, err
 		}
@@ -178,7 +178,7 @@ func proofToPath(
 		current     *itrie.Node
 		currentHash *itypes.Hash
 	)
-	path, current, currentHash = keybytesToBinary(key), root, zktNodeHash(rootHash)
+	path, current, currentHash = keybytesToBinary(key), root, StoreHashFromNodeHash(rootHash)
 	for {
 		if err = cache.Put(currentHash[:], current.CanonicalValue()); err != nil {
 			return nil, nil, err
@@ -447,7 +447,7 @@ func VerifyRangeProof(rootHash common.Hash, kind string, firstKey []byte, lastKe
 	}
 	// Remove all internal references. All the removed parts should
 	// be re-filled(or re-constructed) by the given leaves range.
-	unsetRootHash, err := unsetInternal(zktNodeHash(rootHash), firstKey, lastKey, trieCache)
+	unsetRootHash, err := unsetInternal(StoreHashFromNodeHash(rootHash), firstKey, lastKey, trieCache)
 	if err != nil {
 		return false, err
 	}

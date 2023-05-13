@@ -371,13 +371,13 @@ func stackTrieGenerate(db ethdb.KeyValueWriter, kind string, in chan trieKV, out
 	t := zktrie.NewStackTrie(db)
 	for leaf := range in {
 		if kind == "storage" {
-			t.TryUpdate(leaf.key[:], leaf.value)
+			t.Update(leaf.key[:], leaf.value)
 		} else {
 			var account types.StateAccount
 			if err := rlp.DecodeBytes(leaf.value, &account); err != nil {
 				panic(fmt.Sprintf("decode full account into state.account failed: %v", err))
 			}
-			t.TryUpdateAccount(leaf.key[:], &account)
+			t.UpdateAccount(leaf.key[:], &account)
 		}
 	}
 	var root common.Hash
