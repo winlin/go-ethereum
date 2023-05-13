@@ -17,8 +17,10 @@
 package zktrie
 
 import (
+	"bytes"
 	"fmt"
 	"reflect"
+	"strings"
 	"unsafe"
 
 	itrie "github.com/scroll-tech/zktrie/trie"
@@ -252,4 +254,47 @@ func (t *Trie) getNodeByHash(hash *itypes.Hash) (*itrie.Node, error) {
 // starts at the key after the given start key.
 func (t *Trie) NodeIterator(start []byte) trie.NodeIterator {
 	return newNodeIterator(t, start)
+}
+
+func shortHex(b []byte) string {
+	h := common.Bytes2Hex(b)
+	if len(h) <= 8 {
+		return h
+	}
+	return h[:4] + "..." + h[len(h)-4:]
+}
+
+func (t *Trie) toString(nodeHash *itypes.Hash, depth int) string {
+	node, err := t.getNodeByHash(nodeHash)
+	if err != nil {
+		return fmt.Sprintf("hash(%s)", shortHex(nodeHash[:]))
+	}
+	switch node.Type {
+	case itrie.NodeTypeEmpty:
+		return "empty"
+	case itrie.NodeTypeLeaf:
+		values := make([]string, len(node.ValuePreimage))
+		for i, v := range node.ValuePreimage {
+			values[i] = common.Bytes2Hex(v[:])
+		}
+		return fmt.Sprintf("leaf %s (key: %s, flags: %v, value: %s)", shortHex(nodeHash[:]), common.Bytes2Hex(hashKeyToKeybytes(node.NodeKey)), node.CompressedFlags, strings.Join(values, " "))
+	case itrie.NodeTypeParent:
+		prefix := strings.Repeat("  ", depth+1)
+		buf := new(bytes.Buffer)
+		fmt.Fprintf(buf, "parent %s [\n", shortHex(nodeHash[:]))
+		fmt.Fprintf(buf, "%sL: %s\n", prefix, t.toString(node.ChildL, depth+1))
+		fmt.Fprintf(buf, "%sR: %s]", prefix, t.toString(node.ChildR, depth+1))
+		return buf.String()
+	default:
+		panic("unknown node")
+	}
+}
+
+func (t *Trie) StringWithName(name string) string {
+	root := t.impl.Root()
+	return fmt.Sprintf("%s: [\n%s\n]", name, t.toString(root, 1))
+}
+
+func (t *Trie) String() string {
+	return t.StringWithName("Trie")
 }
