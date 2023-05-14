@@ -170,6 +170,7 @@ func newEmptyNode(depth int, db ethdb.KeyValueWriter) *StackTrie {
 	return &StackTrie{
 		nodeType: emptyNode,
 		depth:    depth,
+		db:       db,
 	}
 }
 
@@ -199,6 +200,11 @@ func (st *StackTrie) insert(binary []byte, flag uint32, value []itypes.Byte32) {
 		if origIdx == newIdx {
 			st.children[newIdx].insert(binary, flag, value)
 		} else {
+			// new fork
+			if origIdx > newIdx {
+				panic("Trying to insert key in reverse order")
+			}
+			st.children[origIdx].hash()
 			st.children[newIdx] = newLeafNode(st.depth+1, binary, flag, value, st.db)
 		}
 	case emptyNode:

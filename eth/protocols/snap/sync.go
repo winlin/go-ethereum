@@ -1766,7 +1766,7 @@ func (s *Syncer) processAccountResponse(res *accountResponse) {
 		}
 		// Check if the account is a contract with an unknown storage trie
 		if account.Root != emptyRoot {
-			if node, err := s.db.Get(account.Root[:]); err != nil || node == nil {
+			if node := rawdb.ReadZKTrieNode(s.db, account.Root); node == nil {
 				// If there was a previous large state retrieval in progress,
 				// don't restart it from scratch. This happens if a sync cycle
 				// is interrupted and resumed later. However, *do* update the
@@ -2603,23 +2603,18 @@ func (s *Syncer) OnTrieNodes(peer SyncPeer, id uint64, trienodes [][]byte) error
 
 	// Cross reference the requested trienodes with the response to find gaps
 	// that the serving node is missing
-	hasher := sha3.NewLegacyKeccak256().(crypto.KeccakState)
-	hash := make([]byte, 32)
-
 	nodes := make([][]byte, len(req.hashes))
 	for i, j := 0, 0; i < len(trienodes); i++ {
 		// Find the next hash that we've been served, leaving misses with nils
-		hasher.Reset()
-		hasher.Write(trienodes[i])
-		hasher.Read(hash)
-
-		for j < len(req.hashes) && !bytes.Equal(hash, req.hashes[j][:]) {
-			j++
-		}
-		if j < len(req.hashes) {
-			nodes[j] = trienodes[i]
-			j++
-			continue
+		if hash, err := zktrie.NodeHash(trienodes[i]); err == nil {
+			for j < len(req.hashes) && !bytes.Equal(hash[:], req.hashes[j][:]) {
+				j++
+			}
+			if j < len(req.hashes) {
+				nodes[j] = trienodes[i]
+				j++
+				continue
+			}
 		}
 		// We've either ran out of hashes, or got unrequested data
 		logger.Warn("Unexpected healing trienodes", "count", len(trienodes)-i)
