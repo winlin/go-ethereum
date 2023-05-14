@@ -136,9 +136,10 @@ func loadSnapshot(diskdb ethdb.KeyValueStore, triedb *zktrie.Database, cache int
 	// Retrieve the block number and hash of the snapshot, failing if no snapshot
 	// is present in the database (or crashed mid-update).
 	baseRoot := rawdb.ReadSnapshotRoot(diskdb)
-	if baseRoot == (common.Hash{}) {
-		return nil, false, errors.New("missing or corrupted snapshot")
-	}
+	// common.Hash{} is an empty trie
+	//if baseRoot == (common.Hash{}) {
+	//	return nil, false, errors.New("missing or corrupted snapshot")
+	//}
 	base := &diskLayer{
 		diskdb: diskdb,
 		triedb: triedb,

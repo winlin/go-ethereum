@@ -680,9 +680,10 @@ func (t *Tree) Journal(root common.Hash) (common.Hash, error) {
 		return common.Hash{}, err
 	}
 	diskroot := t.diskRoot()
-	if diskroot == (common.Hash{}) {
-		return common.Hash{}, errors.New("invalid disk root")
-	}
+	// common.Hash{} is an empty trie
+	//if diskroot == (common.Hash{}) {
+	//	return common.Hash{}, errors.New("invalid disk root")
+	//}
 	// Secondly write out the disk layer root, ensure the
 	// diff journal is continuous with disk.
 	if err := rlp.Encode(journal, diskroot); err != nil {
