@@ -418,14 +418,15 @@ func (s *Sync) processNode(req *request, node []byte) ([]*request, error) {
 	case itrie.NodeTypeLeaf:
 		// Notify any external watcher of a new key/value node
 		if req.callback != nil {
+			binaryPath := hashKeyToBinary(n.NodeKey)
 			var paths [][]byte
-			if len(req.path) == 8*common.HashLength {
-				paths = append(paths, binaryToKeybytes(req.path))
-			} else if len(req.path) == 16*common.HashLength {
-				paths = append(paths, binaryToKeybytes(req.path[:8*common.HashLength]))
-				paths = append(paths, binaryToKeybytes(req.path[8*common.HashLength:]))
+			if len(binaryPath) == 8*common.HashLength {
+				paths = append(paths, binaryToKeybytes(binaryPath))
+			} else if len(binaryPath) == 16*common.HashLength {
+				paths = append(paths, binaryToKeybytes(binaryPath[:8*common.HashLength]))
+				paths = append(paths, binaryToKeybytes(binaryPath[8*common.HashLength:]))
 			}
-			if err := req.callback(paths, req.path, n.Data(), req.hash); err != nil {
+			if err := req.callback(paths, binaryPath, n.Data(), req.hash); err != nil {
 				return nil, err
 			}
 		}

@@ -24,12 +24,9 @@ import (
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/types"
-	"github.com/scroll-tech/go-ethereum/crypto"
 	"github.com/scroll-tech/go-ethereum/crypto/codehash"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
-	"github.com/scroll-tech/go-ethereum/rlp"
-	"github.com/scroll-tech/go-ethereum/trie"
 	"github.com/scroll-tech/go-ethereum/zktrie"
 )
 
@@ -104,10 +101,10 @@ func checkStateAccounts(t *testing.T, db ethdb.Database, root common.Hash, accou
 
 // checkTrieConsistency checks that all nodes in a (sub-)trie are indeed present.
 func checkTrieConsistency(db ethdb.Database, root common.Hash) error {
-	if v, _ := db.Get(root[:]); v == nil {
+	if val := rawdb.ReadZKTrieNode(db, root); val == nil {
 		return nil // Consider a non existent state consistent.
 	}
-	trie, err := trie.New(root, trie.NewDatabase(db))
+	trie, err := zktrie.New(root, zktrie.NewDatabase(db))
 	if err != nil {
 		return err
 	}
@@ -120,7 +117,7 @@ func checkTrieConsistency(db ethdb.Database, root common.Hash) error {
 // checkStateConsistency checks that all data of a state root is present.
 func checkStateConsistency(db ethdb.Database, root common.Hash) error {
 	// Create and iterate a state trie rooted in a sub-node
-	if _, err := db.Get(root.Bytes()); err != nil {
+	if val := rawdb.ReadZKTrieNode(db, root); val == nil {
 		return nil // Consider a non existent state consistent.
 	}
 	state, err := New(root, NewDatabase(db), nil)
@@ -204,10 +201,14 @@ func testIterativeStateSync(t *testing.T, count int, commit bool, bypath bool) {
 				if err != nil {
 					t.Fatalf("failed to retrieve node data for path %x: %v", path, err)
 				}
-				results[len(hashQueue)+i] = zktrie.SyncResult{Hash: crypto.Keccak256Hash(data), Data: data}
+				hash, err := zktrie.NodeHash(data)
+				if err != nil {
+					t.Fatalf("failed to get hash of node: %v", err)
+				}
+				results[len(hashQueue)+i] = zktrie.SyncResult{Hash: hash, Data: data}
 			} else {
-				var acc types.StateAccount
-				if err := rlp.DecodeBytes(srcTrie.Get(path[0]), &acc); err != nil {
+				acc, err := types.UnmarshalStateAccount(srcTrie.Get(path[0]))
+				if err != nil {
 					t.Fatalf("failed to decode account on path %x: %v", path, err)
 				}
 				stTrie, err := zktrie.New(acc.Root, srcDb.TrieDB())
@@ -218,7 +219,11 @@ func testIterativeStateSync(t *testing.T, count int, commit bool, bypath bool) {
 				if err != nil {
 					t.Fatalf("failed to retrieve node data for path %x: %v", path, err)
 				}
-				results[len(hashQueue)+i] = zktrie.SyncResult{Hash: crypto.Keccak256Hash(data), Data: data}
+				hash, err := zktrie.NodeHash(data)
+				if err != nil {
+					t.Fatalf("failed to get hash of node: %v", err)
+				}
+				results[len(hashQueue)+i] = zktrie.SyncResult{Hash: hash, Data: data}
 			}
 		}
 		for _, result := range results {
