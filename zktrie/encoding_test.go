@@ -25,14 +25,14 @@ func TestBinaryCompact(t *testing.T) {
 	tests := []struct{ binary, compact []byte }{
 		{binary: []byte{}, compact: []byte{0x00}},
 		{binary: []byte{0}, compact: []byte{0x01, 0x00}},
-		{binary: []byte{0, 1}, compact: []byte{0x02, 0x01}},
-		{binary: []byte{0, 1, 1}, compact: []byte{0x03, 0x03}},
-		{binary: []byte{0, 1, 1, 0}, compact: []byte{0x04, 0x06}},
-		{binary: []byte{0, 1, 1, 0, 1}, compact: []byte{0x05, 0x0d}},
-		{binary: []byte{0, 1, 1, 0, 1, 0}, compact: []byte{0x06, 0x1a}},
-		{binary: []byte{0, 1, 1, 0, 1, 0, 1}, compact: []byte{0x07, 0x35}},
+		{binary: []byte{0, 1}, compact: []byte{0x02, 0x40}},
+		{binary: []byte{0, 1, 1}, compact: []byte{0x03, 0x60}},
+		{binary: []byte{0, 1, 1, 0}, compact: []byte{0x04, 0x60}},
+		{binary: []byte{0, 1, 1, 0, 1}, compact: []byte{0x05, 0x68}},
+		{binary: []byte{0, 1, 1, 0, 1, 0}, compact: []byte{0x06, 0x68}},
+		{binary: []byte{0, 1, 1, 0, 1, 0, 1}, compact: []byte{0x07, 0x6a}},
 		{binary: []byte{0, 1, 1, 0, 1, 0, 1, 0}, compact: []byte{0x00, 0x6a}},
-		{binary: []byte{0, 1, 0, 1, 0, 1, 0, 1 /* 8 bit */, 0, 1, 1, 0}, compact: []byte{0x04, 0x55, 0x06}},
+		{binary: []byte{0, 1, 0, 1, 0, 1, 0, 1 /* 8 bit */, 0, 1, 1, 0}, compact: []byte{0x04, 0x55, 0x60}},
 	}
 	for _, test := range tests {
 		if c := binaryToCompact(test.binary); !bytes.Equal(c, test.compact) {

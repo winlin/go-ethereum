@@ -12,7 +12,7 @@ func binaryToCompact(b []byte) []byte {
 	for i := 0; i < len(b); i += 8 {
 		v = 0
 		for j := 0; j < 8 && i+j < len(b); j++ {
-			v = (v << 1) | b[i+j]
+			v |= b[i+j] << (7 - j)
 		}
 		compact = append(compact, v)
 	}
@@ -30,9 +30,8 @@ func compactToBinary(c []byte) []byte {
 		if i+1 == len(c) && remainder > 0 {
 			num = remainder
 		}
-		for num > 0 {
-			num -= 1
-			b = append(b, (cc>>num)&1)
+		for j := 0; j < num; j++ {
+			b = append(b, (cc>>(7-j))&1)
 		}
 	}
 	return b
