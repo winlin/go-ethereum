@@ -445,11 +445,7 @@ func storageRangeAt(st state.Trie, start []byte, maxResult int) (StorageRangeRes
 	it := zktrie.NewIterator(st.NodeIterator(start))
 	result := StorageRangeResult{Storage: storageMap{}}
 	for i := 0; i < maxResult && it.Next(); i++ {
-		_, content, _, err := rlp.Split(it.Value)
-		if err != nil {
-			return StorageRangeResult{}, err
-		}
-		e := storageEntry{Value: common.BytesToHash(content)}
+		e := storageEntry{Value: common.BytesToHash(it.Value)}
 		if preimage := st.GetKey(it.Key); preimage != nil {
 			preimage := common.BytesToHash(preimage)
 			e.Key = &preimage

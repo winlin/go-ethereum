@@ -127,7 +127,8 @@ func NewDatabaseWithConfig(diskdb ethdb.KeyValueStore, config *Config) *Database
 		cleans:  cleans,
 		dirties: make(KvMap),
 	}
-	if config != nil && config.Preimages {
+	// enable preimage in default
+	if config == nil || config.Preimages {
 		db.preimages = newPreimageStore(diskdb)
 	}
 	return db

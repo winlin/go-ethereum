@@ -179,7 +179,11 @@ func (t *SecureTrie) Hash() common.Hash {
 
 // Copy returns a copy of SecureBinaryTrie.
 func (t *SecureTrie) Copy() *SecureTrie {
-	return &SecureTrie{zktrie: t.zktrie.Copy(), db: t.db}
+	secure, err := NewSecure(t.trie.Hash(), t.db)
+	if err != nil {
+		panic(fmt.Sprintf("copy secure trie failed: %v", err))
+	}
+	return secure
 }
 
 // NodeIterator returns an iterator that returns nodes of the underlying trie. Iteration
