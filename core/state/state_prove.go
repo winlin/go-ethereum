@@ -51,7 +51,7 @@ func (s *StateDB) GetStorageTrieForProof(addr common.Address) (Trie, error) {
 	stateObject := s.getStateObject(addr)
 	if stateObject == nil {
 		// still return a empty trie
-		addrHash := crypto.Keccak256Hash(addr[:])
+		addrHash := crypto.PoseidonSecureHash(addr[:])
 		dummy_trie, _ := s.db.OpenStorageTrie(addrHash, common.Hash{})
 		return dummy_trie, nil
 	}

@@ -425,7 +425,7 @@ func testGetNodeData(t *testing.T, protocol uint) {
 	it := backend.db.NewIterator(nil, nil)
 	for it.Next() {
 		if key := it.Key(); len(key) == common.HashLength {
-			hashes = append(hashes, common.BytesToHash(key))
+			hashes = append(hashes, zktrie.NodeHashFromStoreKey(key))
 		}
 	}
 	it.Release()
@@ -450,7 +450,9 @@ func testGetNodeData(t *testing.T, protocol uint) {
 	// Verify that all hashes correspond to the requested data.
 	data := res.NodeDataPacket
 	for i, want := range hashes {
-		if hash := crypto.Keccak256Hash(data[i]); hash != want {
+		if hash, err := zktrie.NodeHash(data[i]); err != nil {
+			t.Errorf("get node data hash failed: %v", err)
+		} else if hash != want {
 			t.Errorf("data hash mismatch: have %x, want %x", hash, want)
 		}
 	}

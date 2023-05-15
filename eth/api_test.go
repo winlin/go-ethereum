@@ -76,7 +76,7 @@ func TestAccountRange(t *testing.T) {
 
 	for i := range addrs {
 		hash := common.HexToHash(fmt.Sprintf("%x", i))
-		addr := common.BytesToAddress(crypto.Keccak256Hash(hash.Bytes()).Bytes())
+		addr := common.BytesToAddress(crypto.PoseidonSecureHash(hash.Bytes()).Bytes())
 		addrs[i] = addr
 		state.SetBalance(addrs[i], big.NewInt(1))
 		if _, ok := m[addr]; ok {
@@ -107,7 +107,7 @@ func TestAccountRange(t *testing.T) {
 		if _, duplicate := secondResult.Accounts[addr1]; duplicate {
 			t.Fatalf("pagination test failed:  results should not overlap")
 		}
-		hList = append(hList, crypto.Keccak256Hash(addr1.Bytes()))
+		hList = append(hList, crypto.PoseidonSecureHash(addr1.Bytes()))
 	}
 	// Test to see if it's possible to recover from the middle of the previous
 	// set and get an even split between the first and second sets.
