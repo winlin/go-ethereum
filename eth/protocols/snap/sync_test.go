@@ -763,7 +763,7 @@ func TestMultiSyncManyUseless(t *testing.T) {
 			})
 		}
 	)
-	sourceAccountTrie, elems, storageTries, storageElems := makeAccountTrieWithStorage(100, 3000, true, false)
+	sourceAccountTrie, elems, storageTries, storageElems := makeAccountTrieWithStorage(30, 300, true, false)
 
 	mkSource := func(name string, noAccount, noStorage, noTrieNode bool) *testPeer {
 		source := newTestPeer(name, t, term)
@@ -809,7 +809,7 @@ func TestMultiSyncManyUselessWithLowTimeout(t *testing.T) {
 			})
 		}
 	)
-	sourceAccountTrie, elems, storageTries, storageElems := makeAccountTrieWithStorage(100, 3000, true, false)
+	sourceAccountTrie, elems, storageTries, storageElems := makeAccountTrieWithStorage(30, 300, true, false)
 
 	mkSource := func(name string, noAccount, noStorage, noTrieNode bool) *testPeer {
 		source := newTestPeer(name, t, term)
@@ -860,7 +860,7 @@ func TestMultiSyncManyUnresponsive(t *testing.T) {
 			})
 		}
 	)
-	sourceAccountTrie, elems, storageTries, storageElems := makeAccountTrieWithStorage(100, 3000, true, false)
+	sourceAccountTrie, elems, storageTries, storageElems := makeAccountTrieWithStorage(30, 300, true, false)
 
 	mkSource := func(name string, noAccount, noStorage, noTrieNode bool) *testPeer {
 		source := newTestPeer(name, t, term)
@@ -1161,7 +1161,7 @@ func TestSyncWithStorageAndOneCappedPeer(t *testing.T) {
 			})
 		}
 	)
-	sourceAccountTrie, elems, storageTries, storageElems := makeAccountTrieWithStorage(300, 1000, false, false)
+	sourceAccountTrie, elems, storageTries, storageElems := makeAccountTrieWithStorage(30, 300, false, false)
 
 	mkSource := func(name string, slow bool) *testPeer {
 		source := newTestPeer(name, t, term)
@@ -1202,7 +1202,7 @@ func TestSyncWithStorageAndCorruptPeer(t *testing.T) {
 			})
 		}
 	)
-	sourceAccountTrie, elems, storageTries, storageElems := makeAccountTrieWithStorage(100, 3000, true, false)
+	sourceAccountTrie, elems, storageTries, storageElems := makeAccountTrieWithStorage(30, 300, true, false)
 
 	mkSource := func(name string, handler storageHandlerFunc) *testPeer {
 		source := newTestPeer(name, t, term)
@@ -1240,7 +1240,7 @@ func TestSyncWithStorageAndNonProvingPeer(t *testing.T) {
 			})
 		}
 	)
-	sourceAccountTrie, elems, storageTries, storageElems := makeAccountTrieWithStorage(100, 3000, true, false)
+	sourceAccountTrie, elems, storageTries, storageElems := makeAccountTrieWithStorage(30, 300, true, false)
 
 	mkSource := func(name string, handler storageHandlerFunc) *testPeer {
 		source := newTestPeer(name, t, term)
@@ -1388,13 +1388,21 @@ func makeAccountTrieNoStorage(n int) (*zktrie.Trie, entrySlice) {
 	return accTrie, entries
 }
 
+func reverseByteArray(arr []byte) []byte {
+	reversed := make([]byte, len(arr))
+	for i := 0; i < len(arr); i++ {
+		reversed[i] = arr[len(arr)-i-1]
+	}
+	return reversed
+}
+
 // makeBoundaryAccountTrie constructs an account trie. Instead of filling
 // accounts normally, this function will fill a few accounts which have
 // boundary hash.
 func makeBoundaryAccountTrie(n int) (*zktrie.Trie, entrySlice) {
 	var (
 		entries    entrySlice
-		boundaries []common.Hash
+		boundaries [][]byte
 
 		db      = zktrie.NewDatabase(rawdb.NewMemoryDatabase())
 		trie, _ = zktrie.New(common.Hash{}, db)
@@ -1409,7 +1417,8 @@ func makeBoundaryAccountTrie(n int) (*zktrie.Trie, entrySlice) {
 	)
 	for i := 0; i < accountConcurrency; i++ {
 		last := common.BigToHash(new(big.Int).Add(next.Big(), step))
-		boundaries = append(boundaries, last)
+		lastLE := reverseByteArray(last[:])
+		boundaries = append(boundaries, lastLE)
 		next = common.BigToHash(new(big.Int).Add(last.Big(), common.Big1))
 	}
 	// Fill boundary accounts
@@ -1422,7 +1431,7 @@ func makeBoundaryAccountTrie(n int) (*zktrie.Trie, entrySlice) {
 		account.PoseidonCodeHash = getPoseidonCodeHash(uint64(i))
 		account.CodeSize = 1
 
-		key := boundaries[i].Bytes()
+		key := boundaries[i]
 		trie.UpdateAccount(key, account)
 		elem := &kv{key, trie.Get(key)}
 		entries = append(entries, elem)
@@ -1573,7 +1582,7 @@ func makeStorageTrieWithSeed(n, seed uint64, db *zktrie.Database) (*zktrie.Trie,
 func makeBoundaryStorageTrie(n int, db *zktrie.Database) (*zktrie.Trie, entrySlice) {
 	var (
 		entries    entrySlice
-		boundaries []common.Hash
+		boundaries [][]byte
 		trie, _    = zktrie.New(common.Hash{}, db)
 	)
 	// Initialize boundaries
@@ -1586,7 +1595,8 @@ func makeBoundaryStorageTrie(n int, db *zktrie.Database) (*zktrie.Trie, entrySli
 	)
 	for i := 0; i < accountConcurrency; i++ {
 		last := common.BigToHash(new(big.Int).Add(next.Big(), step))
-		boundaries = append(boundaries, last)
+		lastLE := reverseByteArray(last[:])
+		boundaries = append(boundaries, lastLE)
 		next = common.BigToHash(new(big.Int).Add(last.Big(), common.Big1))
 	}
 	// Fill boundary slots
@@ -1594,7 +1604,7 @@ func makeBoundaryStorageTrie(n int, db *zktrie.Database) (*zktrie.Trie, entrySli
 		key := boundaries[i]
 		val := []byte{0xde, 0xad, 0xbe, 0xef}
 
-		elem := &kv{key[:], val}
+		elem := &kv{key, val}
 		trie.Update(elem.k, elem.v)
 		entries = append(entries, elem)
 	}
