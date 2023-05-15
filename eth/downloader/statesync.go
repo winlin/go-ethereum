@@ -318,8 +318,7 @@ func (s *stateSync) run() {
 	if s.d.snapSync {
 		s.err = s.d.SnapSyncer.Sync(s.root, s.cancel)
 	} else {
-		panic("fast sync is disabled currently, using snap sync instead")
-		//s.err = s.loop()
+		s.err = s.loop()
 	}
 	close(s.done)
 }
@@ -533,7 +532,7 @@ func (s *stateSync) process(req *stateReq) (int, error) {
 
 	// Iterate over all the delivered data and inject one-by-one into the trie
 	for _, blob := range req.response {
-		hash, err := s.processNodeData(blob)
+		hash, err := s.processNodeData(req, blob)
 		switch err {
 		case nil:
 			s.numUncommitted++
@@ -588,11 +587,19 @@ func (s *stateSync) process(req *stateReq) (int, error) {
 // processNodeData tries to inject a trie node data blob delivered from a remote
 // peer into the state trie, returning whether anything useful was written or any
 // error occurred.
-func (s *stateSync) processNodeData(blob []byte) (common.Hash, error) {
+func (s *stateSync) processNodeData(req *stateReq, blob []byte) (common.Hash, error) {
 	res := zktrie.SyncResult{Data: blob}
-	s.keccak.Reset()
-	s.keccak.Write(blob)
-	s.keccak.Read(res.Hash[:])
+
+	// check blob is trie node
+	hash, _ := zktrie.NodeHash(blob)
+	if _, ok := req.trieTasks[hash]; ok {
+		res.Hash = hash
+	} else { // blob is code
+		s.keccak.Reset()
+		s.keccak.Write(blob)
+		s.keccak.Read(res.Hash[:])
+	}
+
 	err := s.sched.Process(res)
 	return res.Hash, err
 }
