@@ -28,7 +28,6 @@ import (
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
-	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/rlp"
@@ -370,15 +369,7 @@ func generateTrieRoot(db ethdb.KeyValueWriter, it Iterator, account common.Hash,
 func stackTrieGenerate(db ethdb.KeyValueWriter, kind string, in chan trieKV, out chan common.Hash) {
 	t := zktrie.NewStackTrie(db)
 	for leaf := range in {
-		if kind == "storage" {
-			t.Update(leaf.key[:], leaf.value)
-		} else {
-			var account types.StateAccount
-			if err := rlp.DecodeBytes(leaf.value, &account); err != nil {
-				panic(fmt.Sprintf("decode full account into state.account failed: %v", err))
-			}
-			t.UpdateAccount(leaf.key[:], &account)
-		}
+		t.TryUpdateWithKind(kind, leaf.key[:], leaf.value)
 	}
 	var root common.Hash
 	if db == nil {

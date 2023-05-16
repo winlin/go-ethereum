@@ -19,13 +19,14 @@ package zktrie
 import (
 	"bytes"
 	"fmt"
+	"math/big"
+	"testing"
+
 	"github.com/scroll-tech/go-ethereum/core/types"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/crypto"
 	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
-	"math/big"
-	"testing"
 )
 
 func TestStackTrieInsertAndHash(t *testing.T) {
