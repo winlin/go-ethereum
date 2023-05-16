@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
@@ -491,16 +492,14 @@ func (t *Tree) cap(diff *diffLayer, layers int) *diskLayer {
 			//	return nil
 			//}
 
-			// Because the current trie does not implement the gc function, it is
-			// acceptable for the trie underneath the generator. In order to prevent
-			// the generation process from being frequently interrupted and affect
-			// performance, we allow accumulation here during the generation process
-			//TODO: fix it when trie gc function is implemented.
+			// In order to prevent the generation process from being frequently interrupted
+			// and affect performance, we wait 5 seconds and then do the diff-to-disk work
 			if flattened.parent.(*diskLayer).genAbort != nil {
-				log.Debug("accumulator layer is working under snapshot generation",
-					"memory", flattened.memory, "limit", aggregatorItemLimit)
+				log.Debug("diff flatten downward while snapshot generation, wait for 5s and write diff into disk")
+				time.Sleep(5 * time.Second)
+			} else {
+				return nil
 			}
-			return nil
 		}
 	default:
 		panic(fmt.Sprintf("unknown data layer: %T", parent))
