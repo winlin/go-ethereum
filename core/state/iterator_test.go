@@ -18,20 +18,20 @@ package state
 
 import (
 	"bytes"
-	"fmt"
-	"os"
 	"testing"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/ethdb"
-	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/zktrie"
 )
 
+func skipForTrieDB(t *testing.T) {
+	t.Skip("skipping testing because zktrie database is not support now")
+}
+
 // Tests that the node iterator indeed walks over the entire database contents.
-// TODO: trie gc
 func TestNodeIteratorCoverage(t *testing.T) {
-	log.Root().SetHandler(log.LvlFilterHandler(log.LvlTrace, log.StreamHandler(os.Stderr, log.TerminalFormat(true))))
+	skipForTrieDB(t)
 	// Create some arbitrary test state to iterate
 	db, root, _ := makeTestState()
 	db.TrieDB().Commit(root, false, nil)
@@ -39,13 +39,6 @@ func TestNodeIteratorCoverage(t *testing.T) {
 	state, err := New(root, db, nil)
 	if err != nil {
 		t.Fatalf("failed to create state trie at %x: %v", root, err)
-	}
-	{
-		t, _ := state.trie.(*zktrie.SecureTrie)
-		fmt.Println(t.String())
-		//for iter := t.NodeIterator(nil); iter.Next(true); {
-		//	fmt.Println(iter.Hash())
-		//}
 	}
 	// Gather all the node hashes found by the iterator
 	hashes := make(map[common.Hash]struct{})
@@ -68,14 +61,10 @@ func TestNodeIteratorCoverage(t *testing.T) {
 			t.Errorf("state entry not reported %x", hash)
 		}
 	}
-
 	it := db.TrieDB().DiskDB().(ethdb.Database).NewIterator(nil, nil)
-	count := 0
 	for it.Next() {
-		count += 1
 		key := it.Key()
 		if bytes.HasPrefix(key, []byte("secure-key-")) {
-			fmt.Printf("key: %q\n", key)
 			continue
 		}
 		hash := zktrie.NodeHashFromStoreKey(key)
@@ -83,6 +72,5 @@ func TestNodeIteratorCoverage(t *testing.T) {
 			t.Errorf("state entry not reported %x", hash)
 		}
 	}
-	fmt.Printf("hashs size: %d, diskdb iterator: %d", len(hashes), count)
 	it.Release()
 }

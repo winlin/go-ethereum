@@ -236,7 +236,7 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 	}
 
 	if !chainConfig.Scroll.ZktrieEnabled() {
-		log.Error("It is not normal for zktrie to be disabled, here will enable zktrie")
+		log.Warn("zktrie should not be disabled, we will enable it")
 		chainConfig.Scroll.UseZktrie = true
 	}
 
