@@ -30,7 +30,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/p2p"
 	"github.com/scroll-tech/go-ethereum/p2p/enode"
 	"github.com/scroll-tech/go-ethereum/p2p/enr"
-	"github.com/scroll-tech/go-ethereum/rlp"
 	"github.com/scroll-tech/go-ethereum/zktrie"
 )
 
@@ -319,8 +318,8 @@ func handleMessage(backend Backend, peer *Peer) error {
 				if err != nil {
 					return p2p.Send(peer.rw, StorageRangesMsg, &StorageRangesPacket{ID: req.ID})
 				}
-				var acc types.StateAccount
-				if err := rlp.DecodeBytes(accTrie.Get(account[:]), &acc); err != nil {
+				acc, err := types.UnmarshalStateAccount(accTrie.Get(account[:]))
+				if err != nil {
 					return p2p.Send(peer.rw, StorageRangesMsg, &StorageRangesPacket{ID: req.ID})
 				}
 				stTrie, err := zktrie.New(acc.Root, backend.Chain().StateCache().TrieDB())
