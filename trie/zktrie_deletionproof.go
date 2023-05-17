@@ -115,6 +115,10 @@ func (t *ProofTracer) MarkDeletion(key []byte) {
 	if path, existed := t.rawPaths[string(key)]; existed {
 		// sanity check
 		leafNode := path[len(path)-1]
+		if leafNode.Type == zktrie.NodeTypeEmpty {
+			// empty node has 0 hash and has been considered as deleted in deletionTracer
+			return
+		}
 		if leafNode.Type != zktrie.NodeTypeLeaf {
 			panic("all path recorded in proofTrace should be ended with leafNode")
 		}
@@ -143,6 +147,10 @@ func (t *ProofTracer) Prove(key []byte, fromLevel uint, proofDb ethdb.KeyValueWr
 				}
 			} else if n.Type == zktrie.NodeTypeParent {
 				mptPath = append(mptPath, n)
+			} else if n.Type == zktrie.NodeTypeEmpty {
+				// empty node is considered as "unhit" but we must also add them
+				mptPath = append(mptPath, n)
+				t.rawPaths[string(key)] = mptPath
 			}
 
 			return proofDb.Put(nodeHash[:], n.Value())
