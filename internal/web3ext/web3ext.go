@@ -858,6 +858,18 @@ web3._extend({
 			name: 'getBlockTraceByNumberOrHash',
 			call: 'scroll_getBlockTraceByNumberOrHash',
 			params: 1
+		}),
+		new web3._extend.Method({
+			name: 'getL1MessageByIndex',
+			call: 'scroll_getL1MessageByIndex',
+			params: 1
+		})
+	],
+	properties:
+	[
+		new web3._extend.Property({
+			name: 'l1SyncHeight',
+			getter: 'scroll_getL1SyncHeight'
 		})
 	]
 });

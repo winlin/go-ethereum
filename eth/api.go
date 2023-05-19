@@ -607,3 +607,23 @@ func (api *PrivateDebugAPI) GetAccessibleState(from, to rpc.BlockNumber) (uint64
 	}
 	return 0, fmt.Errorf("No state found")
 }
+
+// ScrollAPI provides private RPC methods to query the L1 message database.
+type ScrollAPI struct {
+	eth *Ethereum
+}
+
+// NewScrollAPI creates a new RPC service to query the L1 message database.
+func NewScrollAPI(eth *Ethereum) *ScrollAPI {
+	return &ScrollAPI{eth: eth}
+}
+
+// GetL1SyncHeight returns the latest synced L1 block height from the local database.
+func (api *ScrollAPI) GetL1SyncHeight(ctx context.Context) (height *uint64, err error) {
+	return rawdb.ReadSyncedL1BlockNumber(api.eth.ChainDb()), nil
+}
+
+// GetL1MessageByIndex returns an queries an L1 message by its index in the local database.
+func (api *ScrollAPI) GetL1MessageByIndex(ctx context.Context, enqueueIndex uint64) (height *types.L1MessageTx, err error) {
+	return rawdb.ReadL1Message(api.eth.ChainDb(), enqueueIndex), nil
+}
