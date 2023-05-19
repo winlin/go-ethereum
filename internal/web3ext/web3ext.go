@@ -30,6 +30,7 @@ var Modules = map[string]string{
 	"txpool":   TxpoolJs,
 	"les":      LESJs,
 	"vflux":    VfluxJs,
+	"scroll":   ScrollJs,
 }
 
 const CliqueJs = `
@@ -845,6 +846,19 @@ web3._extend({
 			name: 'requestStats',
 			getter: 'vflux_requestStats'
 		}),
+	]
+});
+`
+
+const ScrollJs = `
+web3._extend({
+	property: 'scroll',
+	methods: [
+		new web3._extend.Method({
+			name: 'getBlockTraceByNumberOrHash',
+			call: 'scroll_getBlockTraceByNumberOrHash',
+			params: 1
+		})
 	]
 });
 `
