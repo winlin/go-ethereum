@@ -245,7 +245,7 @@ func (s *Sync) Missing(max int) (nodes []common.Hash, paths []SyncPath, codes []
 		item, prio := s.queue.Peek()
 
 		// If we have too many already-pending tasks for this depth, throttle
-		depth := int(prio >> 56)
+		depth := int(prio >> 47)
 		if s.fetches[depth] > maxFetchesPerDepth {
 			break
 		}
