@@ -11,14 +11,14 @@ type traceFunc func(l *StructLogger, scope *ScopeContext, extraData *types.Extra
 var (
 	// OpcodeExecs the map to load opcodes' trace funcs.
 	OpcodeExecs = map[OpCode][]traceFunc{
-		CALL:         {traceToAddressCode, traceLastNAddressCode(1), traceContractAccount, traceLastNAddressAccount(1)}, // contract account is the caller, stack.nth_last(1) is the callee's address
-		CALLCODE:     {traceToAddressCode, traceLastNAddressCode(1), traceContractAccount, traceLastNAddressAccount(1)}, // contract account is the caller, stack.nth_last(1) is the callee's address
-		DELEGATECALL: {traceToAddressCode, traceLastNAddressCode(1)},
-		STATICCALL:   {traceToAddressCode, traceLastNAddressCode(1), traceLastNAddressAccount(1)},
-		CREATE:       {}, // caller is already recorded in ExtraData.Caller, callee is recorded in CaptureEnter&CaptureExit
-		CREATE2:      {}, // caller is already recorded in ExtraData.Caller, callee is recorded in CaptureEnter&CaptureExit
-		SLOAD:        {}, // trace storage in `captureState` instead of here, to handle `l.cfg.DisableStorage` flag
-		SSTORE:       {}, // trace storage in `captureState` instead of here, to handle `l.cfg.DisableStorage` flag
+		CALL:         {traceToAddressCode, traceLastNAddressCode(1), traceContractAccount, traceLastNAddressAccount(1), traceExtraDataCaller}, // contract account is the caller, stack.nth_last(1) is the callee's address
+		CALLCODE:     {traceToAddressCode, traceLastNAddressCode(1), traceContractAccount, traceLastNAddressAccount(1), traceExtraDataCaller}, // contract account is the caller, stack.nth_last(1) is the callee's address
+		DELEGATECALL: {traceToAddressCode, traceLastNAddressCode(1), traceExtraDataCaller},
+		STATICCALL:   {traceToAddressCode, traceLastNAddressCode(1), traceLastNAddressAccount(1), traceExtraDataCaller},
+		CREATE:       {traceExtraDataCaller}, // caller is already recorded in ExtraData.Caller, callee is recorded in CaptureEnter&CaptureExit
+		CREATE2:      {traceExtraDataCaller}, // caller is already recorded in ExtraData.Caller, callee is recorded in CaptureEnter&CaptureExit
+		SLOAD:        {},                     // trace storage in `captureState` instead of here, to handle `l.cfg.DisableStorage` flag
+		SSTORE:       {},                     // trace storage in `captureState` instead of here, to handle `l.cfg.DisableStorage` flag
 		SELFDESTRUCT: {traceContractAccount, traceLastNAddressAccount(0)},
 		SELFBALANCE:  {traceContractAccount},
 		BALANCE:      {traceLastNAddressAccount(0)},
@@ -29,6 +29,12 @@ var (
 		EXTCODECOPY:  {traceLastNAddressCode(0)},
 	}
 )
+
+// for each "calling" op, pick the caller's state
+func traceExtraDataCaller(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error {
+	extraData.Caller = append(extraData.Caller, getWrappedAccountForAddr(l, scope.Contract.Address()))
+	return nil
+}
 
 // traceToAddressCode gets tx.to address’s code
 func traceToAddressCode(l *StructLogger, scope *ScopeContext, extraData *types.ExtraData) error {
