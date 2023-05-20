@@ -268,12 +268,6 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 			}
 		}
 	}
-	// for each "calling" op, pick the caller's state
-	switch op {
-	case CALL, CALLCODE, STATICCALL, DELEGATECALL, CREATE, CREATE2:
-		extraData := structLog.getOrInitExtraData()
-		extraData.Caller = append(extraData.Caller, getWrappedAccountForAddr(l, scope.Contract.Address()))
-	}
 
 	structLog.RefundCounter = l.env.StateDB.GetRefund()
 	l.logs = append(l.logs, structLog)
