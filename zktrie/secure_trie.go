@@ -67,7 +67,7 @@ func NewSecure(root common.Hash, db *Database) (*SecureTrie, error) {
 		return nil, err
 	}
 
-	trie := NewTrieWithImpl(impl, db)
+	trie := newTrieWithImpl(impl, db)
 	return &SecureTrie{zktrie: trie.secureTrie, db: db, trie: trie}, nil
 }
 
@@ -179,9 +179,10 @@ func (t *SecureTrie) Hash() common.Hash {
 
 // Copy returns a copy of SecureBinaryTrie.
 func (t *SecureTrie) Copy() *SecureTrie {
-	secure, err := NewSecure(t.trie.Hash(), t.db)
+	root := t.trie.Hash()
+	secure, err := NewSecure(root, t.db)
 	if err != nil {
-		panic(fmt.Sprintf("copy secure trie failed: %v", err))
+		log.Crit("secure trie copy failed", "root", root, "err", err)
 	}
 	return secure
 }

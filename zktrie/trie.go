@@ -57,6 +57,10 @@ var (
 // for extracting the raw states(leaf nodes) with corresponding paths.
 type LeafCallback func(paths [][]byte, hexpath []byte, leaf []byte, parent common.Hash) error
 
+// Trie is a Merkle Patricia Trie.
+// Use New to create a trie that sits on top of a database.
+//
+// Trie is not safe for concurrent use.
 type Trie struct {
 	db   *Database
 	impl *itrie.ZkTrieImpl
@@ -83,10 +87,10 @@ func New(root common.Hash, db *Database) (*Trie, error) {
 		return nil, fmt.Errorf("new trie failed: %w", err)
 	}
 
-	return NewTrieWithImpl(impl, db), nil
+	return newTrieWithImpl(impl, db), nil
 }
 
-func NewTrieWithImpl(impl *itrie.ZkTrieImpl, db *Database) *Trie {
+func newTrieWithImpl(impl *itrie.ZkTrieImpl, db *Database) *Trie {
 	if db == nil {
 		panic("zktrie.New called without a database")
 	}
@@ -135,9 +139,9 @@ func (t *Trie) TryUpdateWithKind(kind string, key, value []byte) error {
 	}
 }
 
-// Update associates key with value in the trie. Subsequent calls to
-// Get will return value. If value has length zero, any existing value
-// is deleted from the trie and calls to Get will return nil.
+// Update associates key with storage slot value in the trie. Subsequent
+// calls to Get will return value. If value has length zero, any existing
+// value is deleted from the trie and calls to Get will return nil.
 //
 // The value bytes must not be modified by the caller while they are
 // stored in the trie.
@@ -147,6 +151,8 @@ func (t *Trie) Update(key, value []byte) {
 	}
 }
 
+// UpdateAccount associates key with raw account in the trie. Subsequent
+// calls to Get will return marshaled account values.
 func (t *Trie) UpdateAccount(key []byte, account *types.StateAccount) {
 	if err := t.TryUpdateAccount(key, account); err != nil {
 		log.Error(fmt.Sprintf("Unhandled trie error: %v", err))
