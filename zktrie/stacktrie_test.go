@@ -18,10 +18,13 @@ package zktrie
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"math/big"
+	"sort"
 	"testing"
 
+	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/types"
 
 	"github.com/scroll-tech/go-ethereum/common"
@@ -291,5 +294,49 @@ func TestStacktrieNotModifyValues(t *testing.T) {
 			t.Fatalf("item %d, have %#x want %#x", i, have, want)
 		}
 
+	}
+}
+
+func randomSortedKV(n int) []kv {
+	kvs := make([]kv, n)
+	for i := 0; i < n; i++ {
+		key := make([]byte, 32)
+		binary.BigEndian.PutUint64(key[16:], uint64(i))
+		kvs[i].k = crypto.PoseidonSecure(key)
+		kvs[i].v = []byte("v")
+	}
+	sort.SliceStable(kvs, func(i, j int) bool {
+		return bytes.Compare(kvs[i].k, kvs[j].k) < 0
+	})
+	return kvs
+}
+
+func BenchmarkStacktrieUpdateFixedSize(b *testing.B) {
+	for _, tc := range []struct {
+		name string
+		size int
+	}{
+		{"1", 1},
+		{"10", 10},
+		{"100", 100},
+		{"1K", 1000},
+		{"10K", 10000},
+	} {
+		b.Run(tc.name, func(b *testing.B) {
+			b.ReportAllocs()
+			kvs := randomSortedKV(tc.size)
+			b.ResetTimer()
+			for n := 0; n < b.N; n++ {
+				db := rawdb.NewMemoryDatabase()
+
+				st := NewStackTrie(db)
+
+				for _, it := range kvs {
+					st.Update(it.k, it.v)
+				}
+
+				st.Hash()
+			}
+		})
 	}
 }
