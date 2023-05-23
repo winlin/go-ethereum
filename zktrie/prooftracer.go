@@ -13,6 +13,7 @@ type ProofTracer struct {
 	trie           *SecureTrie
 	deletionTracer map[itypes.Hash]struct{}
 	rawPaths       map[string][]*itrie.Node
+	emptyTermPaths map[string][]*itrie.Node
 }
 
 // NewProofTracer create a proof tracer object
@@ -22,6 +23,7 @@ func (t *SecureTrie) NewProofTracer() *ProofTracer {
 		// always consider 0 is "deleted"
 		deletionTracer: map[itypes.Hash]struct{}{itypes.HashZero: {}},
 		rawPaths:       make(map[string][]*itrie.Node),
+		emptyTermPaths: make(map[string][]*itrie.Node),
 	}
 }
 
@@ -96,9 +98,13 @@ func (t *ProofTracer) GetDeletionProofs() ([][]byte, error) {
 
 // MarkDeletion mark a key has been involved into deletion
 func (t *ProofTracer) MarkDeletion(key []byte) {
-	if path, existed := t.rawPaths[string(key)]; existed {
+	if path, existed := t.emptyTermPaths[string(key)]; existed {
+		// copy empty node terminated path for final scanning
+		t.rawPaths[string(key)] = path
+	} else if path, existed = t.rawPaths[string(key)]; existed {
 		// sanity check
 		leafNode := path[len(path)-1]
+
 		if leafNode.Type != itrie.NodeTypeLeaf {
 			panic("all path recorded in proofTrace should be ended with leafNode")
 		}
@@ -127,6 +133,11 @@ func (t *ProofTracer) Prove(key []byte, fromLevel uint, proofDb ethdb.KeyValueWr
 				}
 			} else if n.Type == itrie.NodeTypeParent {
 				mptPath = append(mptPath, n)
+			} else if n.Type == itrie.NodeTypeEmpty {
+				// empty node is considered as "unhit" but it should be also being added
+				// into a temporary slot for possibly being marked as deletion later
+				mptPath = append(mptPath, n)
+				t.emptyTermPaths[string(key)] = mptPath
 			}
 
 			return proofDb.Put(nodeHash[:], n.Value())
