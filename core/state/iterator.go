@@ -61,9 +61,6 @@ func (it *NodeIterator) Next() bool {
 	// Otherwise step forward with the iterator and report any errors
 	if err := it.step(); err != nil {
 		it.Error = err
-		if it.Error != nil {
-			fmt.Printf("error: %v\n", it.Error)
-		}
 		return false
 	}
 	return it.retrieve()
