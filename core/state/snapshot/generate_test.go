@@ -233,12 +233,10 @@ func (t *testHelper) Generate() (common.Hash, *diskLayer) {
 //   - miss in the beginning
 //   - miss in the middle
 //   - miss in the end
-//
 // - the contract(non-empty storage) has wrong storage slots
 //   - wrong slots in the beginning
 //   - wrong slots in the middle
 //   - wrong slots in the end
-//
 // - the contract(non-empty storage) has extra storage slots
 //   - extra slots in the beginning
 //   - extra slots in the middle
@@ -760,7 +758,7 @@ func TestGenerateFromEmptySnap(t *testing.T) {
 			&Account{Balance: big.NewInt(1), Root: stRoot, KeccakCodeHash: emptyKeccakCode.Bytes(), PoseidonCodeHash: emptyPoseidonCode.Bytes(), CodeSize: 0})
 	}
 	root, snap := helper.Generate()
-	t.Logf("root: %#x\n", root) // root: 0x6f7af6d2e1a1bf2b84a3beb3f8b64388465fbc1e274ca5d5d3fc787ca78f59e4
+	t.Logf("Root: %#x\n", root) // Root: 0x6f7af6d2e1a1bf2b84a3beb3f8b64388465fbc1e274ca5d5d3fc787ca78f59e4
 
 	select {
 	case <-snap.genPending:
@@ -807,7 +805,7 @@ func TestGenerateWithIncompleteStorage(t *testing.T) {
 	}
 
 	root, snap := helper.Generate()
-	t.Logf("root: %#x\n", root) // root: 0xca73f6f05ba4ca3024ef340ef3dfca8fdabc1b677ff13f5a9571fd49c16e67ff
+	t.Logf("Root: %#x\n", root) // Root: 0xca73f6f05ba4ca3024ef340ef3dfca8fdabc1b677ff13f5a9571fd49c16e67ff
 
 	select {
 	case <-snap.genPending:
