@@ -384,9 +384,9 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 			bloomBits.Add(size)
 		case bytes.HasPrefix(key, []byte("clique-")) && len(key) == 7+common.HashLength:
 			cliqueSnaps.Add(size)
-		case bytes.HasPrefix(key, L1MessagePrefix) && len(key) == len(L1MessagePrefix)+8:
+		case bytes.HasPrefix(key, l1MessagePrefix) && len(key) == len(l1MessagePrefix)+8:
 			l1Messages.Add(size)
-		case bytes.HasPrefix(key, FirstQueueIndexNotInL2BlockPrefix) && len(key) == len(FirstQueueIndexNotInL2BlockPrefix)+common.HashLength:
+		case bytes.HasPrefix(key, firstQueueIndexNotInL2BlockPrefix) && len(key) == len(firstQueueIndexNotInL2BlockPrefix)+common.HashLength:
 			lastL1Message.Add(size)
 		case bytes.HasPrefix(key, []byte("cht-")) ||
 			bytes.HasPrefix(key, []byte("chtIndexV2-")) ||

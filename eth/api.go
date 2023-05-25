@@ -624,6 +624,6 @@ func (api *ScrollAPI) GetL1SyncHeight(ctx context.Context) (height *uint64, err 
 }
 
 // GetL1MessageByIndex returns an queries an L1 message by its index in the local database.
-func (api *ScrollAPI) GetL1MessageByIndex(ctx context.Context, enqueueIndex uint64) (height *types.L1MessageTx, err error) {
-	return rawdb.ReadL1Message(api.eth.ChainDb(), enqueueIndex), nil
+func (api *ScrollAPI) GetL1MessageByIndex(ctx context.Context, queueIndex uint64) (height *types.L1MessageTx, err error) {
+	return rawdb.ReadL1Message(api.eth.ChainDb(), queueIndex), nil
 }

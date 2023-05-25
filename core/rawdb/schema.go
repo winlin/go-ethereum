@@ -101,8 +101,8 @@ var (
 
 	// Scroll L1 message store
 	syncedL1BlockNumberKey            = []byte("LastSyncedL1BlockNumber")
-	L1MessagePrefix                   = []byte("l1") // L1MessagePrefix + enqueueIndex (uint64 big endian) -> L1MessageTx
-	FirstQueueIndexNotInL2BlockPrefix = []byte("q")  // FirstQueueIndexNotInL2BlockPrefix + L2 block hash -> enqueue index
+	l1MessagePrefix                   = []byte("l1") // l1MessagePrefix + queueIndex (uint64 big endian) -> L1MessageTx
+	firstQueueIndexNotInL2BlockPrefix = []byte("q")  // firstQueueIndexNotInL2BlockPrefix + L2 block hash -> enqueue index
 )
 
 const (
@@ -236,19 +236,19 @@ func configKey(hash common.Hash) []byte {
 	return append(configPrefix, hash.Bytes()...)
 }
 
-// encodeBlockNumber encodes an L1 enqueue index as big endian uint64
-func encodeEnqueueIndex(index uint64) []byte {
+// encodeQueueIndex encodes an L1 enqueue index as big endian uint64
+func encodeQueueIndex(index uint64) []byte {
 	enc := make([]byte, 8)
 	binary.BigEndian.PutUint64(enc, index)
 	return enc
 }
 
-// L1MessageKey = L1MessagePrefix + enqueueIndex (uint64 big endian)
-func L1MessageKey(enqueueIndex uint64) []byte {
-	return append(L1MessagePrefix, encodeEnqueueIndex(enqueueIndex)...)
+// L1MessageKey = l1MessagePrefix + queueIndex (uint64 big endian)
+func L1MessageKey(queueIndex uint64) []byte {
+	return append(l1MessagePrefix, encodeQueueIndex(queueIndex)...)
 }
 
-// FirstQueueIndexNotInL2BlockKey = FirstQueueIndexNotInL2BlockPrefix + L2 block hash
+// FirstQueueIndexNotInL2BlockKey = firstQueueIndexNotInL2BlockPrefix + L2 block hash
 func FirstQueueIndexNotInL2BlockKey(l2BlockHash common.Hash) []byte {
-	return append(FirstQueueIndexNotInL2BlockPrefix, l2BlockHash.Bytes()...)
+	return append(firstQueueIndexNotInL2BlockPrefix, l2BlockHash.Bytes()...)
 }

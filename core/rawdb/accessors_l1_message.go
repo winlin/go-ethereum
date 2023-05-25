@@ -57,8 +57,7 @@ func WriteL1Message(db ethdb.KeyValueWriter, l1Msg types.L1MessageTx) {
 	if err != nil {
 		log.Crit("Failed to RLP encode L1 message", "err", err)
 	}
-	enqueueIndex := l1Msg.QueueIndex
-	if err := db.Put(L1MessageKey(enqueueIndex), bytes); err != nil {
+	if err := db.Put(L1MessageKey(l1Msg.QueueIndex), bytes); err != nil {
 		log.Crit("Failed to store L1 message", "err", err)
 	}
 }
@@ -80,26 +79,26 @@ func WriteL1MessagesBatch(db ethdb.Batcher, l1Msgs []types.L1MessageTx) {
 }
 
 // ReadL1MessageRLP retrieves an L1 message in its raw RLP database encoding.
-func ReadL1MessageRLP(db ethdb.Reader, enqueueIndex uint64) rlp.RawValue {
-	data, err := db.Get(L1MessageKey(enqueueIndex))
+func ReadL1MessageRLP(db ethdb.Reader, queueIndex uint64) rlp.RawValue {
+	data, err := db.Get(L1MessageKey(queueIndex))
 	if err != nil && isNotFoundErr(err) {
 		return nil
 	}
 	if err != nil {
-		log.Crit("Failed to load L1 message", "enqueueIndex", enqueueIndex, "err", err)
+		log.Crit("Failed to load L1 message", "queueIndex", queueIndex, "err", err)
 	}
 	return data
 }
 
 // ReadL1Message retrieves the L1 message corresponding to the enqueue index.
-func ReadL1Message(db ethdb.Reader, enqueueIndex uint64) *types.L1MessageTx {
-	data := ReadL1MessageRLP(db, enqueueIndex)
+func ReadL1Message(db ethdb.Reader, queueIndex uint64) *types.L1MessageTx {
+	data := ReadL1MessageRLP(db, queueIndex)
 	if len(data) == 0 {
 		return nil
 	}
 	l1Msg := new(types.L1MessageTx)
 	if err := rlp.Decode(bytes.NewReader(data), l1Msg); err != nil {
-		log.Crit("Invalid L1 message RLP", "enqueueIndex", enqueueIndex, "data", data, "err", err)
+		log.Crit("Invalid L1 message RLP", "queueIndex", queueIndex, "data", data, "err", err)
 	}
 	return l1Msg
 }
@@ -114,10 +113,10 @@ type L1MessageIterator struct {
 
 // IterateL1MessagesFrom creates an L1MessageIterator that iterates over
 // all L1 message in the database starting at the provided enqueue index.
-func IterateL1MessagesFrom(db ethdb.Iteratee, fromEnqueueIndex uint64) L1MessageIterator {
-	start := encodeEnqueueIndex(fromEnqueueIndex)
-	it := db.NewIterator(L1MessagePrefix, start)
-	keyLength := len(L1MessagePrefix) + 8
+func IterateL1MessagesFrom(db ethdb.Iteratee, fromQueueIndex uint64) L1MessageIterator {
+	start := encodeQueueIndex(fromQueueIndex)
+	it := db.NewIterator(l1MessagePrefix, start)
+	keyLength := len(l1MessagePrefix) + 8
 
 	return L1MessageIterator{
 		inner:     it,
@@ -137,12 +136,12 @@ func (it *L1MessageIterator) Next() bool {
 	return false
 }
 
-// EnqueueIndex returns the enqueue index of the current L1 message.
-func (it *L1MessageIterator) EnqueueIndex() uint64 {
+// QueueIndex returns the enqueue index of the current L1 message.
+func (it *L1MessageIterator) QueueIndex() uint64 {
 	key := it.inner.Key()
-	raw := key[len(L1MessagePrefix) : len(L1MessagePrefix)+8]
-	enqueueIndex := binary.BigEndian.Uint64(raw)
-	return enqueueIndex
+	raw := key[len(l1MessagePrefix) : len(l1MessagePrefix)+8]
+	queueIndex := binary.BigEndian.Uint64(raw)
+	return queueIndex
 }
 
 // L1Message returns the current L1 message.
@@ -162,18 +161,18 @@ func (it *L1MessageIterator) Release() {
 
 // ReadL1MessagesInRange retrieves all L1 messages between two enqueue indices (inclusive).
 // The resulting array is ordered by the L1 message enqueue index.
-func ReadL1MessagesInRange(db ethdb.Iteratee, firstEnqueueIndex, lastEnqueueIndex uint64, checkRange bool) []types.L1MessageTx {
-	if firstEnqueueIndex > lastEnqueueIndex {
+func ReadL1MessagesInRange(db ethdb.Iteratee, firstQueueIndex, lastQueueIndex uint64, checkRange bool) []types.L1MessageTx {
+	if firstQueueIndex > lastQueueIndex {
 		return nil
 	}
 
-	expectedCount := lastEnqueueIndex - firstEnqueueIndex + 1
+	expectedCount := lastQueueIndex - firstQueueIndex + 1
 	msgs := make([]types.L1MessageTx, 0, expectedCount)
-	it := IterateL1MessagesFrom(db, firstEnqueueIndex)
+	it := IterateL1MessagesFrom(db, firstQueueIndex)
 	defer it.Release()
 
 	for it.Next() {
-		if it.EnqueueIndex() > lastEnqueueIndex {
+		if it.QueueIndex() > lastQueueIndex {
 			break
 		}
 		msgs = append(msgs, it.L1Message())
@@ -181,8 +180,8 @@ func ReadL1MessagesInRange(db ethdb.Iteratee, firstEnqueueIndex, lastEnqueueInde
 
 	if checkRange && uint64(len(msgs)) != expectedCount {
 		log.Crit("Missing or unordered L1 messages in database",
-			"firstEnqueueIndex", firstEnqueueIndex,
-			"lastEnqueueIndex", lastEnqueueIndex,
+			"firstQueueIndex", firstQueueIndex,
+			"lastQueueIndex", lastQueueIndex,
 			"count", len(msgs),
 		)
 	}
@@ -194,8 +193,8 @@ func ReadL1MessagesInRange(db ethdb.Iteratee, firstEnqueueIndex, lastEnqueueInde
 // that is NOT included in the ledger up to and including the provided L2 block.
 // The L2 block is identified by its block hash. If the L2 block contains zero
 // L1 messages, this value MUST equal its parent's value.
-func WriteFirstQueueIndexNotInL2Block(db ethdb.KeyValueWriter, l2BlockHash common.Hash, enqueueIndex uint64) {
-	if err := db.Put(FirstQueueIndexNotInL2BlockKey(l2BlockHash), encodeEnqueueIndex(enqueueIndex)); err != nil {
+func WriteFirstQueueIndexNotInL2Block(db ethdb.KeyValueWriter, l2BlockHash common.Hash, queueIndex uint64) {
+	if err := db.Put(FirstQueueIndexNotInL2BlockKey(l2BlockHash), encodeQueueIndex(queueIndex)); err != nil {
 		log.Crit("Failed to store last L1 message in L2 block", "l2BlockHash", l2BlockHash, "err", err)
 	}
 }
@@ -213,6 +212,6 @@ func ReadFirstQueueIndexNotInL2Block(db ethdb.Reader, l2BlockHash common.Hash) *
 	if len(data) == 0 {
 		return nil
 	}
-	enqueueIndex := binary.BigEndian.Uint64(data)
-	return &enqueueIndex
+	queueIndex := binary.BigEndian.Uint64(data)
+	return &queueIndex
 }

@@ -28,9 +28,9 @@ func TestReadWriteSyncedL1BlockNumber(t *testing.T) {
 	}
 }
 
-func newL1MessageTx(enqueueIndex uint64) types.L1MessageTx {
+func newL1MessageTx(queueIndex uint64) types.L1MessageTx {
 	return types.L1MessageTx{
-		QueueIndex: enqueueIndex,
+		QueueIndex: queueIndex,
 		Gas:        0,
 		To:         &common.Address{},
 		Value:      big.NewInt(0),
@@ -40,13 +40,13 @@ func newL1MessageTx(enqueueIndex uint64) types.L1MessageTx {
 }
 
 func TestReadWriteL1Message(t *testing.T) {
-	enqueueIndex := uint64(123)
-	msg := newL1MessageTx(enqueueIndex)
+	queueIndex := uint64(123)
+	msg := newL1MessageTx(queueIndex)
 	db := NewMemoryDatabase()
 	WriteL1Messages(db, []types.L1MessageTx{msg})
-	got := ReadL1Message(db, enqueueIndex)
-	if got == nil || got.QueueIndex != enqueueIndex {
-		t.Fatal("L1 message mismatch", "expected", enqueueIndex, "got", got)
+	got := ReadL1Message(db, queueIndex)
+	if got == nil || got.QueueIndex != queueIndex {
+		t.Fatal("L1 message mismatch", "expected", queueIndex, "got", got)
 	}
 }
 
