@@ -84,7 +84,6 @@ type TxData interface {
 	value() *big.Int
 	nonce() uint64
 	to() *common.Address
-	queueIndex() uint64
 
 	rawSignatureValues() (v, r, s *big.Int)
 	setSignatureValues(chainID, v, r, s *big.Int)
@@ -294,13 +293,19 @@ func (tx *Transaction) To() *common.Address {
 	return copyAddressPtr(tx.inner.to())
 }
 
-// QueueIndex returns the L1 queue index if `tx` is of type `L1MessageTx`.
-// It returns 0 otherwise.
-func (tx *Transaction) QueueIndex() uint64 { return tx.inner.queueIndex() }
-
 // IsL1MessageTx returns true if the transaction is an L1 cross-domain tx.
 func (tx *Transaction) IsL1MessageTx() bool {
 	return tx.Type() == L1MessageTxType
+}
+
+// L1MessageQueueIndex returns the L1 queue index if `tx` is of type `L1MessageTx`.
+// It returns 0 otherwise.
+func (tx *Transaction) L1MessageQueueIndex() uint64 {
+	if tx.IsL1MessageTx() {
+		return tx.AsL1MessageTx().QueueIndex
+	} else {
+		return 0
+	}
 }
 
 // AsL1MessageTx casts the tx into an L1 cross-domain tx.

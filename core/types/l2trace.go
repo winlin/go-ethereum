@@ -169,7 +169,7 @@ func NewTransactionData(tx *Transaction, blockNumber uint64, config *params.Chai
 
 	nonce := tx.Nonce()
 	if tx.IsL1MessageTx() {
-		nonce = tx.QueueIndex()
+		nonce = tx.L1MessageQueueIndex()
 	}
 
 	result := &TransactionData{
