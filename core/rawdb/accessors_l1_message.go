@@ -159,31 +159,32 @@ func (it *L1MessageIterator) Release() {
 	it.inner.Release()
 }
 
-// ReadL1MessagesInRange retrieves all L1 messages between two enqueue indices (inclusive).
-// The resulting array is ordered by the L1 message enqueue index.
-func ReadL1MessagesInRange(db ethdb.Iteratee, firstQueueIndex, lastQueueIndex uint64, checkRange bool) []types.L1MessageTx {
-	if firstQueueIndex > lastQueueIndex {
-		return nil
-	}
-
-	expectedCount := lastQueueIndex - firstQueueIndex + 1
-	msgs := make([]types.L1MessageTx, 0, expectedCount)
-	it := IterateL1MessagesFrom(db, firstQueueIndex)
+// ReadL1MessagesFrom retrieves up to `maxCount` L1 messages starting at `startIndex`.
+func ReadL1MessagesFrom(db ethdb.Iteratee, startIndex, maxCount uint64) []types.L1MessageTx {
+	msgs := make([]types.L1MessageTx, 0, maxCount)
+	it := IterateL1MessagesFrom(db, startIndex)
 	defer it.Release()
 
-	for it.Next() {
-		if it.QueueIndex() > lastQueueIndex {
-			break
-		}
-		msgs = append(msgs, it.L1Message())
-	}
+	index := startIndex
+	count := maxCount
 
-	if checkRange && uint64(len(msgs)) != expectedCount {
-		log.Crit("Missing or unordered L1 messages in database",
-			"firstQueueIndex", firstQueueIndex,
-			"lastQueueIndex", lastQueueIndex,
-			"count", len(msgs),
-		)
+	for count > 0 && it.Next() {
+		msg := it.L1Message()
+
+		// sanity check
+		if msg.QueueIndex != index {
+			log.Crit(
+				"Unexpected QueueIndex in ReadL1MessagesFrom",
+				"expected", index,
+				"got", msg.QueueIndex,
+				"startIndex", startIndex,
+				"maxCount", maxCount,
+			)
+		}
+
+		msgs = append(msgs, msg)
+		index += 1
+		count -= 1
 	}
 
 	return msgs

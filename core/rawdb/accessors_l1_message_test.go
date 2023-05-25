@@ -87,21 +87,20 @@ func TestReadL1MessageTxRange(t *testing.T) {
 	msgs := []types.L1MessageTx{
 		newL1MessageTx(100),
 		newL1MessageTx(101),
+		newL1MessageTx(102),
 		newL1MessageTx(103),
-		newL1MessageTx(200),
-		newL1MessageTx(1000),
 	}
 
 	db := NewMemoryDatabase()
 	WriteL1Messages(db, msgs)
 
-	got := ReadL1MessagesInRange(db, 101, 999, false)
+	got := ReadL1MessagesFrom(db, 101, 3)
 
 	if len(got) != 3 {
 		t.Fatal("Invalid length", "expected", 3, "got", len(got))
 	}
 
-	if got[0].QueueIndex != 101 || got[1].QueueIndex != 103 || got[2].QueueIndex != 200 {
+	if got[0].QueueIndex != 101 || got[1].QueueIndex != 102 || got[2].QueueIndex != 103 {
 		t.Fatal("Invalid result", "got", got)
 	}
 }

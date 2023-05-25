@@ -949,12 +949,12 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 func (w *worker) collectPendingL1Messages() []types.L1MessageTx {
 	nextQueueIndex := rawdb.ReadFirstQueueIndexNotInL2Block(w.eth.ChainDb(), w.chain.CurrentHeader().Hash())
 	if nextQueueIndex == nil {
-		log.Crit("Failed to read last L1 message in L2 block", "l2BlockHash", w.chain.CurrentHeader().Hash(), " last L1 message is nil")
+		// the parent (w.chain.CurrentHeader) must have been processed before we start a new mining job.
+		log.Crit("Failed to read last L1 message in L2 block", "l2BlockHash", w.chain.CurrentHeader().Hash())
 	}
-
-	first := *nextQueueIndex
-	last := first + w.chainConfig.Scroll.L1Config.NumL1MessagesPerBlock - 1
-	return rawdb.ReadL1MessagesInRange(w.eth.ChainDb(), first, last, false)
+	startIndex := *nextQueueIndex
+	maxCount := w.chainConfig.Scroll.L1Config.NumL1MessagesPerBlock
+	return rawdb.ReadL1MessagesFrom(w.eth.ChainDb(), startIndex, maxCount)
 }
 
 // commitNewWork generates several new sealing tasks based on the parent block.
