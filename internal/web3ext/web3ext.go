@@ -69,6 +69,16 @@ web3._extend({
 			params: 1
 		}),
 		new web3._extend.Method({
+			name: 'getPeriod',
+			call: 'clique_getPeriod',
+			params: 0
+		}),
+		new web3._extend.Method({
+			name: 'setPeriod',
+			call: 'clique_setPeriod',
+			params: 1
+		}),
+		new web3._extend.Method({
 			name: 'status',
 			call: 'clique_status',
 			params: 0

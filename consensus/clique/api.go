@@ -123,6 +123,17 @@ func (api *API) Discard(address common.Address) {
 	delete(api.clique.proposals, address)
 }
 
+// GetPeriod returns the current clique block period (number of seconds between blocks to enforce).
+func (api *API) GetPeriod() uint64 {
+	return api.clique.config.Period
+}
+
+// SetPeriod sets the current clique block period (number of seconds between blocks to enforce)
+// to a given value.
+func (api *API) SetPeriod(period uint64) {
+	api.clique.config.Period = period
+}
+
 type status struct {
 	InturnPercent float64                `json:"inturnPercent"`
 	SigningStatus map[common.Address]int `json:"sealerActivity"`
