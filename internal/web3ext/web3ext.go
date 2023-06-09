@@ -70,11 +70,6 @@ web3._extend({
 			params: 1
 		}),
 		new web3._extend.Method({
-			name: 'getPeriod',
-			call: 'clique_getPeriod',
-			params: 0
-		}),
-		new web3._extend.Method({
 			name: 'setPeriod',
 			call: 'clique_setPeriod',
 			params: 1
@@ -95,6 +90,10 @@ web3._extend({
 		new web3._extend.Property({
 			name: 'proposals',
 			getter: 'clique_proposals'
+		}),
+		new web3._extend.Property({
+			name: 'period',
+			getter: 'clique_getPeriod',
 		}),
 	]
 });
