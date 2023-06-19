@@ -65,34 +65,74 @@ func reverseDataToMsg(txdata *types.TransactionData) types.Message {
 		(*big.Int)(txdata.GasPrice), (*big.Int)(txdata.GasPrice), (*big.Int)(txdata.GasPrice), databytes, nil, false)
 }
 
-func TestCalculateL1DataSize(t *testing.T) {
+type l1DataTestCase struct {
+	TxDataSample      string
+	EIP1559BaseFee    *big.Int
+	L1basefee         *big.Int
+	L1feeOverHead     *big.Int
+	L1feeScalar       *big.Int
+	EncodedExpected   int
+	L1DataFeeExpected *big.Int
+}
+
+func testCalculateL1DataSize(t *testing.T, t_case *l1DataTestCase) {
 	txdata := new(types.TransactionData)
-	assert.NoError(t, json.Unmarshal([]byte(example_tx1), txdata), "parse json fail")
+	assert.NoError(t, json.Unmarshal([]byte(t_case.TxDataSample), txdata), "parse json fail")
 
-	t.Log(txdata)
+	// we have decomposed EstimateL1DataFeeForMessage here so
+	// to catch more detail inside the process
+	var msg types.Message
 
-	msg := reverseDataToMsg(txdata)
-
-	chainID := big.NewInt(53077) //0xcf55
-	var eip1559baseFee *big.Int
-	//eip1559baseFee = new(big.Int).SetUint64(15000000)
+	if t_case.EIP1559BaseFee != nil {
+		//TODO: EIP1559 test
+		panic("no implement")
+	} else {
+		msg = reverseDataToMsg(txdata)
+	}
+	chainID := (*big.Int)(txdata.ChainId)
 	signer := types.NewLondonSigner(chainID)
-	t.Log(msg)
-
-	unsigned := asUnsignedTx(msg, eip1559baseFee, chainID)
+	unsigned := asUnsignedTx(msg, t_case.EIP1559BaseFee, chainID)
 
 	tx, err := unsigned.WithSignature(signer, append(bytes.Repeat([]byte{0xff}, crypto.SignatureLength-1), 0x01))
 	assert.NoError(t, err, "build dummy tx fail")
 	raw, err := rlpEncode(tx)
-	t.Log(raw)
 	assert.NoError(t, err, "rlp fail")
 
-	assert.Equal(t, 173, len(raw))
+	if t_case.EncodedExpected != 0 {
+		assert.Equal(t, t_case.EncodedExpected, len(raw))
+	} else {
+		t.Log("caluldated encoded rlp len:", len(raw))
+	}
 
-	basefee := big.NewInt(0x64)
-	overhead := big.NewInt(0x17d4)
-	scalar := big.NewInt(0x4a42fc80)
+	l1DataFee := calculateEncodedL1DataFee(raw, t_case.L1feeOverHead, t_case.L1basefee, t_case.L1feeScalar)
+	if t_case.L1DataFeeExpected != nil {
+		assert.Equal(t, t_case.L1DataFeeExpected, l1DataFee)
+	} else {
+		t.Log("calculated l1data fee:", l1DataFee)
+	}
+}
 
-	l1DataFee := calculateEncodedL1DataFee(raw, overhead, basefee, scalar)
-	assert.Equal(t, big.NewInt(0xfffe8), l1DataFee)
+func TestCalculateL1DataSize(t *testing.T) {
+
+	for _, tcase := range []*l1DataTestCase{
+		{
+			TxDataSample:      example_tx1,
+			L1basefee:         big.NewInt(0x64),
+			L1feeOverHead:     big.NewInt(0x17d4),
+			L1feeScalar:       big.NewInt(0x4a42fc80),
+			EncodedExpected:   173,
+			L1DataFeeExpected: big.NewInt(0xfffe8),
+		},
+		{
+			TxDataSample:      example_tx2,
+			L1basefee:         big.NewInt(0x64),
+			L1feeOverHead:     big.NewInt(0x17d4),
+			L1feeScalar:       big.NewInt(0x4a42fc80),
+			EncodedExpected:   140,
+			L1DataFeeExpected: big.NewInt(0xf3f2f),
+		},
+	} {
+		testCalculateL1DataSize(t, tcase)
+	}
+
 }
