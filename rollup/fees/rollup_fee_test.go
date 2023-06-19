@@ -75,7 +75,7 @@ type l1DataTestCase struct {
 	L1DataFeeExpected *big.Int
 }
 
-func testCalculateL1DataSize(t *testing.T, t_case *l1DataTestCase) {
+func testEstimateL1DataFeeForTransactionData(t *testing.T, t_case *l1DataTestCase) {
 	txdata := new(types.TransactionData)
 	assert.NoError(t, json.Unmarshal([]byte(t_case.TxDataSample), txdata), "parse json fail")
 
