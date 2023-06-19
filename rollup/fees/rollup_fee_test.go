@@ -61,7 +61,8 @@ func reverseDataToMsg(txdata *types.TransactionData) types.Message {
 	if err != nil {
 		panic(err)
 	}
-	return types.NewMessage(txdata.From, txdata.To, txdata.Nonce, (*big.Int)(txdata.Value), txdata.Gas, nil, nil, nil, databytes, nil, false)
+	return types.NewMessage(txdata.From, txdata.To, txdata.Nonce, (*big.Int)(txdata.Value), txdata.Gas,
+		(*big.Int)(txdata.GasPrice), (*big.Int)(txdata.GasPrice), (*big.Int)(txdata.GasPrice), databytes, nil, false)
 }
 
 func TestCalculateL1DataSize(t *testing.T) {
@@ -74,7 +75,7 @@ func TestCalculateL1DataSize(t *testing.T) {
 
 	chainID := big.NewInt(53077) //0xcf55
 	var eip1559baseFee *big.Int
-	eip1559baseFee = new(big.Int).SetUint64(15000000)
+	//eip1559baseFee = new(big.Int).SetUint64(15000000)
 	signer := types.NewLondonSigner(chainID)
 	t.Log(msg)
 
@@ -86,7 +87,7 @@ func TestCalculateL1DataSize(t *testing.T) {
 	t.Log(raw)
 	assert.NoError(t, err, "rlp fail")
 
-	assert.Equal(t, 169, len(raw))
+	assert.Equal(t, 173, len(raw))
 
 	basefee := big.NewInt(0x64)
 	overhead := big.NewInt(0x17d4)
