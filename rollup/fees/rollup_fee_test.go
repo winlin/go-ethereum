@@ -65,7 +65,7 @@ func transactionDataToMessage(txdata *types.TransactionData) types.Message {
 		(*big.Int)(txdata.GasPrice), (*big.Int)(txdata.GasPrice), (*big.Int)(txdata.GasPrice), databytes, nil, false)
 }
 
-type l1DataTestCase struct {
+type l1DataFeeTestCase struct {
 	TxDataSample      string
 	EIP1559BaseFee    *big.Int
 	L1basefee         *big.Int
