@@ -56,7 +56,7 @@ const example_tx2 = `
 	}
 `
 
-func reverseDataToMsg(txdata *types.TransactionData) types.Message {
+func transactionDataToMessage(txdata *types.TransactionData) types.Message {
 	databytes, err := hexutil.Decode(txdata.Data)
 	if err != nil {
 		panic(err)
