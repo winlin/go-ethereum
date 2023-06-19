@@ -7,6 +7,7 @@ import (
 
 	"encoding/json"
 
+	"github.com/scroll-tech/go-ethereum/common/hexutil"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
@@ -56,7 +57,11 @@ const example_tx2 = `
 `
 
 func reverseDataToMsg(txdata *types.TransactionData) types.Message {
-	return types.NewMessage(txdata.From, txdata.To, txdata.Nonce, (*big.Int)(txdata.Value), txdata.Gas, nil, nil, nil, []byte(txdata.Data), nil, false)
+	databytes, err := hexutil.Decode(txdata.Data)
+	if err != nil {
+		panic(err)
+	}
+	return types.NewMessage(txdata.From, txdata.To, txdata.Nonce, (*big.Int)(txdata.Value), txdata.Gas, nil, nil, nil, databytes, nil, false)
 }
 
 func TestCalculateL1DataSize(t *testing.T) {
@@ -68,18 +73,20 @@ func TestCalculateL1DataSize(t *testing.T) {
 	msg := reverseDataToMsg(txdata)
 
 	chainID := big.NewInt(53077) //0xcf55
-	//eip1559baseFee := new(big.Int).SetUint64(15000000)
-	signer := types.NewEIP155Signer(chainID)
+	var eip1559baseFee *big.Int
+	eip1559baseFee = new(big.Int).SetUint64(15000000)
+	signer := types.NewLondonSigner(chainID)
+	t.Log(msg)
 
-	unsigned := asUnsignedTx(msg, nil, chainID)
+	unsigned := asUnsignedTx(msg, eip1559baseFee, chainID)
 
 	tx, err := unsigned.WithSignature(signer, append(bytes.Repeat([]byte{0xff}, crypto.SignatureLength-1), 0x01))
 	assert.NoError(t, err, "build dummy tx fail")
-
 	raw, err := rlpEncode(tx)
+	t.Log(raw)
 	assert.NoError(t, err, "rlp fail")
 
-	assert.Equal(t, 239, len(raw))
+	assert.Equal(t, 169, len(raw))
 
 	basefee := big.NewInt(0x64)
 	overhead := big.NewInt(0x17d4)
