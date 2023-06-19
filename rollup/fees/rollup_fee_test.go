@@ -112,7 +112,7 @@ func testEstimateL1DataFeeForTransactionData(t *testing.T, t_case *l1DataTestCas
 	}
 }
 
-func TestCalculateL1DataSize(t *testing.T) {
+func TestEstimateL1DataFeeForTransactionData(t *testing.T) {
 
 	for _, tcase := range []*l1DataTestCase{
 		{
