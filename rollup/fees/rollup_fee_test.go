@@ -85,7 +85,7 @@ func testEstimateL1DataFeeForTransactionData(t *testing.T, t_case *l1DataTestCas
 
 	if t_case.EIP1559BaseFee != nil {
 		//TODO: EIP1559 test
-		panic("no implement")
+		panic("not implemented")
 	} else {
 		msg = reverseDataToMsg(txdata)
 	}
