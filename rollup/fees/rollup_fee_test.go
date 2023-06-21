@@ -7,9 +7,10 @@ import (
 
 	"encoding/json"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
 	"github.com/scroll-tech/go-ethereum/core/types"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestCalculateEncodedL1DataFee(t *testing.T) {
@@ -61,7 +62,7 @@ const example_tx2 = `
 	}
 `
 
-func reverseDataToMsg(txdata *types.TransactionData) types.Message {
+func transactionDataToMessage(txdata *types.TransactionData) types.Message {
 	databytes, err := hexutil.Decode(txdata.Data)
 	if err != nil {
 		panic(err)
@@ -70,7 +71,7 @@ func reverseDataToMsg(txdata *types.TransactionData) types.Message {
 		(*big.Int)(txdata.GasPrice), (*big.Int)(txdata.GasPrice), (*big.Int)(txdata.GasPrice), databytes, nil, false)
 }
 
-type l1DataTestCase struct {
+type l1DataFeeTestCase struct {
 	TxDataSample      string
 	EIP1559BaseFee    *big.Int
 	L1basefee         *big.Int
@@ -80,7 +81,7 @@ type l1DataTestCase struct {
 	L1DataFeeExpected *big.Int
 }
 
-func testCalculateL1DataSize(t *testing.T, t_case *l1DataTestCase) {
+func testEstimateL1DataFeeForTransactionData(t *testing.T, t_case *l1DataFeeTestCase) {
 	txdata := new(types.TransactionData)
 	assert.NoError(t, json.Unmarshal([]byte(t_case.TxDataSample), txdata), "parse json fail")
 
@@ -90,9 +91,9 @@ func testCalculateL1DataSize(t *testing.T, t_case *l1DataTestCase) {
 
 	if t_case.EIP1559BaseFee != nil {
 		//TODO: EIP1559 test
-		panic("no implement")
+		panic("not implemented")
 	} else {
-		msg = reverseDataToMsg(txdata)
+		msg = transactionDataToMessage(txdata)
 	}
 	chainID := (*big.Int)(txdata.ChainId)
 	signer := types.NewLondonSigner(chainID)
@@ -126,9 +127,9 @@ func testCalculateL1DataSize(t *testing.T, t_case *l1DataTestCase) {
 	}
 }
 
-func TestCalculateL1DataSize(t *testing.T) {
+func TestEstimateL1DataFeeForTransactionData(t *testing.T) {
 
-	for _, tcase := range []*l1DataTestCase{
+	for _, tcase := range []*l1DataFeeTestCase{
 		{
 			TxDataSample:      example_tx1,
 			L1basefee:         big.NewInt(0x64),
@@ -146,7 +147,7 @@ func TestCalculateL1DataSize(t *testing.T) {
 			L1DataFeeExpected: big.NewInt(0xf3f2f),
 		},
 	} {
-		testCalculateL1DataSize(t, tcase)
+		testEstimateL1DataFeeForTransactionData(t, tcase)
 	}
 
 }
