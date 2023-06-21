@@ -9,7 +9,6 @@ import (
 
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
 	"github.com/scroll-tech/go-ethereum/core/types"
-	"github.com/scroll-tech/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -37,7 +36,10 @@ const example_tx1 = `
 		"chainId": "0xcf55",
 		"value": "0x0",
 		"data": "0xa9059cbb000000000000000000000000c0c4c8baea3f6acb49b6e1fb9e2adeceeacb0ca200000000000000000000000000000000000000000000000000000000000003e8",
-		"isCreate": false
+		"isCreate": false,
+		"v": "0x19ecd",
+		"r": "0xaaa87d285f44e2683266d83116ee3df09313f38e91393bfe2966e947c31e4002",
+		"s": "0x9e105efcad78b8e836aa9c588e39f0d81b2d6552d04762d0e02652a9ea94b1d"
 	}
 `
 const example_tx2 = `
@@ -52,7 +54,10 @@ const example_tx2 = `
 		"chainId": "0xcf55",
 		"value": "0x0",
 		"data": "0xb0f2b72a000000000000000000000000000000000000000000000000000000000000000a",
-		"isCreate": false
+		"isCreate": false,
+		"v": "0x19ece",
+		"r": "0xa0ed5a985f5b74215ba05b0c3fc2a2af1c26c65d9426867eda637fa5d7d388eb",
+		"s": "0x81054ba4a31ee6f0715f36d1005393623b97703c061afe5518a7e31ecbfda6f"		
 	}
 `
 
@@ -79,7 +84,7 @@ func testCalculateL1DataSize(t *testing.T, t_case *l1DataTestCase) {
 	txdata := new(types.TransactionData)
 	assert.NoError(t, json.Unmarshal([]byte(t_case.TxDataSample), txdata), "parse json fail")
 
-	// we have decomposed EstimateL1DataFeeForMessage here so
+	// we have decomposed CalcDataFeeForMessage here so
 	// to catch more detail inside the process
 	var msg types.Message
 
@@ -93,7 +98,16 @@ func testCalculateL1DataSize(t *testing.T, t_case *l1DataTestCase) {
 	signer := types.NewLondonSigner(chainID)
 	unsigned := asUnsignedTx(msg, t_case.EIP1559BaseFee, chainID)
 
-	tx, err := unsigned.WithSignature(signer, append(bytes.Repeat([]byte{0xff}, crypto.SignatureLength-1), 0x01))
+	// here we have to recover signature
+	v := big.NewInt(0).Sub(txdata.V.ToInt(), big.NewInt(chainID.Int64()*2)).Uint64() - 35
+	assert.True(t, v == 0 || v == 1, "v must be reasonably recovered")
+
+	r := make([]byte, 32)
+	s := make([]byte, 32)
+	txdata.R.ToInt().FillBytes(r)
+	txdata.S.ToInt().FillBytes(s)
+
+	tx, err := unsigned.WithSignature(signer, bytes.Join([][]byte{r, s, {byte(v)}}, nil))
 	assert.NoError(t, err, "build dummy tx fail")
 	raw, err := rlpEncode(tx)
 	assert.NoError(t, err, "rlp fail")
