@@ -93,6 +93,7 @@ type environment struct {
 	l1TxCount int                // l1 msg count in cycle
 	gasPool   *core.GasPool      // available gas used to pack transactions
 
+	parent   *types.Block
 	header   *types.Header
 	txs      []*types.Transaction
 	receipts []*types.Receipt
@@ -722,13 +723,13 @@ func (w *worker) makeCurrent(parent *types.Block, header *types.Header) error {
 	}
 	state.StartPrefetcher("miner")
 
-	traceEnv, err := core.CreateTraceEnv(w.chainConfig, w.chain, w.engine, state.Copy(), parent,
-		// new block with a placeholder tx, for traceEnv's ExecutionResults length & TxStorageTraces length
-		types.NewBlockWithHeader(header).WithBody([]*types.Transaction{types.NewTx(&types.LegacyTx{})}, nil),
-	)
-	if err != nil {
-		return err
-	}
+	// traceEnv, err := core.CreateTraceEnv(w.chainConfig, w.chain, w.engine, state.Copy(), parent,
+	// 	// new block with a placeholder tx, for traceEnv's ExecutionResults length & TxStorageTraces length
+	// 	types.NewBlockWithHeader(header).WithBody([]*types.Transaction{types.NewTx(&types.LegacyTx{})}, nil),
+	// )
+	// if err != nil {
+	// 	return err
+	// }
 
 	env := &environment{
 		signer:    types.MakeSigner(w.chainConfig, header.Number),
@@ -736,8 +737,9 @@ func (w *worker) makeCurrent(parent *types.Block, header *types.Header) error {
 		ancestors: mapset.NewSet(),
 		family:    mapset.NewSet(),
 		uncles:    mapset.NewSet(),
+		parent:    parent,
 		header:    header,
-		traceEnv:  traceEnv,
+		// traceEnv:  traceEnv,
 	}
 	// when 08 is processed ancestors contain 07 (quick block)
 	for _, ancestor := range w.chain.GetBlocksFromHash(parent.Hash(), 7) {
@@ -848,6 +850,16 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 	// Short circuit if current is nil
 	if w.current == nil {
 		return true
+	}
+	if w.current.traceEnv == nil {
+		traceEnv, err := core.CreateTraceEnv(w.chainConfig, w.chain, w.engine, w.current.state, w.current.parent,
+			// new block with a placeholder tx, for traceEnv's ExecutionResults length & TxStorageTraces length
+			types.NewBlockWithHeader(w.current.header).WithBody([]*types.Transaction{types.NewTx(&types.LegacyTx{})}, nil),
+		)
+		if err != nil {
+			return true
+		}
+		w.current.traceEnv = traceEnv
 	}
 
 	gasLimit := w.current.header.GasLimit
