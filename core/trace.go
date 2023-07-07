@@ -126,7 +126,7 @@ func (env *TraceEnv) GetBlockTrace(block *types.Block) (*types.BlockTrace, error
 			defer pend.Done()
 			// Fetch and execute the next transaction trace tasks
 			for task := range jobs {
-				if err := env.getTxResult(task.statedb, task.index, block); err != nil {
+				if err := env.ApplyTxForBlock(task.statedb, task.index, block); err != nil {
 					select {
 					case errCh <- err:
 					default:
@@ -173,10 +173,10 @@ func (env *TraceEnv) GetBlockTrace(block *types.Block) (*types.BlockTrace, error
 		}
 	}
 
-	return env.fillBlockTrace(block)
+	return env.FillBlockTrace(block)
 }
 
-func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.Block) error {
+func (env *TraceEnv) ApplyTxForBlock(state *state.StateDB, index int, block *types.Block) error {
 	tx := block.Transactions()[index]
 	msg, _ := tx.AsMessage(env.Signer, block.BaseFee())
 	from, _ := types.Sender(env.Signer, tx)
@@ -377,8 +377,8 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 	return nil
 }
 
-// fillBlockTrace content after all the txs are finished running.
-func (env *TraceEnv) fillBlockTrace(block *types.Block) (*types.BlockTrace, error) {
+// FillBlockTrace fill content after all the txs are finished running.
+func (env *TraceEnv) FillBlockTrace(block *types.Block) (*types.BlockTrace, error) {
 	// after all tx has been traced, collect "deletion proof" for zktrie
 	for _, tracer := range env.ZkTrieTracer {
 		delProofs, err := tracer.GetDeletionProofs()

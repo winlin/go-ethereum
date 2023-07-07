@@ -184,10 +184,11 @@ func ApplyTransactionWithCircuitCheck2(config *params.ChainConfig, bc ChainConte
 	// Create a new context to be used in the EVM environment
 	blockContext := NewEVMBlockContext(header, bc, author)
 	vmenv := vm.NewEVM(blockContext, vm.TxContext{}, statedb, config, cfg)
-	return applyTransactionWithCircuitCheck2(msg, config, bc, author, gp, statedb, header.Number, header.Hash(), tx, usedGas, vmenv)
+	return applyTransactionWithCircuitCheck2(msg, config, bc, author, gp, statedb, header, tx, usedGas, vmenv, traceEnv, checker)
 }
 
-func applyTransactionWithCircuitCheck2(msg types.Message, config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.StateDB, blockNumber *big.Int, blockHash common.Hash, tx *types.Transaction, usedGas *uint64, evm *vm.EVM) (*types.Receipt, error) {
+func applyTransactionWithCircuitCheck2(msg types.Message, config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.StateDB, header *types.Header, tx *types.Transaction, usedGas *uint64, evm *vm.EVM,
+	traceEnv *TraceEnv, checker *circuitcapacitychecker.CircuitCapacityChecker) (*types.Receipt, error) {
 	// Create a new context to be used in the EVM environment.
 	txContext := NewEVMTxContext(msg)
 	evm.Reset(txContext, statedb)
@@ -203,12 +204,24 @@ func applyTransactionWithCircuitCheck2(msg types.Message, config *params.ChainCo
 		return nil, err
 	}
 
+	block:=types.NewBlockWithHeader(header).WithBody([]*types.Transaction{tx}, nil)
+	if err := traceEnv.ApplyTxForBlock(statedb, 0, block); err != nil {
+		return nil, err
+	}
+	traces, err:= traceEnv.FillBlockTrace(block)
+	if err != nil {
+		return nil, err
+	}
+	if err := checker.ApplyTransaction(traces); err != nil {
+		return nil, err
+	}
+
 	// Update the state with pending changes.
 	var root []byte
-	if config.IsByzantium(blockNumber) {
+	if config.IsByzantium(header.Number) {
 		statedb.Finalise(true)
 	} else {
-		root = statedb.IntermediateRoot(config.IsEIP158(blockNumber)).Bytes()
+		root = statedb.IntermediateRoot(config.IsEIP158(header.Number)).Bytes()
 	}
 	*usedGas += result.UsedGas
 
@@ -234,10 +247,10 @@ func applyTransactionWithCircuitCheck2(msg types.Message, config *params.ChainCo
 	}
 
 	// Set the receipt logs and create the bloom filter.
-	receipt.Logs = statedb.GetLogs(tx.Hash(), blockHash)
+	receipt.Logs = statedb.GetLogs(tx.Hash(), header.Hash())
 	receipt.Bloom = types.CreateBloom(types.Receipts{receipt})
-	receipt.BlockHash = blockHash
-	receipt.BlockNumber = blockNumber
+	receipt.BlockHash = header.Hash()
+	receipt.BlockNumber = header.Number
 	receipt.TransactionIndex = uint(statedb.TxIndex())
 	receipt.L1Fee = result.L1DataFee
 	return receipt, err
