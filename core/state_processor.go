@@ -184,7 +184,11 @@ func ApplyTransactionWithCircuitCheck2(config *params.ChainConfig, bc ChainConte
 	// Create a new context to be used in the EVM environment
 	blockContext := NewEVMBlockContext(header, bc, author)
 	vmenv := vm.NewEVM(blockContext, vm.TxContext{}, statedb, config, cfg)
-	return applyTransaction(msg, config, bc, author, gp, statedb, header.Number, header.Hash(), tx, usedGas, vmenv)
+	return applyTransactionWithCircuitCheck2(msg, config, bc, author, gp, statedb, header.Number, header.Hash(), tx, usedGas, vmenv)
+}
+
+func applyTransactionWithCircuitCheck2(msg types.Message, config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.StateDB, blockNumber *big.Int, blockHash common.Hash, tx *types.Transaction, usedGas *uint64, evm *vm.EVM) (*types.Receipt, error) {
+	return nil, nil
 }
 
 func applyTransactionWithCircuitCheck(msg types.Message, config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.StateDB, header *types.Header, signer types.Signer, tx *types.Transaction, usedGas *uint64, evm *vm.EVM,
