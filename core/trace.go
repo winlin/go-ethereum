@@ -163,25 +163,6 @@ func (env *TraceEnv) GetBlockTrace(block *types.Block) (*types.BlockTrace, error
 	close(jobs)
 	pend.Wait()
 
-	// after all tx has been traced, collect "deletion proof" for zktrie
-	for _, tracer := range env.ZkTrieTracer {
-		delProofs, err := tracer.GetDeletionProofs()
-		if err != nil {
-			log.Error("deletion proof failure", "error", err)
-		} else {
-			for _, proof := range delProofs {
-				env.DeletionProofs = append(env.DeletionProofs, proof)
-			}
-		}
-	}
-
-	// build dummy per-tx deletion proof
-	for _, txStorageTrace := range env.TxStorageTraces {
-		if txStorageTrace != nil {
-			txStorageTrace.DeletionProofs = env.DeletionProofs
-		}
-	}
-
 	// If execution failed in between, abort
 	select {
 	case err := <-errCh:
@@ -398,6 +379,24 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 
 // fillBlockTrace content after all the txs are finished running.
 func (env *TraceEnv) fillBlockTrace(block *types.Block) (*types.BlockTrace, error) {
+	// after all tx has been traced, collect "deletion proof" for zktrie
+	for _, tracer := range env.ZkTrieTracer {
+		delProofs, err := tracer.GetDeletionProofs()
+		if err != nil {
+			log.Error("deletion proof failure", "error", err)
+		} else {
+			for _, proof := range delProofs {
+				env.DeletionProofs = append(env.DeletionProofs, proof)
+			}
+		}
+	}
+	// build dummy per-tx deletion proof
+	for _, txStorageTrace := range env.TxStorageTraces {
+		if txStorageTrace != nil {
+			txStorageTrace.DeletionProofs = env.DeletionProofs
+		}
+	}
+
 	statedb := env.State
 
 	txs := make([]*types.TransactionData, block.Transactions().Len())
