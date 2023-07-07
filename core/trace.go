@@ -156,9 +156,8 @@ func (env *TraceEnv) GetBlockTrace(block *types.Block) (*types.BlockTrace, error
 			failed = err
 			break
 		}
-		// Finalize the state so any modifications are written to the trie
-		// Only delete empty objects if EIP158/161 (a.k.a Spurious Dragon) is in effect
-		env.State.Finalise(vmenv.ChainConfig().IsEIP158(block.Number()))
+		// we'd better don't finalise
+		// env.State.Finalise(vmenv.ChainConfig().IsEIP158(block.Number()))
 	}
 	close(jobs)
 	pend.Wait()

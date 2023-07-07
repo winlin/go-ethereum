@@ -816,7 +816,7 @@ func (w *worker) updateSnapshot() {
 
 func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Address) ([]*types.Log, error) {
 	snap := w.current.state.Snapshot()
-	traceEnvStateCopy := w.current.traceEnv.State.Copy()
+	traceEnvSnap := w.current.traceEnv.State.Snapshot()
 
 	// has to check circuit capacity before `core.ApplyTransaction`,
 	// because if the tx can be successfully executed but circuit capacity overflows, it will be inconvenient to revert
@@ -824,13 +824,11 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 		types.NewBlockWithHeader(w.current.header).WithBody([]*types.Transaction{tx}, nil),
 	)
 	if err != nil {
-		// revert to previous state, can also be achieved by `RevertToSnapshot`, since traceEnv.State is not committed yet
-		w.current.traceEnv.State = traceEnvStateCopy
+		w.current.traceEnv.State.RevertToSnapshot(traceEnvSnap)
 		return nil, err
 	}
 	if err := w.circuitCapacityChecker.ApplyTransaction(traces); err != nil {
-		// revert to previous state, has to do it this way, since traceEnv.State has been committed
-		w.current.traceEnv.State = traceEnvStateCopy
+		w.current.traceEnv.State.RevertToSnapshot(traceEnvSnap)
 		return nil, err
 	}
 
