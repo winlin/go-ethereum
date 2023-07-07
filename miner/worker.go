@@ -722,7 +722,7 @@ func (w *worker) makeCurrent(parent *types.Block, header *types.Header) error {
 	}
 	state.StartPrefetcher("miner")
 
-	traceEnv, err := core.CreateTraceEnv(w.chainConfig, w.chain, w.engine, state.Copy(), parent,
+	traceEnv, err := core.CreateTraceEnv(w.chainConfig, w.chain, w.engine, state, parent,
 		// new block with a placeholder tx, for traceEnv's ExecutionResults length & TxStorageTraces length
 		types.NewBlockWithHeader(header).WithBody([]*types.Transaction{types.NewTx(&types.LegacyTx{})}, nil),
 	)
@@ -816,7 +816,6 @@ func (w *worker) updateSnapshot() {
 
 func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Address) ([]*types.Log, error) {
 	snap := w.current.state.Snapshot()
-	traceEnvSnap := w.current.traceEnv.State.Snapshot()
 
 	// has to check circuit capacity before `core.ApplyTransaction`,
 	// because if the tx can be successfully executed but circuit capacity overflows, it will be inconvenient to revert
@@ -824,11 +823,11 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 		types.NewBlockWithHeader(w.current.header).WithBody([]*types.Transaction{tx}, nil),
 	)
 	if err != nil {
-		w.current.traceEnv.State.RevertToSnapshot(traceEnvSnap)
+		w.current.state.RevertToSnapshot(snap)
 		return nil, err
 	}
 	if err := w.circuitCapacityChecker.ApplyTransaction(traces); err != nil {
-		w.current.traceEnv.State.RevertToSnapshot(traceEnvSnap)
+		w.current.state.RevertToSnapshot(snap)
 		return nil, err
 	}
 
