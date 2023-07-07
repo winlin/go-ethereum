@@ -720,6 +720,7 @@ func (w *worker) makeCurrent(parent *types.Block, header *types.Header) error {
 	if err != nil {
 		return err
 	}
+	state.StartPrefetcher("miner")
 
 	traceEnv, err := core.CreateTraceEnv(w.chainConfig, w.chain, w.engine, state.Copy(), parent,
 		// new block with a placeholder tx, for traceEnv's ExecutionResults length & TxStorageTraces length
@@ -728,8 +729,6 @@ func (w *worker) makeCurrent(parent *types.Block, header *types.Header) error {
 	if err != nil {
 		return err
 	}
-
-	state.StartPrefetcher("miner")
 
 	env := &environment{
 		signer:    types.MakeSigner(w.chainConfig, header.Number),
