@@ -51,8 +51,8 @@ type TraceCache struct {
 	ZkTrieTracer  map[string]state.ZktrieProofTracer
 }
 
-func NewTraceCache() TraceCache {
-	return TraceCache{
+func NewTraceCache() *TraceCache {
+	return &TraceCache{
 		Proofs:        make(map[string][]hexutil.Bytes),
 		StorageProofs: make(map[string]map[string][]hexutil.Bytes),
 		ZkTrieTracer:  make(map[string]state.ZktrieProofTracer),

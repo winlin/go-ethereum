@@ -97,8 +97,8 @@ type environment struct {
 	txs      []*types.Transaction
 	receipts []*types.Receipt
 
-	proofCaches map[string]*circuitcapacitychecker.ProofCache
-	traceEnv    *core.TraceEnv
+	// proofCaches map[string]*circuitcapacitychecker.ProofCache
+	traceCache *core.TraceCache
 }
 
 // task contains all information for consensus engine sealing and result submitting.
@@ -733,14 +733,14 @@ func (w *worker) makeCurrent(parent *types.Block, header *types.Header) error {
 	// }
 
 	env := &environment{
-		signer:      types.MakeSigner(w.chainConfig, header.Number),
-		state:       state,
-		ancestors:   mapset.NewSet(),
-		family:      mapset.NewSet(),
-		uncles:      mapset.NewSet(),
-		header:      header,
-		proofCaches: make(map[string]*circuitcapacitychecker.ProofCache),
-		// traceEnv:    traceEnv,
+		signer:    types.MakeSigner(w.chainConfig, header.Number),
+		state:     state,
+		ancestors: mapset.NewSet(),
+		family:    mapset.NewSet(),
+		uncles:    mapset.NewSet(),
+		header:    header,
+		// proofCaches: make(map[string]*circuitcapacitychecker.ProofCache),
+		traceCache: core.NewTraceCache(),
 	}
 	// when 08 is processed ancestors contain 07 (quick block)
 	for _, ancestor := range w.chain.GetBlocksFromHash(parent.Hash(), 7) {
@@ -820,7 +820,7 @@ func (w *worker) updateSnapshot() {
 func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Address) ([]*types.Log, error) {
 	snap := w.current.state.Snapshot()
 
-	receipt, err := core.ApplyTransactionWithCircuitCheck2(w.chainConfig, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &w.current.header.GasUsed, *w.chain.GetVMConfig(), w.current.traceEnv, w.circuitCapacityChecker)
+	receipt, err := core.ApplyTransactionWithCircuitCheck2(w.chainConfig, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &w.current.header.GasUsed, *w.chain.GetVMConfig(), w.current.traceCache, w.circuitCapacityChecker)
 	if err != nil {
 		w.current.state.RevertToSnapshot(snap)
 		return nil, err
