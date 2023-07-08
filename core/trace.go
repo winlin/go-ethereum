@@ -45,6 +45,20 @@ type TraceEnv struct {
 	ExecutionResults []*types.ExecutionResult
 }
 
+type TraceCache struct {
+	Proofs        map[string][]hexutil.Bytes
+	StorageProofs map[string]map[string][]hexutil.Bytes
+	ZkTrieTracer  map[string]state.ZktrieProofTracer
+}
+
+func NewTraceCache() TraceCache {
+	return TraceCache{
+		Proofs:        make(map[string][]hexutil.Bytes),
+		StorageProofs: make(map[string]map[string][]hexutil.Bytes),
+		ZkTrieTracer:  make(map[string]state.ZktrieProofTracer),
+	}
+}
+
 // Context is the same as Context in eth/tracers/tracers.go
 type Context struct {
 	BlockHash common.Hash

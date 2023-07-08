@@ -204,11 +204,11 @@ func applyTransactionWithCircuitCheck2(msg types.Message, config *params.ChainCo
 		return nil, err
 	}
 
-	block:=types.NewBlockWithHeader(header).WithBody([]*types.Transaction{tx}, nil)
+	block := types.NewBlockWithHeader(header).WithBody([]*types.Transaction{tx}, nil)
 	if err := traceEnv.ApplyTxForBlock(statedb, 0, block); err != nil {
 		return nil, err
 	}
-	traces, err:= traceEnv.FillBlockTrace(block)
+	traces, err := traceEnv.FillBlockTrace(block)
 	if err != nil {
 		return nil, err
 	}
