@@ -209,6 +209,7 @@ func applyTransactionWithCircuitCheck2(msg types.Message, blockContext vm.BlockC
 	// traceEnv, err := CreateTraceEnv(config, bc, bc.Engine(), statedb, parent, block, traceCache)
 	_, err = CreateTraceEnv(config, bc, bc.Engine(), statedb, parent, block, traceCache)
 	if err != nil {
+		log.Error("!!!!!!!!!!!!!!!", "err", err)
 		return nil, err
 	}
 	// traceEnv.BlockCtx = blockContext
