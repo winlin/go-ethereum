@@ -177,32 +177,34 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 // indicating the block was invalid.
 func ApplyTransactionWithCircuitCheck2(config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.StateDB, header *types.Header, tx *types.Transaction, usedGas *uint64, cfg vm.Config,
 	parent *types.Block, traceCache *TraceCache, checker *circuitcapacitychecker.CircuitCapacityChecker) (*types.Receipt, error) {
-	msg, err := tx.AsMessage(types.MakeSigner(config, header.Number), header.BaseFee)
-	if err != nil {
-		return nil, err
-	}
-	// Create a new context to be used in the EVM environment
-	blockContext := NewEVMBlockContext(header, bc, author)
-	vmenv := vm.NewEVM(blockContext, vm.TxContext{}, statedb, config, cfg)
-	return applyTransactionWithCircuitCheck2(msg, config, bc, author, gp, statedb, header, tx, usedGas, vmenv, parent, traceCache, checker)
+	// msg, err := tx.AsMessage(types.MakeSigner(config, header.Number), header.BaseFee)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// // Create a new context to be used in the EVM environment
+	// blockContext := NewEVMBlockContext(header, bc, author)
+	// vmenv := vm.NewEVM(blockContext, vm.TxContext{}, statedb, config, cfg)
+	// return applyTransactionWithCircuitCheck2(msg, config, bc, author, gp, statedb, header, tx, usedGas, vmenv, parent, traceCache, checker)
+	return applyTransactionWithCircuitCheck2(types.Message{}, config, bc, author, gp, statedb, header, tx, usedGas, nil, parent, traceCache, checker)
 }
 
 func applyTransactionWithCircuitCheck2(msg types.Message, config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.StateDB, header *types.Header, tx *types.Transaction, usedGas *uint64, evm *vm.EVM,
 	parent *types.Block, traceCache *TraceCache, checker *circuitcapacitychecker.CircuitCapacityChecker) (*types.Receipt, error) {
 	// Create a new context to be used in the EVM environment.
-	txContext := NewEVMTxContext(msg)
-	evm.Reset(txContext, statedb)
+	
+	// txContext := NewEVMTxContext(msg)
+	// evm.Reset(txContext, statedb)
 
-	l1DataFee, err := fees.CalculateL1DataFee(tx, statedb)
-	if err != nil {
-		return nil, err
-	}
+	// l1DataFee, err := fees.CalculateL1DataFee(tx, statedb)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
-	// Apply the transaction to the current state (included in the env).
-	result, err := ApplyMessage(evm, msg, gp, l1DataFee)
-	if err != nil {
-		return nil, err
-	}
+	// // Apply the transaction to the current state (included in the env).
+	// result, err := ApplyMessage(evm, msg, gp, l1DataFee)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	block := types.NewBlockWithHeader(header).WithBody([]*types.Transaction{tx}, nil)
 	traceEnv, err := CreateTraceEnv(config, bc, bc.Engine(), statedb, parent, block, traceCache)
@@ -220,44 +222,45 @@ func applyTransactionWithCircuitCheck2(msg types.Message, config *params.ChainCo
 		return nil, err
 	}
 
-	// Update the state with pending changes.
-	var root []byte
-	if config.IsByzantium(header.Number) {
-		statedb.Finalise(true)
-	} else {
-		root = statedb.IntermediateRoot(config.IsEIP158(header.Number)).Bytes()
-	}
-	*usedGas += result.UsedGas
+	// // Update the state with pending changes.
+	// var root []byte
+	// if config.IsByzantium(header.Number) {
+	// 	statedb.Finalise(true)
+	// } else {
+	// 	root = statedb.IntermediateRoot(config.IsEIP158(header.Number)).Bytes()
+	// }
+	// *usedGas += result.UsedGas
 
-	// If the result contains a revert reason, return it.
-	returnVal := result.Return()
-	if len(result.Revert()) > 0 {
-		returnVal = result.Revert()
-	}
-	// Create a new receipt for the transaction, storing the intermediate root and gas used
-	// by the tx.
-	receipt := &types.Receipt{Type: tx.Type(), PostState: root, CumulativeGasUsed: *usedGas, ReturnValue: returnVal}
-	if result.Failed() {
-		receipt.Status = types.ReceiptStatusFailed
-	} else {
-		receipt.Status = types.ReceiptStatusSuccessful
-	}
-	receipt.TxHash = tx.Hash()
-	receipt.GasUsed = result.UsedGas
+	// // If the result contains a revert reason, return it.
+	// returnVal := result.Return()
+	// if len(result.Revert()) > 0 {
+	// 	returnVal = result.Revert()
+	// }
+	// // Create a new receipt for the transaction, storing the intermediate root and gas used
+	// // by the tx.
+	// receipt := &types.Receipt{Type: tx.Type(), PostState: root, CumulativeGasUsed: *usedGas, ReturnValue: returnVal}
+	// if result.Failed() {
+	// 	receipt.Status = types.ReceiptStatusFailed
+	// } else {
+	// 	receipt.Status = types.ReceiptStatusSuccessful
+	// }
+	// receipt.TxHash = tx.Hash()
+	// receipt.GasUsed = result.UsedGas
 
-	// If the transaction created a contract, store the creation address in the receipt.
-	if msg.To() == nil {
-		receipt.ContractAddress = crypto.CreateAddress(evm.TxContext.Origin, tx.Nonce())
-	}
+	// // If the transaction created a contract, store the creation address in the receipt.
+	// if msg.To() == nil {
+	// 	receipt.ContractAddress = crypto.CreateAddress(evm.TxContext.Origin, tx.Nonce())
+	// }
 
-	// Set the receipt logs and create the bloom filter.
-	receipt.Logs = statedb.GetLogs(tx.Hash(), header.Hash())
-	receipt.Bloom = types.CreateBloom(types.Receipts{receipt})
-	receipt.BlockHash = header.Hash()
-	receipt.BlockNumber = header.Number
-	receipt.TransactionIndex = uint(statedb.TxIndex())
-	receipt.L1Fee = result.L1DataFee
-	return receipt, err
+	// // Set the receipt logs and create the bloom filter.
+	// receipt.Logs = statedb.GetLogs(tx.Hash(), header.Hash())
+	// receipt.Bloom = types.CreateBloom(types.Receipts{receipt})
+	// receipt.BlockHash = header.Hash()
+	// receipt.BlockNumber = header.Number
+	// receipt.TransactionIndex = uint(statedb.TxIndex())
+	// receipt.L1Fee = result.L1DataFee
+	// return receipt, err
+	return nil, err
 }
 
 func applyTransactionWithCircuitCheck(msg types.Message, config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.StateDB, header *types.Header, signer types.Signer, tx *types.Transaction, usedGas *uint64, evm *vm.EVM,
