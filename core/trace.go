@@ -72,7 +72,7 @@ type txTraceTask struct {
 	index   int
 }
 
-func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext ChainContext, engine consensus.Engine, statedb *state.StateDB, parent *types.Block, block *types.Block) (*TraceEnv, error) {
+func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext ChainContext, engine consensus.Engine, statedb *state.StateDB, parent *types.Block, block *types.Block, traceCache *TraceCache) (*TraceEnv, error) {
 	var coinbase common.Address
 	var err error
 	if chainConfig.Scroll.FeeVaultEnabled() {
@@ -103,6 +103,12 @@ func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext ChainContext, 
 		ZkTrieTracer:     make(map[string]state.ZktrieProofTracer),
 		ExecutionResults: make([]*types.ExecutionResult, block.Transactions().Len()),
 		TxStorageTraces:  make([]*types.StorageTrace, block.Transactions().Len()),
+	}
+
+	if traceCache != nil{
+		env.Proofs = traceCache.Proofs
+		env.StorageProofs = traceCache.StorageProofs
+		env.ZkTrieTracer = traceCache.ZkTrieTracer
 	}
 
 	key := coinbase.String()
@@ -170,9 +176,9 @@ func (env *TraceEnv) GetBlockTrace(block *types.Block) (*types.BlockTrace, error
 			failed = err
 			break
 		}
-		// Finalize the state so any modifications are written to the trie
-		// Only delete empty objects if EIP158/161 (a.k.a Spurious Dragon) is in effect
-		env.State.Finalise(vmenv.ChainConfig().IsEIP158(block.Number()))
+
+		// we'd better don't finalise here
+		// env.State.Finalise(vmenv.ChainConfig().IsEIP158(block.Number()))
 	}
 	close(jobs)
 	pend.Wait()

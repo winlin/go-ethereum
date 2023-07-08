@@ -820,7 +820,7 @@ func (w *worker) updateSnapshot() {
 func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Address) ([]*types.Log, error) {
 	snap := w.current.state.Snapshot()
 
-	receipt, err := core.ApplyTransactionWithCircuitCheck2(w.chainConfig, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &w.current.header.GasUsed, *w.chain.GetVMConfig(), w.current.traceCache, w.circuitCapacityChecker)
+	receipt, err := core.ApplyTransactionWithCircuitCheck2(w.chainConfig, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &w.current.header.GasUsed, *w.chain.GetVMConfig(), w.chain.CurrentBlock(), w.current.traceCache, w.circuitCapacityChecker)
 	if err != nil {
 		w.current.state.RevertToSnapshot(snap)
 		return nil, err
