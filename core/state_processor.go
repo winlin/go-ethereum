@@ -205,11 +205,12 @@ func applyTransactionWithCircuitCheck2(msg types.Message, blockContext vm.BlockC
 		return nil, err
 	}
 
-	// block := types.NewBlockWithHeader(header).WithBody([]*types.Transaction{tx}, nil)
+	block := types.NewBlockWithHeader(header).WithBody([]*types.Transaction{tx}, nil)
 	// traceEnv, err := CreateTraceEnv(config, bc, bc.Engine(), statedb, parent, block, traceCache)
-	// if err != nil {
-	// 	return nil, err
-	// }
+	_, err = CreateTraceEnv(config, bc, bc.Engine(), statedb, parent, block, traceCache)
+	if err != nil {
+		return nil, err
+	}
 	// traceEnv.BlockCtx = blockContext
 	// if err := traceEnv.ApplyTxForBlock(statedb, 0, block); err != nil {
 	// 	return nil, err
