@@ -105,7 +105,7 @@ func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext ChainContext, 
 		TxStorageTraces:  make([]*types.StorageTrace, block.Transactions().Len()),
 	}
 
-	if traceCache != nil{
+	if traceCache != nil {
 		env.Proofs = traceCache.Proofs
 		env.StorageProofs = traceCache.StorageProofs
 		env.ZkTrieTracer = traceCache.ZkTrieTracer
