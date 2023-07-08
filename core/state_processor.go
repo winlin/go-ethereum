@@ -261,7 +261,8 @@ func applyTransactionWithCircuitCheck2(msg types.Message, blockContext vm.BlockC
 	// receipt.TransactionIndex = uint(statedb.TxIndex())
 	// receipt.L1Fee = result.L1DataFee
 	// return receipt, err
-	return nil, err
+	// return nil, err
+	return nil, nil
 }
 
 func applyTransactionWithCircuitCheck(msg types.Message, config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.StateDB, header *types.Header, signer types.Signer, tx *types.Transaction, usedGas *uint64, evm *vm.EVM,
