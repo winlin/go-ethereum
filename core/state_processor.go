@@ -206,22 +206,22 @@ func applyTransactionWithCircuitCheck2(msg types.Message, blockContext vm.BlockC
 	// 	return nil, err
 	// }
 
-	block := types.NewBlockWithHeader(header).WithBody([]*types.Transaction{tx}, nil)
-	traceEnv, err := CreateTraceEnv(config, bc, bc.Engine(), statedb, parent, block, traceCache)
-	if err != nil {
-		return nil, err
-	}
-	traceEnv.BlockCtx = blockContext
-	if err := traceEnv.ApplyTxForBlock(statedb, 0, block); err != nil {
-		return nil, err
-	}
-	traces, err := traceEnv.FillBlockTrace(block)
-	if err != nil {
-		return nil, err
-	}
-	if err := checker.ApplyTransaction(traces); err != nil {
-		return nil, err
-	}
+	// block := types.NewBlockWithHeader(header).WithBody([]*types.Transaction{tx}, nil)
+	// traceEnv, err := CreateTraceEnv(config, bc, bc.Engine(), statedb, parent, block, traceCache)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// traceEnv.BlockCtx = blockContext
+	// if err := traceEnv.ApplyTxForBlock(statedb, 0, block); err != nil {
+	// 	return nil, err
+	// }
+	// traces, err := traceEnv.FillBlockTrace(block)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// if err := checker.ApplyTransaction(traces); err != nil {
+	// 	return nil, err
+	// }
 
 	// // Update the state with pending changes.
 	// var root []byte
