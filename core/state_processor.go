@@ -184,14 +184,11 @@ func ApplyTransactionWithCircuitCheck2(config *params.ChainConfig, bc ChainConte
 	// Create a new context to be used in the EVM environment
 	blockContext := NewEVMBlockContext(header, bc, author)
 	vmenv := vm.NewEVM(blockContext, vm.TxContext{}, statedb, config, cfg)
-
-	traceEnv := &TraceEnv{}
-
-	return applyTransactionWithCircuitCheck2(msg, config, bc, author, gp, statedb, header, tx, usedGas, vmenv, traceEnv, checker)
+	return applyTransactionWithCircuitCheck2(msg, config, bc, author, gp, statedb, header, tx, usedGas, vmenv, traceCache, checker)
 }
 
 func applyTransactionWithCircuitCheck2(msg types.Message, config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.StateDB, header *types.Header, tx *types.Transaction, usedGas *uint64, evm *vm.EVM,
-	traceEnv *TraceEnv, checker *circuitcapacitychecker.CircuitCapacityChecker) (*types.Receipt, error) {
+	traceCache *TraceCache, checker *circuitcapacitychecker.CircuitCapacityChecker) (*types.Receipt, error) {
 	// Create a new context to be used in the EVM environment.
 	txContext := NewEVMTxContext(msg)
 	evm.Reset(txContext, statedb)
@@ -208,6 +205,10 @@ func applyTransactionWithCircuitCheck2(msg types.Message, config *params.ChainCo
 	}
 
 	block := types.NewBlockWithHeader(header).WithBody([]*types.Transaction{tx}, nil)
+	traceEnv, err := CreateTraceEnv(config, bc, nil, statedb, nil, block)
+	if err != nil {
+		return nil, err
+	}
 	if err := traceEnv.ApplyTxForBlock(statedb, 0, block); err != nil {
 		return nil, err
 	}
