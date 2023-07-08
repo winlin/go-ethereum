@@ -80,7 +80,7 @@ func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext ChainContext, 
 	} else {
 		coinbase, err = engine.Author(block.Header())
 		if err != nil {
-			return nil, err
+			log.Warn("recover author fail", "err", err)
 		}
 	}
 
