@@ -185,26 +185,26 @@ func ApplyTransactionWithCircuitCheck2(config *params.ChainConfig, bc ChainConte
 	blockContext := NewEVMBlockContext(header, bc, author)
 	// vmenv := vm.NewEVM(blockContext, vm.TxContext{}, statedb, config, cfg)
 	// return applyTransactionWithCircuitCheck2(msg, config, bc, author, gp, statedb, header, tx, usedGas, vmenv, parent, traceCache, checker)
-	return applyTransactionWithCircuitCheck2(types.Message{}, blockContext, config, bc, author, gp, statedb, header, tx, usedGas, nil, parent, traceCache, checker)
+	return applyTransactionWithCircuitCheck2(msg, blockContext, config, bc, author, gp, statedb, header, tx, usedGas, vmenv, parent, traceCache, checker)
 }
 
 func applyTransactionWithCircuitCheck2(msg types.Message, blockContext vm.BlockContext, config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.StateDB, header *types.Header, tx *types.Transaction, usedGas *uint64, evm *vm.EVM,
 	parent *types.Block, traceCache *TraceCache, checker *circuitcapacitychecker.CircuitCapacityChecker) (*types.Receipt, error) {
 	// Create a new context to be used in the EVM environment.
 	
-	// txContext := NewEVMTxContext(msg)
-	// evm.Reset(txContext, statedb)
+	txContext := NewEVMTxContext(msg)
+	evm.Reset(txContext, statedb)
 
 	// l1DataFee, err := fees.CalculateL1DataFee(tx, statedb)
 	// if err != nil {
 	// 	return nil, err
 	// }
 
-	// // Apply the transaction to the current state (included in the env).
-	// result, err := ApplyMessage(evm, msg, gp, l1DataFee)
-	// if err != nil {
-	// 	return nil, err
-	// }
+	// Apply the transaction to the current state (included in the env).
+	result, err := ApplyMessage(evm, msg, gp, l1DataFee)
+	if err != nil {
+		return nil, err
+	}
 
 	// block := types.NewBlockWithHeader(header).WithBody([]*types.Transaction{tx}, nil)
 	// traceEnv, err := CreateTraceEnv(config, bc, bc.Engine(), statedb, parent, block, traceCache)
