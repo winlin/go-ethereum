@@ -19,6 +19,7 @@ package core
 import (
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/scroll-tech/go-ethereum/consensus"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
@@ -39,9 +40,11 @@ type BlockValidator struct {
 	bc     *BlockChain         // Canonical block chain
 	engine consensus.Engine    // Consensus engine used for validating
 
-	checkCircuitCapacity   bool
-	db                     ethdb.Database
-	circuitCapacityChecker *circuitcapacitychecker.CircuitCapacityChecker
+	// circuit capacity checker related fields
+	checkCircuitCapacity   bool                                           // whether enable circuit capacity check
+	db                     ethdb.Database                                 // db to store row consumption
+	cMu                    *sync.Mutex                                    // mutex for circuit capacity checker
+	circuitCapacityChecker *circuitcapacitychecker.CircuitCapacityChecker // circuit capacity checker instance
 }
 
 // NewBlockValidator returns a new block validator which is safe for re-use
@@ -52,6 +55,7 @@ func NewBlockValidator(config *params.ChainConfig, blockchain *BlockChain, engin
 		bc:                     blockchain,
 		checkCircuitCapacity:   checkCircuitCapacity,
 		db:                     db,
+		cMu:                    &sync.Mutex{},
 		circuitCapacityChecker: circuitcapacitychecker.NewCircuitCapacityChecker(),
 	}
 	return validator
@@ -248,6 +252,9 @@ func (v *BlockValidator) validateCircuitRowConsumption(block *types.Block) (uint
 	if err != nil {
 		return 0, err
 	}
+
+	v.cMu.Lock()
+	defer v.cMu.Unlock()
 
 	v.circuitCapacityChecker.Reset()
 	return v.circuitCapacityChecker.ApplyBlock(traces)
