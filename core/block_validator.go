@@ -43,7 +43,7 @@ type BlockValidator struct {
 	// circuit capacity checker related fields
 	checkCircuitCapacity   bool                                           // whether enable circuit capacity check
 	db                     ethdb.Database                                 // db to store row consumption
-	cMu                    *sync.Mutex                                    // mutex for circuit capacity checker
+	cMu                    sync.Mutex                                     // mutex for circuit capacity checker
 	circuitCapacityChecker *circuitcapacitychecker.CircuitCapacityChecker // circuit capacity checker instance
 }
 
@@ -55,7 +55,6 @@ func NewBlockValidator(config *params.ChainConfig, blockchain *BlockChain, engin
 		bc:                     blockchain,
 		checkCircuitCapacity:   checkCircuitCapacity,
 		db:                     db,
-		cMu:                    &sync.Mutex{},
 		circuitCapacityChecker: circuitcapacitychecker.NewCircuitCapacityChecker(),
 	}
 	return validator

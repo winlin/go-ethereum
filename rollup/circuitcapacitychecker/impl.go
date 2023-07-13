@@ -23,16 +23,13 @@ func init() {
 }
 
 type CircuitCapacityChecker struct {
-	*sync.Mutex
+	sync.Mutex
 	id uint64
 }
 
 func NewCircuitCapacityChecker() *CircuitCapacityChecker {
 	id := C.new_circuit_capacity_checker()
-	return &CircuitCapacityChecker{
-		Mutex: &sync.Mutex{},
-		id:    uint64(id),
-	}
+	return &CircuitCapacityChecker{id: uint64(id)}
 }
 
 func (ccc *CircuitCapacityChecker) Reset() {
