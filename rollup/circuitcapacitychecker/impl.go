@@ -53,9 +53,9 @@ func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) er
 		C.free(unsafe.Pointer(tracesStr))
 	}()
 
-	log.Info("start to check circuit capacity")
+	log.Info("start to check circuit capacity for tx")
 	result := C.apply_tx(C.uint64_t(ccc.id), tracesStr)
-	log.Info("check circuit capacity done")
+	log.Info("check circuit capacity for tx done")
 
 	switch result {
 	case 0:
@@ -83,9 +83,9 @@ func (ccc *CircuitCapacityChecker) ApplyBlock(traces *types.BlockTrace) (uint64,
 		C.free(unsafe.Pointer(tracesStr))
 	}()
 
-	log.Info("start to check circuit capacity")
+	log.Info("start to check circuit capacity for block")
 	result := C.apply_block(C.uint64_t(ccc.id), tracesStr)
-	log.Info("check circuit capacity done")
+	log.Info("check circuit capacity for block done")
 
 	if result == 0 {
 		return 0, ErrUnknown
