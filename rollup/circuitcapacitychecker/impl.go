@@ -70,16 +70,17 @@ func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) (u
 }
 
 func (ccc *CircuitCapacityChecker) ApplyBlock(traces *types.BlockTrace) (uint64, error) {
-	txTraces := *traces
-	for i, txTrace := range txTraces {
-		txTrace.Transactions = traces.Transactions[i]
-		txTrace.TxStorageTraces = traces.TxStorageTraces[i]
-		txTrace.ExecutionResults = traces.ExecutionResults[i]
+	txTraces := make([]types.BlockTrace, len(traces.Transactions))
+	for i := range traces.Transactions {
+		txTraces[i] = *traces
+		txTraces[i].Transactions = []*types.TransactionData{traces.Transactions[i]}
+		txTraces[i].TxStorageTraces = []*types.StorageTrace{traces.TxStorageTraces[i]}
+		txTraces[i].ExecutionResults = []*types.ExecutionResult{traces.ExecutionResults[i]}
 	}
 
 	var result uint64
 	var err error
-	for i, txTrace := range txTraces {
+	for _, txTrace := range txTraces {
 		result, err = ccc.ApplyTransaction(&txTrace)
 		if err == ErrTxRowConsumptionOverflow || err == ErrBlockRowConsumptionOverflow {
 			return 0, ErrBlockRowConsumptionOverflow
