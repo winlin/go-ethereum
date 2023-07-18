@@ -70,28 +70,22 @@ func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) (u
 }
 
 func (ccc *CircuitCapacityChecker) ApplyBlock(traces *types.BlockTrace) (uint64, error) {
-	ccc.Lock()
-	defer ccc.Unlock()
-
-	tracesByt, err := json.Marshal(traces)
-	if err != nil {
-		return 0, ErrUnknown
+	txTraces := *traces
+	for i, txTrace := range txTraces {
+		txTrace.Transactions = traces.Transactions[i]
+		txTrace.TxStorageTraces = traces.TxStorageTraces[i]
+		txTrace.ExecutionResults = traces.ExecutionResults[i]
 	}
 
-	tracesStr := C.CString(string(tracesByt))
-	defer func() {
-		C.free(unsafe.Pointer(tracesStr))
-	}()
-
-	log.Info("start to check circuit capacity for block")
-	result := C.apply_block(C.uint64_t(ccc.id), tracesStr)
-	log.Info("check circuit capacity for block done")
-
-	if result == 0 {
-		return 0, ErrUnknown
+	var result uint64
+	var err error
+	for i, txTrace := range txTraces {
+		result, err = ccc.ApplyTransaction(&txTrace)
+		if err == ErrTxRowConsumptionOverflow || err == ErrBlockRowConsumptionOverflow {
+			return 0, ErrBlockRowConsumptionOverflow
+		} else if err != nil {
+			return 0, err
+		}
 	}
-	if result < 0 {
-		return 0, ErrBlockRowConsumptionOverflow
-	}
-	return uint64(result), nil
+	return result, nil
 }
