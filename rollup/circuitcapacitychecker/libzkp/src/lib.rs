@@ -77,7 +77,6 @@ pub mod checker {
     pub unsafe extern "C" fn apply_block(id: u64, tx_traces: *const c_char) -> i64 {
         let tx_traces_vec = c_char_to_vec(tx_traces);
         let traces = serde_json::from_slice::<BlockTrace>(&tx_traces_vec).unwrap();
-        // TODO: switch to correct API when zkevm team gets it ready
         let result = panic::catch_unwind(|| {
             CHECKERS
                 .get_mut()
