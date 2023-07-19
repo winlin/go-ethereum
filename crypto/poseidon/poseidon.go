@@ -9,6 +9,7 @@ import (
 
 	"github.com/iden3/go-iden3-crypto/ff"
 	"github.com/iden3/go-iden3-crypto/utils"
+
 	"github.com/scroll-tech/go-ethereum/log"
 )
 
