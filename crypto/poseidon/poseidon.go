@@ -9,6 +9,7 @@ import (
 
 	"github.com/iden3/go-iden3-crypto/ff"
 	"github.com/iden3/go-iden3-crypto/utils"
+	"github.com/scroll-tech/go-ethereum/log"
 )
 
 const NROUNDSF = 8 //nolint:golint
@@ -178,5 +179,6 @@ func HashFixedWithDomain(inpBI []*big.Int, domain *big.Int) (*big.Int, error) {
 
 // Deprecated HashFixed entry, with domain field is 0
 func HashFixed(inpBI []*big.Int) (*big.Int, error) {
+	log.Warn("called a deprecated method for poseidon fixed hash", "inputs", inpBI)
 	return HashFixedWithDomain(inpBI, big.NewInt(0))
 }
