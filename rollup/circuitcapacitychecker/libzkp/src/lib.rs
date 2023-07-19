@@ -58,6 +58,11 @@ pub mod checker {
                     tx_row_usage.row_number
                 );
                 if acc_row_usage.is_ok {
+                    log::error!(
+                        "acc_row_usage.row_usage_details: {:?}, tx_row_usage.row_usage_details: {:?}",
+                        acc_row_usage.row_usage_details,
+                        tx_row_usage.row_usage_details
+                    );
                     // block row usage ok
                     // if row usage ok, row_number must < 2^30 due to our circuit size,
                     // so using i64 for return type won't overflow
