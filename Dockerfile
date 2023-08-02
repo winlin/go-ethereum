@@ -7,6 +7,8 @@ ARG BUILDNUM=""
 FROM scrolltech/go-rust-builder:go-1.19-rust-nightly-2022-12-10 as chef
 WORKDIR app
 
+RUN go env
+
 FROM chef as planner
 COPY ./rollup/circuitcapacitychecker/libzkp/ .
 RUN cargo chef prepare --recipe-path recipe.json
