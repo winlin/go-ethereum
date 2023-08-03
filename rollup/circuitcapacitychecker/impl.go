@@ -11,6 +11,7 @@ import "C" //nolint:typecheck
 
 import (
 	"encoding/json"
+	"fmt"
 	"sync"
 	"unsafe"
 
@@ -50,6 +51,7 @@ func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) (*
 	ccc.Lock()
 	defer ccc.Unlock()
 
+	fmt.Println("CircuitCapacityChecker ApplyTransaction")
 	if len(traces.Transactions) != 1 || len(traces.ExecutionResults) != 1 || len(traces.TxStorageTraces) != 1 {
 		log.Error("malformatted BlockTrace in ApplyTransaction", "id", ccc.ID,
 			"len(traces.Transactions)", len(traces.Transactions),
@@ -98,6 +100,7 @@ func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) (*
 	if !result.AccRowUsage.IsOk {
 		return nil, ErrBlockRowConsumptionOverflow
 	}
+	fmt.Println("CircuitCapacityChecker ApplyTransaction done")
 	return (*types.RowConsumption)(&result.AccRowUsage.RowUsageDetails), nil
 }
 
@@ -105,12 +108,14 @@ func (ccc *CircuitCapacityChecker) ApplyBlock(traces *types.BlockTrace) (*types.
 	ccc.Lock()
 	defer ccc.Unlock()
 
+	fmt.Println("CircuitCapacityChecker ApplyBlock")
 	tracesByt, err := json.Marshal(traces)
 	if err != nil {
 		log.Error("fail to json marshal traces in ApplyBlock", "id", ccc.ID, "blockNumber", traces.Header.Number, "blockHash", traces.Header.Hash(), "err", err)
 		return nil, ErrUnknown
 	}
 
+	fmt.Println("trace", string(tracesByt))
 	tracesStr := C.CString(string(tracesByt))
 	defer func() {
 		C.free(unsafe.Pointer(tracesStr))
@@ -118,6 +123,8 @@ func (ccc *CircuitCapacityChecker) ApplyBlock(traces *types.BlockTrace) (*types.
 
 	log.Debug("start to check circuit capacity for block", "id", ccc.ID, "blockNumber", traces.Header.Number, "blockHash", traces.Header.Hash())
 	rawResult := C.apply_block(C.uint64_t(ccc.ID), tracesStr)
+	resultS := C.GoString(rawResult)
+	fmt.Println("raw result", (resultS))
 	log.Debug("check circuit capacity for block done", "id", ccc.ID, "blockNumber", traces.Header.Number, "blockHash", traces.Header.Hash())
 
 	result := &WrappedRowUsage{}
@@ -137,5 +144,6 @@ func (ccc *CircuitCapacityChecker) ApplyBlock(traces *types.BlockTrace) (*types.
 	if !result.AccRowUsage.IsOk {
 		return nil, ErrBlockRowConsumptionOverflow
 	}
+	fmt.Println("CircuitCapacityChecker ApplyBlock done")
 	return (*types.RowConsumption)(&result.AccRowUsage.RowUsageDetails), nil
 }

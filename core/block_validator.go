@@ -104,6 +104,7 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 		if rawdb.ReadBlockRowConsumption(v.db, block.Hash()) != nil {
 			return nil
 		}
+		fmt.Println("validateCircuitRowConsumption")
 		rowConsumption, err := v.validateCircuitRowConsumption(block)
 		if err != nil {
 			return err
@@ -268,6 +269,7 @@ func (v *BlockValidator) validateCircuitRowConsumption(block *types.Block) (*typ
 		return nil, err
 	}
 
+	fmt.Println("validateCircuitRowConsumption getting trace")
 	traces, err := env.GetBlockTrace(block)
 	if err != nil {
 		return nil, err
