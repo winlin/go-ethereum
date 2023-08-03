@@ -643,6 +643,8 @@ func (w *worker) taskLoop() {
 				// we won't reprocess the same messages from the next block.
 				rawdb.WriteFirstQueueIndexNotInL2Block(w.eth.ChainDb(), sealHash, task.maxL1Index+1)
 
+				log.Warn("!!!!! worker WriteBlockRowConsumption", "sealHash", sealHash, "hash", task.block.Hash(), "accRows", *task.accRows)
+
 				// Store circuit row consumption.
 				rawdb.WriteBlockRowConsumption(w.eth.ChainDb(), sealHash, task.accRows)
 			}

@@ -104,10 +104,12 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 		if rawdb.ReadBlockRowConsumption(v.db, block.Hash()) != nil {
 			return nil
 		}
+		log.Warn("!!!! validator ReadBlockRowConsumption", "hash", block.Hash(), "result", "<nil>")
 		rowConsumption, err := v.validateCircuitRowConsumption(block)
 		if err != nil {
 			return err
 		}
+		log.Warn("!!!! validator WriteBlockRowConsumption", "hash", block.Hash(), "accRows", *rowConsumption)
 		rawdb.WriteBlockRowConsumption(v.db, block.Hash(), rowConsumption)
 	}
 	return nil
