@@ -32,6 +32,8 @@ type CircuitCapacityChecker struct {
 }
 
 func NewCircuitCapacityChecker() *CircuitCapacityChecker {
+	log.Info("using REAL NewCircuitCapacityChecker")
+
 	creationMu.Lock()
 	defer creationMu.Unlock()
 

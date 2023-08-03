@@ -6,6 +6,7 @@ import (
 	"math/rand"
 
 	"github.com/scroll-tech/go-ethereum/core/types"
+	"github.com/scroll-tech/go-ethereum/log"
 )
 
 type CircuitCapacityChecker struct {
@@ -13,6 +14,7 @@ type CircuitCapacityChecker struct {
 }
 
 func NewCircuitCapacityChecker() *CircuitCapacityChecker {
+	log.Info("using MOCK NewCircuitCapacityChecker")
 	return &CircuitCapacityChecker{ID: rand.Uint64()}
 }
 
