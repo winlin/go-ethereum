@@ -98,6 +98,7 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 		return err
 	}
 	if v.checkCircuitCapacity {
+		log.Info("msg, ctx!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
 		// if a block's RowConsumption has been stored, which means it has been processed before,
 		// (e.g., in miner/worker.go or in insertChain),
 		// we simply skip its calculation and validation
