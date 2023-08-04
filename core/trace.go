@@ -335,19 +335,30 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 			env.sMu.Lock()
 			m, existed := env.StorageProofs[addrStr]
 			if !existed {
+				fmt.Println("env.StorageProofs not existed, initing ", addrStr)
 				m = make(map[string][]hexutil.Bytes)
 				env.StorageProofs[addrStr] = m
 				if zktrieTracer.Available() {
 					env.ZkTrieTracer[addrStr] = state.NewProofTracer(trie)
 				}
-			} else if proof, existed := m[keyStr]; existed {
-				txm[keyStr] = proof
-				// still need to touch tracer for deletion
-				if isDelete && zktrieTracer.Available() {
-					env.ZkTrieTracer[addrStr].MarkDeletion(key)
+			} else {
+
+				fmt.Println("env.StorageProofs existed, checking tracer ", addrStr)
+				if !env.ZkTrieTracer[addrStr].Available() {
+					// zzhang: probably panic
+					panic(fmt.Sprintf("invalid tracer %v", addrStr))
+					//fmt.Println("env.StorageProofs existed, checking tracer ", addrStr)
 				}
-				env.sMu.Unlock()
-				continue
+				fmt.Println("env.StorageProofs existed, check tracer done", addrStr)
+				if proof, existed := m[keyStr]; existed {
+					txm[keyStr] = proof
+					// still need to touch tracer for deletion
+					if isDelete && zktrieTracer.Available() {
+						env.ZkTrieTracer[addrStr].MarkDeletion(key)
+					}
+					env.sMu.Unlock()
+					continue
+				}
 			}
 			env.sMu.Unlock()
 
@@ -372,6 +383,10 @@ func (env *TraceEnv) getTxResult(state *state.StateDB, index int, block *types.B
 			if zktrieTracer.Available() {
 				if isDelete {
 					zktrieTracer.MarkDeletion(key)
+				}
+				if !env.ZkTrieTracer[addrStr].Available() {
+					// zzhang: i think this line will panic
+					panic(fmt.Sprintf("tracer null, addr is %v", addrStr))
 				}
 				env.ZkTrieTracer[addrStr].Merge(zktrieTracer)
 			}
