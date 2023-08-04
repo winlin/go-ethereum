@@ -21,14 +21,14 @@ func (ccc *CircuitCapacityChecker) Reset() {
 
 func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) (*types.RowConsumption, error) {
 	return &types.RowConsumption{types.SubCircuitRowUsage{
-		Name: "mock",
+		Name:      "mock",
 		RowNumber: 1,
 	}}, nil
 }
 
 func (ccc *CircuitCapacityChecker) ApplyBlock(traces *types.BlockTrace) (*types.RowConsumption, error) {
 	return &types.RowConsumption{types.SubCircuitRowUsage{
-		Name: "mock",
+		Name:      "mock",
 		RowNumber: 2,
 	}}, nil
 }
