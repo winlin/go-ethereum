@@ -329,7 +329,7 @@ var (
 			EnableEIP1559:             false,
 			L1Config: &L1Config{
 				L1ChainId:             11155111,
-				L1MessageQueueAddress: common.HexToAddress("0xF0B2293F5D834eAe920c6974D50957A1732de763"),
+				L1MessageQueueAddress: common.HexToAddress("0x3E1c99Ab2B3134FE44656c13ad48316b1a183668"),
 				NumL1MessagesPerBlock: 10,
 			},
 		},
