@@ -22,7 +22,7 @@ import (
 )
 
 var (
-    tracePath    = flag.String("trace", "/assets/traces/1_transfer.json", "trace")
+    tracePath    = flag.String("trace", "test_trace.json", "trace")
 )
 
 func TestApplyTx(t *testing.T) {
