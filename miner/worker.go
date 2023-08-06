@@ -698,11 +698,29 @@ func (w *worker) resultLoop() {
 				}
 				logs = append(logs, receipt.Logs...)
 			}
-			// Store first L1 queue index not processed by this block.
-			// Note: This accounts for both included and skipped messages. This
-			// way, if a block only skips messages, we won't reprocess the same
-			// messages from the next block.
-			rawdb.WriteFirstQueueIndexNotInL2Block(w.eth.ChainDb(), hash, task.nextL1MsgIndex)
+			// It's possible that we've stored L1 queue index for this block previously,
+			// in this case do not overwrite it.
+			if index := rawdb.ReadFirstQueueIndexNotInL2Block(w.eth.ChainDb(), hash); index == nil {
+				// Store first L1 queue index not processed by this block.
+				// Note: This accounts for both included and skipped messages. This
+				// way, if a block only skips messages, we won't reprocess the same
+				// messages from the next block.
+				log.Trace(
+					"Worker WriteFirstQueueIndexNotInL2Block",
+					"number", block.Number(),
+					"hash", hash.String(),
+					"task.nextL1MsgIndex", task.nextL1MsgIndex,
+				)
+				rawdb.WriteFirstQueueIndexNotInL2Block(w.eth.ChainDb(), hash, task.nextL1MsgIndex)
+			} else {
+				log.Trace(
+					"Worker WriteFirstQueueIndexNotInL2Block: not overwriting existing index",
+					"number", block.Number(),
+					"hash", hash.String(),
+					"index", *index,
+					"task.nextL1MsgIndex", task.nextL1MsgIndex,
+				)
+			}
 			// Store circuit row consumption.
 			log.Trace(
 				"Worker write block row consumption",
@@ -774,7 +792,14 @@ func (w *worker) makeCurrent(parent *types.Block, header *types.Header) error {
 	env.tcount = 0
 	env.blockSize = 0
 	env.l1TxCount = 0
-	env.nextL1MsgIndex = 0 // initialized in commitNewWork
+
+	// find next L1 message queue index
+	nextQueueIndex := rawdb.ReadFirstQueueIndexNotInL2Block(w.eth.ChainDb(), parent.Hash())
+	if nextQueueIndex == nil {
+		// the parent must have been processed before we start a new mining job.
+		log.Crit("Failed to read last L1 message in L2 block", "parent.Hash()", parent.Hash().String())
+	}
+	env.nextL1MsgIndex = *nextQueueIndex
 
 	// Swap out the old work with the new one, terminating any leftover prefetcher
 	// processes in the mean time and starting a new one.
@@ -1068,15 +1093,9 @@ loop:
 	return false, circuitCapacityReached
 }
 
-func (w *worker) collectPendingL1Messages() (uint64, []types.L1MessageTx) {
-	nextQueueIndex := rawdb.ReadFirstQueueIndexNotInL2Block(w.eth.ChainDb(), w.chain.CurrentHeader().Hash())
-	if nextQueueIndex == nil {
-		// the parent (w.chain.CurrentHeader) must have been processed before we start a new mining job.
-		log.Crit("Failed to read last L1 message in L2 block", "l2BlockHash", w.chain.CurrentHeader().Hash())
-	}
-	startIndex := *nextQueueIndex
+func (w *worker) collectPendingL1Messages(startIndex uint64) []types.L1MessageTx {
 	maxCount := w.chainConfig.Scroll.L1Config.NumL1MessagesPerBlock
-	return startIndex, rawdb.ReadL1MessagesFrom(w.eth.ChainDb(), startIndex, maxCount)
+	return rawdb.ReadL1MessagesFrom(w.eth.ChainDb(), startIndex, maxCount)
 }
 
 // commitNewWork generates several new sealing tasks based on the parent block.
@@ -1185,12 +1204,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	l1Txs := make(map[common.Address]types.Transactions)
 	pendingL1Txs := 0
 	if w.chainConfig.Scroll.ShouldIncludeL1Messages() {
-		nextQueueIndex, l1Messages := w.collectPendingL1Messages()
-
-		// If l1Messages is empty, we should still set this
-		// to the same value as the parent block.
-		env.nextL1MsgIndex = nextQueueIndex
-
+		l1Messages := w.collectPendingL1Messages(env.nextL1MsgIndex)
 		pendingL1Txs = len(l1Messages)
 		for _, l1msg := range l1Messages {
 			tx := types.NewTx(&l1msg)
