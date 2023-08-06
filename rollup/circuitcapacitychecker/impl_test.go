@@ -5,6 +5,7 @@
 // sudo cp ./rollup/circuitcapacitychecker/libzkp/libzkp.so /usr/local/lib/
 // sudo cp ./rollup/circuitcapacitychecker/libzkp/libzktrie.so /usr/local/lib/
 // export LD_LIBRARY_PATH=/usr/local/lib/
+// export CHAIN_ID=534351
 
 // // in this dir
 // go test -v -race -gcflags="-l" -ldflags="-s=false" -tags circuit_capacity_checker ./...
