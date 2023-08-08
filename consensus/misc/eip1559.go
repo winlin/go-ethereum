@@ -39,7 +39,7 @@ func VerifyEip1559Header(config *params.ChainConfig, parent, header *types.Heade
 		return err
 	}
 	// Verify the header is not malformed
-	if header.BaseFee == nil && config.Scroll.BaseFeeEnabled() {
+	if (header.BaseFee == nil && config.Scroll.BaseFeeEnabled()) || (header.BaseFee != nil && !config.Scroll.BaseFeeEnabled()) {
 		return fmt.Errorf("header is missing baseFee")
 	}
 	// Now BaseFee can be nil, because !config.Scroll.BaseFeeEnabled()
