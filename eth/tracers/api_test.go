@@ -387,7 +387,7 @@ func TestTraceBlock(t *testing.T) {
 		// Trace head block
 		{
 			blockNumber: rpc.BlockNumber(genBlocks),
-			want:        `[{"result":{"gas":21000,"failed":false,"returnValue":"","structLogs":[]}}]`,
+			want:        `[{"result":{"l1DataFee":"0x0","gas":21000,"failed":false,"returnValue":"","accountAfter":null,"structLogs":[]}}]`,
 		},
 		// Trace non-existent block
 		{
@@ -397,12 +397,12 @@ func TestTraceBlock(t *testing.T) {
 		// Trace latest block
 		{
 			blockNumber: rpc.LatestBlockNumber,
-			want:        `[{"result":{"gas":21000,"failed":false,"returnValue":"","structLogs":[]}}]`,
+			want:        `[{"result":{"l1DataFee":"0x0","gas":21000,"failed":false,"returnValue":"","accountAfter":null,"structLogs":[]}}]`,
 		},
 		// Trace pending block
 		{
 			blockNumber: rpc.PendingBlockNumber,
-			want:        `[{"result":{"gas":21000,"failed":false,"returnValue":"","structLogs":[]}}]`,
+			want:        `[{"result":{"l1DataFee":"0x0","gas":21000,"failed":false,"returnValue":"","accountAfter":null,"structLogs":[]}}]`,
 		},
 	}
 	for i, tc := range testSuite {
