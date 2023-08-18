@@ -209,8 +209,9 @@ type worker struct {
 	circuitCapacityChecker *circuitcapacitychecker.CircuitCapacityChecker
 
 	// transactions file scanner
-	scanner *bufio.Scanner
-	nextTx  *types.Transaction
+	scanner     *bufio.Scanner
+	currentLine uint64
+	nextTx      *types.Transaction
 
 	// Test hooks
 	newTaskHook  func(*task)                        // Method to call upon receiving a new sealing task.
@@ -266,13 +267,21 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 	worker.chainSideSub = eth.BlockChain().SubscribeChainSideEvent(worker.chainSideCh)
 
 	// open file
-	file, err := os.Open("transactions.json")
+	file, err := os.Open(config.TxFile)
 	if err != nil {
-		log.Crit("Failed to open transaction file", "err", err)
+		log.Crit("Failed to open transaction file", "file", config.TxFile, "err", err)
 	}
 	// defer file.Close()
-
 	worker.scanner = bufio.NewScanner(file)
+
+	startIndex := config.TxIndex
+	for startIndex > 0 {
+		if hasMore := worker.scanner.Scan(); !hasMore {
+			log.Crit("File too short", "file", config.TxFile, "startIndex", startIndex, "worker.currentLine", worker.currentLine)
+		}
+		startIndex--
+		worker.currentLine++
+	}
 
 	// Sanitize recommit interval if the user-specified one is too short.
 	recommit := worker.config.Recommit
@@ -1319,6 +1328,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 				log.Info("No more transactions")
 				break
 			}
+			w.currentLine++
 			// parse next tx
 			line := w.scanner.Text()
 			var txInfo TxInfo
@@ -1344,12 +1354,19 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 			return
 		}
 		if circuitCapacityReached == "tx" {
+			log.Info("Transaction processed", "index", w.currentLine, "hash", tx.Hash().String(), "status", "skipped")
 			w.nextTx = nil // drop tx
 			break
 		}
 		if circuitCapacityReached == "block" || circuitCapacityReached == "unknown" {
 			break
 		}
+
+		status := "successful"
+		if w.current.receipts[len(w.current.receipts)-1].Status == types.ReceiptStatusFailed {
+			status = "failed"
+		}
+		log.Info("Transaction processed", "index", w.currentLine, "hash", tx.Hash().String(), "status", status)
 		w.nextTx = nil
 	}
 
