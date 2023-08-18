@@ -17,9 +17,12 @@
 package miner
 
 import (
+	"bufio"
 	"bytes"
+	"encoding/json"
 	"errors"
 	"math/big"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -39,6 +42,11 @@ import (
 	"github.com/scroll-tech/go-ethereum/rollup/circuitcapacitychecker"
 	"github.com/scroll-tech/go-ethereum/trie"
 )
+
+type TxInfo struct {
+	Hash string `json:"hash"`
+	Raw  []byte `json:"raw"`
+}
 
 const (
 	// resultQueueSize is the size of channel listening to sealing result.
@@ -200,6 +208,10 @@ type worker struct {
 
 	circuitCapacityChecker *circuitcapacitychecker.CircuitCapacityChecker
 
+	// transactions file scanner
+	scanner *bufio.Scanner
+	nextTx  *types.Transaction
+
 	// Test hooks
 	newTaskHook  func(*task)                        // Method to call upon receiving a new sealing task.
 	skipSealHook func(*task) bool                   // Method to decide whether skipping the sealing.
@@ -252,6 +264,15 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 	// Subscribe events for blockchain
 	worker.chainHeadSub = eth.BlockChain().SubscribeChainHeadEvent(worker.chainHeadCh)
 	worker.chainSideSub = eth.BlockChain().SubscribeChainSideEvent(worker.chainSideCh)
+
+	// open file
+	file, err := os.Open("transactions.json")
+	if err != nil {
+		log.Crit("Failed to open transaction file", "err", err)
+	}
+	// defer file.Close()
+
+	worker.scanner = bufio.NewScanner(file)
 
 	// Sanitize recommit interval if the user-specified one is too short.
 	recommit := worker.config.Recommit
@@ -926,8 +947,8 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	return receipt.Logs, nil
 }
 
-func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coinbase common.Address, interrupt *int32) (bool, bool) {
-	var circuitCapacityReached bool
+func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coinbase common.Address, interrupt *int32) (bool, string) {
+	var circuitCapacityReached string = "false"
 
 	// Short circuit if current is nil
 	if w.current == nil {
@@ -1060,7 +1081,7 @@ loop:
 			// though it might still be possible to add some "smaller" txs,
 			// but it's a trade-off between tracing overhead & block usage rate
 			log.Trace("Circuit capacity limit reached in a block", "acc_rows", w.current.accRows, "tx", tx.Hash().String())
-			circuitCapacityReached = true
+			circuitCapacityReached = "block"
 			break loop
 
 		case (errors.Is(err, circuitcapacitychecker.ErrTxRowConsumptionOverflow) && tx.IsL1MessageTx()):
@@ -1075,7 +1096,7 @@ loop:
 			// after `ErrTxRowConsumptionOverflow`, ccc might not revert updates
 			// associated with this transaction so we cannot pack more transactions.
 			// TODO: fix this in ccc and change these lines back to `txs.Shift()`
-			circuitCapacityReached = true
+			circuitCapacityReached = "tx"
 			break loop
 
 		case (errors.Is(err, circuitcapacitychecker.ErrTxRowConsumptionOverflow) && !tx.IsL1MessageTx()):
@@ -1086,7 +1107,7 @@ loop:
 			// after `ErrTxRowConsumptionOverflow`, ccc might not revert updates
 			// associated with this transaction so we cannot pack more transactions.
 			// TODO: fix this in ccc and change these lines back to `txs.Pop()`
-			circuitCapacityReached = true
+			circuitCapacityReached = "tx"
 			break loop
 
 		case (errors.Is(err, circuitcapacitychecker.ErrUnknown) && tx.IsL1MessageTx()):
@@ -1100,7 +1121,7 @@ loop:
 			// after `ErrUnknown`, ccc might not revert updates associated
 			// with this transaction so we cannot pack more transactions.
 			// TODO: fix this in ccc and change these lines back to `txs.Shift()`
-			circuitCapacityReached = true
+			circuitCapacityReached = "unknown"
 			break loop
 
 		case (errors.Is(err, circuitcapacitychecker.ErrUnknown) && !tx.IsL1MessageTx()):
@@ -1110,7 +1131,7 @@ loop:
 			// after `ErrUnknown`, ccc might not revert updates associated
 			// with this transaction so we cannot pack more transactions.
 			// TODO: fix this in ccc and change these lines back to `txs.Pop()`
-			circuitCapacityReached = true
+			circuitCapacityReached = "unknown"
 			break loop
 
 		default:
@@ -1291,30 +1312,45 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 			localTxs[account] = txs
 		}
 	}
-	var skipCommit, circuitCapacityReached bool
-	if w.chainConfig.Scroll.ShouldIncludeL1Messages() && len(l1Txs) > 0 {
-		log.Trace("Processing L1 messages for inclusion", "count", pendingL1Txs)
-		txs := types.NewTransactionsByPriceAndNonce(w.current.signer, l1Txs, header.BaseFee)
-		skipCommit, circuitCapacityReached = w.commitTransactions(txs, w.coinbase, interrupt)
+
+	for {
+		if w.nextTx == nil {
+			if hasMore := w.scanner.Scan(); !hasMore {
+				log.Info("No more transactions")
+				break
+			}
+			// parse next tx
+			line := w.scanner.Text()
+			var txInfo TxInfo
+			err = json.Unmarshal([]byte(line), &txInfo)
+			if err != nil {
+				log.Crit("Failed to unmarshal transaction", "err", err)
+			}
+			tx := new(types.Transaction)
+			if err := tx.UnmarshalBinary(txInfo.Raw); err != nil {
+				log.Crit("Failed to unmarshal raw transaction", "err", err)
+			}
+			w.nextTx = tx
+		}
+
+		tx := w.nextTx
+		txs := make(map[common.Address]types.Transactions)
+		acc, _ := types.Sender(w.current.signer, tx)
+		txs[acc] = types.Transactions{tx}
+		txs2 := types.NewTransactionsByPriceAndNonce(w.current.signer, txs, header.BaseFee)
+
+		skipCommit, circuitCapacityReached := w.commitTransactions(txs2, w.coinbase, interrupt)
 		if skipCommit {
 			return
 		}
-	}
-	if len(localTxs) > 0 && !circuitCapacityReached {
-		txs := types.NewTransactionsByPriceAndNonce(w.current.signer, localTxs, header.BaseFee)
-		skipCommit, circuitCapacityReached = w.commitTransactions(txs, w.coinbase, interrupt)
-		if skipCommit {
-			return
+		if circuitCapacityReached == "tx" {
+			w.nextTx = nil // drop tx
+			break
 		}
-	}
-	if len(remoteTxs) > 0 && !circuitCapacityReached {
-		txs := types.NewTransactionsByPriceAndNonce(w.current.signer, remoteTxs, header.BaseFee)
-		// don't need to get `circuitCapacityReached` here because we don't have further `commitTransactions`
-		// after this one, and if we assign it won't take effect (`ineffassign`)
-		skipCommit, _ = w.commitTransactions(txs, w.coinbase, interrupt)
-		if skipCommit {
-			return
+		if circuitCapacityReached == "block" || circuitCapacityReached == "unknown" {
+			break
 		}
+		w.nextTx = nil
 	}
 
 	// do not produce empty blocks
