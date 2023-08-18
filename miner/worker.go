@@ -1049,22 +1049,26 @@ loop:
 			queueIndex := tx.AsL1MessageTx().QueueIndex
 			log.Info("Skipping L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "gas limit exceeded")
 			w.current.nextL1MsgIndex = queueIndex + 1
-			txs.Shift()
+			circuitCapacityReached = "unknown"
+			break loop
 
 		case errors.Is(err, core.ErrGasLimitReached):
 			// Pop the current out-of-gas transaction without shifting in the next from the account
 			log.Trace("Gas limit exceeded for current block", "sender", from)
-			txs.Pop()
+			circuitCapacityReached = "block"
+			break loop
 
 		case errors.Is(err, core.ErrNonceTooLow):
 			// New head notification data race between the transaction pool and miner, shift
 			log.Trace("Skipping transaction with low nonce", "sender", from, "nonce", tx.Nonce())
-			txs.Shift()
+			circuitCapacityReached = "unknown"
+			break loop
 
 		case errors.Is(err, core.ErrNonceTooHigh):
 			// Reorg notification data race between the transaction pool and miner, skip account =
 			log.Trace("Skipping account with hight nonce", "sender", from, "nonce", tx.Nonce())
-			txs.Pop()
+			circuitCapacityReached = "unknown"
+			break loop
 
 		case errors.Is(err, nil):
 			// Everything ok, collect the logs and shift in the next transaction from the same account
@@ -1082,7 +1086,8 @@ loop:
 		case errors.Is(err, core.ErrTxTypeNotSupported):
 			// Pop the unsupported transaction without shifting in the next from the account
 			log.Trace("Skipping unsupported transaction type", "sender", from, "type", tx.Type())
-			txs.Pop()
+			circuitCapacityReached = "unknown"
+			break loop
 
 		case errors.Is(err, circuitcapacitychecker.ErrBlockRowConsumptionOverflow):
 			// Circuit capacity check: circuit capacity limit reached in a block,
@@ -1152,7 +1157,8 @@ loop:
 				log.Info("Skipping L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "strange error", "err", err)
 				w.current.nextL1MsgIndex = queueIndex + 1
 			}
-			txs.Shift()
+			circuitCapacityReached = "unknown"
+			break loop
 		}
 	}
 
@@ -1353,12 +1359,12 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 		if skipCommit {
 			return
 		}
-		if circuitCapacityReached == "tx" {
-			log.Info("Transaction processed", "index", w.currentLine, "hash", tx.Hash().String(), "status", "skipped")
+		if circuitCapacityReached == "tx" || circuitCapacityReached == "unknown" {
+			log.Warn("Transaction processed", "index", w.currentLine, "hash", tx.Hash().String(), "status", "skipped")
 			w.nextTx = nil // drop tx
 			break
 		}
-		if circuitCapacityReached == "block" || circuitCapacityReached == "unknown" {
+		if circuitCapacityReached == "block" {
 			break
 		}
 
