@@ -490,10 +490,6 @@ var (
 		Name:  "miner.tx.file",
 		Usage: "",
 	}
-	MinerTxIndexFlag = cli.StringFlag{
-		Name:  "miner.tx.index",
-		Usage: "",
-	}
 	// Account settings
 	UnlockedAccountFlag = cli.StringFlag{
 		Name:  "unlock",
@@ -1495,7 +1491,6 @@ func setMiner(ctx *cli.Context, cfg *miner.Config) {
 		log.Warn("The generic --miner.gastarget flag is deprecated and will be removed in the future!")
 	}
 	cfg.TxFile = ctx.GlobalString(MinerTxFileFlag.Name)
-	cfg.TxIndex = ctx.GlobalUint64(MinerTxIndexFlag.Name)
 }
 
 func setWhitelist(ctx *cli.Context, cfg *ethconfig.Config) {

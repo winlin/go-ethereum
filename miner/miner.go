@@ -57,7 +57,6 @@ type Config struct {
 	Recommit   time.Duration  // The time interval for miner to re-create mining work.
 	Noverify   bool           // Disable remote mining solution verification(only useful in ethash).
 	TxFile     string
-	TxIndex    uint64
 }
 
 // Miner creates blocks and searches for proof-of-work values.

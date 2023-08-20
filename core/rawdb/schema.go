@@ -110,6 +110,10 @@ var (
 
 	// Row consumption
 	rowConsumptionPrefix = []byte("rc") // rowConsumptionPrefix + hash -> row consumption by block
+
+	// Tx replay
+	nextReplayTxIndexKey  = []byte("LastReplayedTxIndex")
+	nextReplayIndexPrefix = []byte("nx") // nextReplayIndexPrefix + L2 block hash -> next replay index
 )
 
 const (
@@ -267,4 +271,9 @@ func rowConsumptionKey(hash common.Hash) []byte {
 
 func isNotFoundErr(err error) bool {
 	return errors.Is(err, leveldb.ErrNotFound) || errors.Is(err, memorydb.ErrMemorydbNotFound)
+}
+
+// NextReplayIndexKey = nextReplayIndexPrefix + L2 block hash
+func NextReplayIndexKey(l2BlockHash common.Hash) []byte {
+	return append(nextReplayIndexPrefix, l2BlockHash.Bytes()...)
 }
