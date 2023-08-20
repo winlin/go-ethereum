@@ -112,7 +112,6 @@ var (
 	rowConsumptionPrefix = []byte("rc") // rowConsumptionPrefix + hash -> row consumption by block
 
 	// Tx replay
-	nextReplayTxIndexKey  = []byte("LastReplayedTxIndex")
 	nextReplayIndexPrefix = []byte("nx") // nextReplayIndexPrefix + L2 block hash -> next replay index
 )
 

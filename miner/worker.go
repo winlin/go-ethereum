@@ -446,8 +446,7 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 		}
 		interrupt = new(int32)
 		select {
-		// case w.newWorkCh <- &newWorkReq{interrupt: interrupt, noempty: noempty, timestamp: timestamp}:
-		case w.newWorkCh <- &newWorkReq{interrupt: nil, noempty: noempty, timestamp: timestamp}:
+		case w.newWorkCh <- &newWorkReq{interrupt: interrupt, noempty: noempty, timestamp: timestamp}:
 		case <-w.exitCh:
 			return
 		}
@@ -482,11 +481,6 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 			// If mining is running resubmit a new work cycle periodically to pull in
 			// higher priced transactions. Disable this overhead for pending blocks.
 			if w.isRunning() && (w.chainConfig.Clique == nil || w.chainConfig.Clique.Period > 0) {
-				// Short circuit if no new transaction arrives.
-				// if atomic.LoadInt32(&w.newTxs) == 0 && atomic.LoadInt32(&w.newL1Msgs) == 0 {
-				// 	timer.Reset(recommit)
-				// 	continue
-				// }
 				commit(true, commitInterruptResubmit)
 			}
 
@@ -745,7 +739,6 @@ func (w *worker) resultLoop() {
 				logs = append(logs, receipt.Logs...)
 			}
 			rawdb.WriteNextReplayIndex(w.eth.ChainDb(), hash, task.nextLine)
-			// log.Info("!!!! WriteNextReplayIndex", "hash", hash.String(), "number", block.NumberU64(), "nextIndex", task.currentLine)
 			// It's possible that we've stored L1 queue index for this block previously,
 			// in this case do not overwrite it.
 			if index := rawdb.ReadFirstQueueIndexNotInL2Block(w.eth.ChainDb(), hash); index == nil {
@@ -1042,7 +1035,8 @@ loop:
 		}
 		if !tx.IsL1MessageTx() && !w.chainConfig.Scroll.IsValidBlockSize(w.current.blockSize+tx.Size()) {
 			log.Trace("Block size limit reached", "have", w.current.blockSize, "want", w.chainConfig.Scroll.MaxTxPayloadBytesPerBlock, "tx", tx.Size())
-			txs.Pop() // skip transactions from this account
+			sealBlock = true
+			nextTransaction = false
 			continue
 		}
 		// Error may be ignored here. The error has already been checked
