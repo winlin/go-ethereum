@@ -1036,7 +1036,7 @@ loop:
 		if !tx.IsL1MessageTx() && !w.chainConfig.Scroll.IsValidBlockSize(w.current.blockSize+tx.Size()) {
 			log.Trace("Block size limit reached", "have", w.current.blockSize, "want", w.chainConfig.Scroll.MaxTxPayloadBytesPerBlock, "tx", tx.Size())
 			sealBlock = true
-			nextTransaction = false
+			nextTransaction = false // TODO: consider single tx overflow
 			continue
 		}
 		// Error may be ignored here. The error has already been checked
