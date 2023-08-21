@@ -49,6 +49,14 @@ type TxInfo struct {
 	Raw  []byte `json:"raw"`
 }
 
+type TxAction int
+
+const (
+	TxActionNotProcessed TxAction = iota
+	TxActionExecuted
+	TxActionSkipped
+)
+
 const (
 	// resultQueueSize is the size of channel listening to sealing result.
 	resultQueueSize = 10
@@ -968,13 +976,13 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	return receipt.Logs, nil
 }
 
-func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coinbase common.Address, interrupt *int32) (bool, bool, bool) {
-	var sealBlock bool = false
-	var nextTransaction bool = false
+func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coinbase common.Address, interrupt *int32) (bool, bool, TxAction) {
+	sealBlock := false
+	txAction := TxActionNotProcessed
 
 	// Short circuit if current is nil
 	if w.current == nil {
-		return true, sealBlock, nextTransaction
+		return true, sealBlock, txAction
 	}
 
 	gasLimit := w.current.header.GasLimit
@@ -1004,20 +1012,20 @@ loop:
 					inc:   true,
 				}
 			}
-			return atomic.LoadInt32(interrupt) == commitInterruptNewHead, sealBlock, nextTransaction
+			return atomic.LoadInt32(interrupt) == commitInterruptNewHead, sealBlock, txAction
 		}
 		// If we have collected enough transactions then we're done
 		if !w.chainConfig.Scroll.IsValidL2TxCount(w.current.tcount - w.current.l1TxCount + 1) {
 			log.Trace("Transaction count limit reached", "have", w.current.tcount-w.current.l1TxCount, "want", w.chainConfig.Scroll.MaxTxPerBlock)
 			sealBlock = true
-			nextTransaction = false
+			txAction = TxActionNotProcessed
 			break
 		}
 		// If we don't have enough gas for any further transactions then we're done
 		if w.current.gasPool.Gas() < params.TxGas {
 			log.Trace("Not enough gas for further transactions", "have", w.current.gasPool, "want", params.TxGas)
 			sealBlock = true
-			nextTransaction = false
+			txAction = TxActionNotProcessed
 			break
 		}
 		// Retrieve the next transaction and abort if all done
@@ -1034,10 +1042,15 @@ loop:
 			break
 		}
 		if !tx.IsL1MessageTx() && !w.chainConfig.Scroll.IsValidBlockSize(w.current.blockSize+tx.Size()) {
-			log.Trace("Block size limit reached", "have", w.current.blockSize, "want", w.chainConfig.Scroll.MaxTxPayloadBytesPerBlock, "tx", tx.Size())
+			log.Info("Block size limit reached", "have", w.current.blockSize, "want", w.chainConfig.Scroll.MaxTxPayloadBytesPerBlock, "tx", tx.Size())
 			sealBlock = true
-			nextTransaction = false // TODO: consider single tx overflow
-			continue
+			if !w.chainConfig.Scroll.IsValidBlockSize(tx.Size()) {
+				log.Error("Skipping oversized transaction", "hash", tx.Hash().String(), "size", tx.Size().String(), "limit", w.chainConfig.Scroll.MaxTxPayloadBytesPerBlock)
+				txAction = TxActionSkipped
+			} else {
+				txAction = TxActionNotProcessed
+			}
+			break
 		}
 		// Error may be ignored here. The error has already been checked
 		// during transaction acceptance is the transaction pool.
@@ -1047,10 +1060,10 @@ loop:
 		// Check whether the tx is replay protected. If we're not in the EIP155 hf
 		// phase, start ignoring the sender until we do.
 		if tx.Protected() && !w.chainConfig.IsEIP155(w.current.header.Number) {
-			log.Trace("Ignoring reply protected transaction", "hash", tx.Hash(), "eip155", w.chainConfig.EIP155Block)
-
-			txs.Pop()
-			continue
+			log.Error("Ignoring reply protected transaction", "hash", tx.Hash(), "eip155", w.chainConfig.EIP155Block)
+			sealBlock = false
+			txAction = TxActionSkipped
+			break
 		}
 		// Start executing the transaction
 		w.current.state.Prepare(tx.Hash(), w.current.tcount)
@@ -1062,36 +1075,36 @@ loop:
 			// terminate here and try again in the next block.
 			if w.current.l1TxCount > 0 {
 				sealBlock = true
-				nextTransaction = false
+				txAction = TxActionNotProcessed
 				break loop
 			}
 			// A single L1 message leads to out-of-gas. Skip it.
 			queueIndex := tx.AsL1MessageTx().QueueIndex
-			log.Info("Skipping L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "gas limit exceeded")
+			log.Error("Skipping L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "gas limit exceeded")
 			w.current.nextL1MsgIndex = queueIndex + 1
 			sealBlock = false
-			nextTransaction = true
+			txAction = TxActionSkipped
 			break loop
 
 		case errors.Is(err, core.ErrGasLimitReached):
 			// Pop the current out-of-gas transaction without shifting in the next from the account
-			log.Trace("Gas limit exceeded for current block", "sender", from)
+			log.Info("Gas limit exceeded for current block", "sender", from)
 			sealBlock = true
-			nextTransaction = false
+			txAction = TxActionNotProcessed
 			break loop
 
 		case errors.Is(err, core.ErrNonceTooLow):
 			// New head notification data race between the transaction pool and miner, shift
-			log.Trace("Skipping transaction with low nonce", "sender", from, "nonce", tx.Nonce())
+			log.Error("Skipping transaction with low nonce", "sender", from, "nonce", tx.Nonce())
 			sealBlock = false
-			nextTransaction = true
+			txAction = TxActionSkipped
 			break loop
 
 		case errors.Is(err, core.ErrNonceTooHigh):
 			// Reorg notification data race between the transaction pool and miner, skip account =
-			log.Trace("Skipping account with hight nonce", "sender", from, "nonce", tx.Nonce())
+			log.Error("Skipping account with hight nonce", "sender", from, "nonce", tx.Nonce())
 			sealBlock = false
-			nextTransaction = true
+			txAction = TxActionSkipped
 			break loop
 
 		case errors.Is(err, nil):
@@ -1102,18 +1115,19 @@ loop:
 				log.Debug("Including L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String())
 				w.current.l1TxCount++
 				w.current.nextL1MsgIndex = queueIndex + 1
+			} else {
+				w.current.blockSize += tx.Size()
 			}
 			w.current.tcount++
-			w.current.blockSize += tx.Size()
 			sealBlock = false
-			nextTransaction = true
+			txAction = TxActionExecuted
 			break loop
 
 		case errors.Is(err, core.ErrTxTypeNotSupported):
 			// Pop the unsupported transaction without shifting in the next from the account
-			log.Trace("Skipping unsupported transaction type", "sender", from, "type", tx.Type())
+			log.Error("Skipping unsupported transaction type", "sender", from, "type", tx.Type())
 			sealBlock = false
-			nextTransaction = true
+			txAction = TxActionSkipped
 			break loop
 
 		case errors.Is(err, circuitcapacitychecker.ErrBlockRowConsumptionOverflow):
@@ -1121,9 +1135,9 @@ loop:
 			// don't pop or shift, just quit the loop immediately;
 			// though it might still be possible to add some "smaller" txs,
 			// but it's a trade-off between tracing overhead & block usage rate
-			log.Trace("Circuit capacity limit reached in a block", "acc_rows", w.current.accRows, "tx", tx.Hash().String())
+			log.Info("Circuit capacity limit reached in a block", "acc_rows", w.current.accRows, "tx", tx.Hash().String(), "w.current.tcount", w.current.tcount)
 			sealBlock = true
-			nextTransaction = false
+			txAction = TxActionNotProcessed
 			break loop
 
 		case (errors.Is(err, circuitcapacitychecker.ErrTxRowConsumptionOverflow) && tx.IsL1MessageTx()):
@@ -1132,26 +1146,26 @@ loop:
 			// This is also useful for skipping "problematic" L1MessageTxs.
 			queueIndex := tx.AsL1MessageTx().QueueIndex
 			log.Trace("Circuit capacity limit reached for a single tx", "tx", tx.Hash().String(), "queueIndex", queueIndex)
-			log.Info("Skipping L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "row consumption overflow")
+			log.Error("Skipping L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "row consumption overflow")
 			w.current.nextL1MsgIndex = queueIndex + 1
 
 			// after `ErrTxRowConsumptionOverflow`, ccc might not revert updates
 			// associated with this transaction so we cannot pack more transactions.
 			// TODO: fix this in ccc and change these lines back to `txs.Shift()`
 			sealBlock = true
-			nextTransaction = true
+			txAction = TxActionSkipped
 			break loop
 
 		case (errors.Is(err, circuitcapacitychecker.ErrTxRowConsumptionOverflow) && !tx.IsL1MessageTx()):
 			// Circuit capacity check: L2MessageTx row consumption too high, skip the account.
 			// This is also useful for skipping "problematic" L2MessageTxs.
-			log.Trace("Circuit capacity limit reached for a single tx", "tx", tx.Hash().String())
+			log.Error("Circuit capacity limit reached for a single tx", "tx", tx.Hash().String())
 
 			// after `ErrTxRowConsumptionOverflow`, ccc might not revert updates
 			// associated with this transaction so we cannot pack more transactions.
 			// TODO: fix this in ccc and change these lines back to `txs.Pop()`
 			sealBlock = true
-			nextTransaction = true
+			txAction = TxActionSkipped
 			break loop
 
 		case (errors.Is(err, circuitcapacitychecker.ErrUnknown) && tx.IsL1MessageTx()):
@@ -1159,38 +1173,38 @@ loop:
 			// shift to the next from the account because we shouldn't skip the entire txs from the same account
 			queueIndex := tx.AsL1MessageTx().QueueIndex
 			log.Trace("Unknown circuit capacity checker error for L1MessageTx", "tx", tx.Hash().String(), "queueIndex", queueIndex)
-			log.Info("Skipping L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "unknown row consumption error")
+			log.Error("Skipping L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "unknown row consumption error")
 			w.current.nextL1MsgIndex = queueIndex + 1
 
 			// after `ErrUnknown`, ccc might not revert updates associated
 			// with this transaction so we cannot pack more transactions.
 			// TODO: fix this in ccc and change these lines back to `txs.Shift()`
 			sealBlock = true
-			nextTransaction = true
+			txAction = TxActionSkipped
 			break loop
 
 		case (errors.Is(err, circuitcapacitychecker.ErrUnknown) && !tx.IsL1MessageTx()):
 			// Circuit capacity check: unknown circuit capacity checker error for L2MessageTx, skip the account
-			log.Trace("Unknown circuit capacity checker error for L2MessageTx", "tx", tx.Hash().String())
+			log.Error("Unknown circuit capacity checker error for L2MessageTx", "tx", tx.Hash().String())
 
 			// after `ErrUnknown`, ccc might not revert updates associated
 			// with this transaction so we cannot pack more transactions.
 			// TODO: fix this in ccc and change these lines back to `txs.Pop()`
 			sealBlock = true
-			nextTransaction = true
+			txAction = TxActionSkipped
 			break loop
 
 		default:
 			// Strange error, discard the transaction and get the next in line (note, the
 			// nonce-too-high clause will prevent us from executing in vain).
-			log.Debug("Transaction failed, account skipped", "hash", tx.Hash().String(), "err", err)
+			log.Error("Transaction failed, account skipped", "hash", tx.Hash().String(), "err", err)
 			if tx.IsL1MessageTx() {
 				queueIndex := tx.AsL1MessageTx().QueueIndex
 				log.Info("Skipping L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "strange error", "err", err)
 				w.current.nextL1MsgIndex = queueIndex + 1
 			}
 			sealBlock = true
-			nextTransaction = true
+			txAction = TxActionSkipped
 			break loop
 		}
 	}
@@ -1215,7 +1229,7 @@ loop:
 	if interrupt != nil {
 		w.resubmitAdjustCh <- &intervalAdjust{inc: false}
 	}
-	return false, sealBlock, nextTransaction
+	return false, sealBlock, txAction
 }
 
 func (w *worker) collectPendingL1Messages(startIndex uint64) []types.L1MessageTx {
@@ -1361,15 +1375,23 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 		txs2 := types.NewTransactionsByPriceAndNonce(w.current.signer, txs, header.BaseFee)
 
 		// process
-		skipCommit, sealBlock, nextTransaction := w.commitTransactions(txs2, w.coinbase, interrupt)
+		skipCommit, sealBlock, txAction := w.commitTransactions(txs2, w.coinbase, interrupt)
 		if skipCommit {
 			return
 		}
-		if nextTransaction {
-			log.Warn("Transaction processed", "index", w.current.nextLine, "hash", tx.Hash().String())
+		if txAction == TxActionExecuted {
+			status := "successful"
+			if w.current.receipts[len(w.current.receipts)-1].Status == types.ReceiptStatusFailed {
+				status = "failed"
+			}
+			log.Warn("Transaction processed", "index", w.current.nextLine, "status", status, "hash", tx.Hash().String())
 			nextTx = nil
 			w.current.nextLine++
 			count++
+		} else if txAction == TxActionSkipped {
+			log.Error("Transaction skipped", "index", w.current.nextLine, "hash", tx.Hash().String())
+			nextTx = nil
+			w.current.nextLine++
 		}
 		if sealBlock || count == 100 {
 			break
