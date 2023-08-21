@@ -224,6 +224,12 @@ type worker struct {
 	// transactions file scanner
 	transactionsFile *os.File
 
+	// replay stats
+	numTotal uint64
+	numSuccess uint64
+	numRevert uint64
+	numSkipped uint64
+
 	// Test hooks
 	newTaskHook  func(*task)                        // Method to call upon receiving a new sealing task.
 	skipSealHook func(*task) bool                   // Method to decide whether skipping the sealing.
@@ -1380,15 +1386,21 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 			return
 		}
 		if txAction == TxActionExecuted {
+			w.numTotal++
 			status := "successful"
 			if w.current.receipts[len(w.current.receipts)-1].Status == types.ReceiptStatusFailed {
 				status = "failed"
+				w.numRevert++
+			} else {
+				w.numSuccess++
 			}
 			log.Warn("Transaction processed", "index", w.current.nextLine, "status", status, "hash", tx.Hash().String())
 			nextTx = nil
 			w.current.nextLine++
 			count++
 		} else if txAction == TxActionSkipped {
+			w.numTotal++
+			w.numSkipped++
 			log.Error("Transaction skipped", "index", w.current.nextLine, "hash", tx.Hash().String())
 			nextTx = nil
 			w.current.nextLine++
@@ -1397,6 +1409,14 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 			break
 		}
 	}
+
+	log.Info(
+		"Replay stats",
+		"numTotal", w.numTotal,
+		"numSuccess", w.numSuccess, "numSuccess%", 100 * float64(w.numSuccess) / float64(w.numTotal),
+		"numRevert", w.numRevert, "numRevert%", 100 * float64(w.numRevert) / float64(w.numTotal),
+		"numSkipped", w.numSkipped, "numSkipped%", 100 * float64(w.numSkipped) / float64(w.numTotal),
+	)
 
 	// do not produce empty blocks
 	if w.current.tcount == 0 {
