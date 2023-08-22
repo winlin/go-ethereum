@@ -129,11 +129,10 @@ func rlpEncode(tx *types.Transaction) ([]byte, error) {
 }
 
 func readGPOStorageSlots(addr common.Address, state StateDB) (*big.Int, *big.Int, *big.Int) {
-	// l1BaseFee := state.GetState(addr, rcfg.L1BaseFeeSlot)
+	l1BaseFee := state.GetState(addr, rcfg.L1BaseFeeSlot)
 	overhead := state.GetState(addr, rcfg.OverheadSlot)
 	scalar := state.GetState(addr, rcfg.ScalarSlot)
-	// return l1BaseFee.Big(), overhead.Big(), scalar.Big()
-	return big.NewInt(1), overhead.Big(), scalar.Big()
+	return l1BaseFee.Big(), overhead.Big(), scalar.Big()
 }
 
 // calculateEncodedL1DataFee computes the L1 fee for an RLP-encoded tx
