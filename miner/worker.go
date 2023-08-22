@@ -317,12 +317,14 @@ func (w *worker) scanFrom(nextIndex uint64) *bufio.Scanner {
 	}
 	scanner := bufio.NewScanner(w.transactionsFile)
 	// skip already replayed txs
+	log.Info("Rewinding scanner...")
 	for nextIndex > 0 {
 		if hasMore := scanner.Scan(); !hasMore {
 			log.Crit("File too short", "file", w.config.TxFile, "nextIndex", nextIndex)
 		}
 		nextIndex--
 	}
+	log.Info("Rewinding scanner done")
 	return scanner
 }
 
@@ -1405,7 +1407,12 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 			nextTx = nil
 			w.current.nextLine++
 		}
+		if sealBlock && count == 0 {
+			w.circuitCapacityChecker.Reset()
+			continue
+		}
 		if sealBlock || count == 100 {
+			log.Info("Sealing block", "count", count)
 			break
 		}
 	}
