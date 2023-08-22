@@ -283,11 +283,15 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 	worker.chainHeadSub = eth.BlockChain().SubscribeChainHeadEvent(worker.chainHeadCh)
 	worker.chainSideSub = eth.BlockChain().SubscribeChainSideEvent(worker.chainSideCh)
 
-	file, err := os.Open(config.TxFile)
-	if err != nil {
-		log.Crit("Failed to open transaction file", "file", config.TxFile, "err", err)
+	if config.TxFile != "" {
+		file, err := os.Open(config.TxFile)
+		if err != nil {
+			log.Crit("Failed to open transaction file", "file", config.TxFile, "err", err)
+		}
+		worker.transactionsFile = file
+	} else {
+		log.Warn("No transactions file provided")
 	}
-	worker.transactionsFile = file
 
 	// Sanitize recommit interval if the user-specified one is too short.
 	recommit := worker.config.Recommit
@@ -1350,6 +1354,11 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	}
 
 	// replay transactions
+	if w.transactionsFile == nil {
+		log.Warn("No transactions file, terminating")
+		return
+	}
+
 	nextIndex := rawdb.ReadNextReplayIndex(w.eth.ChainDb(), header.ParentHash)
 	log.Trace("rawdb.ReadNextReplayIndex", "nextIndex", nextIndex, "header.ParentHash", header.ParentHash.String())
 	w.current.nextLine = nextIndex
