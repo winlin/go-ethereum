@@ -225,9 +225,9 @@ type worker struct {
 	transactionsFile *os.File
 
 	// replay stats
-	numTotal uint64
+	numTotal   uint64
 	numSuccess uint64
-	numRevert uint64
+	numRevert  uint64
 	numSkipped uint64
 
 	// Test hooks
@@ -755,6 +755,7 @@ func (w *worker) resultLoop() {
 				logs = append(logs, receipt.Logs...)
 			}
 			rawdb.WriteNextReplayIndex(w.eth.ChainDb(), hash, task.nextLine)
+			log.Trace("rawdb.WriteNextReplayIndex", "task.nextLine", task.nextLine, "hash", hash.String())
 			// It's possible that we've stored L1 queue index for this block previously,
 			// in this case do not overwrite it.
 			if index := rawdb.ReadFirstQueueIndexNotInL2Block(w.eth.ChainDb(), hash); index == nil {
@@ -1350,12 +1351,15 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 
 	// replay transactions
 	nextIndex := rawdb.ReadNextReplayIndex(w.eth.ChainDb(), header.ParentHash)
+	log.Trace("rawdb.ReadNextReplayIndex", "nextIndex", nextIndex, "header.ParentHash", header.ParentHash.String())
 	w.current.nextLine = nextIndex
 	scanner := w.scanFrom(nextIndex)
 	var nextTx *types.Transaction
 	count := 0
 
 	for {
+		log.Trace("Tx reading loop", "w.current.nextLine", w.current.nextLine, "count", count)
+
 		// read and parse next tx
 		if nextTx == nil {
 			if hasMore := scanner.Scan(); !hasMore {
@@ -1373,6 +1377,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 				log.Crit("Failed to unmarshal raw transaction", "err", err)
 			}
 			nextTx = tx
+			log.Trace("Read next tx done", "hash", nextTx.Hash().String())
 		}
 
 		// convert into transaction set
@@ -1384,6 +1389,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 
 		// process
 		skipCommit, sealBlock, txAction := w.commitTransactions(txs2, w.coinbase, interrupt)
+		log.Trace("commitTransactions result", "skipCommit", skipCommit, "sealBlock", sealBlock, "txAction", txAction)
 		if skipCommit {
 			return
 		}
@@ -1420,9 +1426,9 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	log.Info(
 		"Replay stats",
 		"numTotal", w.numTotal,
-		"numSuccess", w.numSuccess, "numSuccess%", 100 * float64(w.numSuccess) / float64(w.numTotal),
-		"numRevert", w.numRevert, "numRevert%", 100 * float64(w.numRevert) / float64(w.numTotal),
-		"numSkipped", w.numSkipped, "numSkipped%", 100 * float64(w.numSkipped) / float64(w.numTotal),
+		"numSuccess", w.numSuccess, "numSuccess%", 100*float64(w.numSuccess)/float64(w.numTotal),
+		"numRevert", w.numRevert, "numRevert%", 100*float64(w.numRevert)/float64(w.numTotal),
+		"numSkipped", w.numSkipped, "numSkipped%", 100*float64(w.numSkipped)/float64(w.numTotal),
 	)
 
 	// do not produce empty blocks
