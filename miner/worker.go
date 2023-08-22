@@ -229,6 +229,7 @@ type worker struct {
 	numSuccess uint64
 	numRevert  uint64
 	numSkipped uint64
+	startTime  int64
 
 	// Test hooks
 	newTaskHook  func(*task)                        // Method to call upon receiving a new sealing task.
@@ -289,6 +290,7 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 			log.Crit("Failed to open transaction file", "file", config.TxFile, "err", err)
 		}
 		worker.transactionsFile = file
+		worker.startTime = time.Now().Unix()
 	} else {
 		log.Warn("No transactions file provided")
 	}
@@ -1432,12 +1434,15 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 		}
 	}
 
+	elapsed := time.Now().Unix() - w.startTime
+
 	log.Info(
 		"Replay stats",
 		"numTotal", w.numTotal,
 		"numSuccess", w.numSuccess, "numSuccess%", 100*float64(w.numSuccess)/float64(w.numTotal),
 		"numRevert", w.numRevert, "numRevert%", 100*float64(w.numRevert)/float64(w.numTotal),
 		"numSkipped", w.numSkipped, "numSkipped%", 100*float64(w.numSkipped)/float64(w.numTotal),
+		"rate (tx/s)", float64(w.numTotal)/float64(elapsed),
 	)
 
 	// do not produce empty blocks
