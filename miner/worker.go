@@ -1369,6 +1369,11 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	count := 0
 
 	for {
+		if !w.isRunning() {
+			log.Info("Terminating block", "count", count)
+			break;
+		}
+
 		log.Trace("Tx reading loop", "w.current.nextLine", w.current.nextLine, "count", count)
 
 		// read and parse next tx
