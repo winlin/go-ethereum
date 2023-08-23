@@ -1056,6 +1056,8 @@ loop:
 		}
 		if !w.chainConfig.Scroll.IsValidL2TxCount(l2TxCount) {
 			log.Trace("Transaction count limit reached", "have", w.current.tcount-w.current.l1TxCount, "want", w.chainConfig.Scroll.MaxTxPerBlock)
+			sealBlock = true
+			txAction = TxActionNotProcessed
 			break
 		}
 		if tx.IsL1MessageTx() && tx.AsL1MessageTx().QueueIndex != w.current.nextL1MsgIndex {
