@@ -186,6 +186,11 @@ func (miner *Miner) SetExtra(extra []byte) error {
 	return nil
 }
 
+func (miner *Miner) SetCircuitCapacity(check bool) error {
+	miner.worker.setCircuitCapacity(check)
+	return nil
+}
+
 // SetRecommitInterval sets the interval for sealing work resubmitting.
 func (miner *Miner) SetRecommitInterval(interval time.Duration) {
 	miner.worker.setRecommitInterval(interval)

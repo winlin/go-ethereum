@@ -220,6 +220,7 @@ type worker struct {
 	isLocalBlock func(block *types.Block) bool // Function used to determine whether the specified block is mined by local miner.
 
 	circuitCapacityChecker *circuitcapacitychecker.CircuitCapacityChecker
+	checkCircuitCapacity   bool
 
 	// transactions file scanner
 	transactionsFile *os.File
@@ -358,6 +359,13 @@ func (w *worker) setExtra(extra []byte) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.extra = extra
+}
+
+//
+func (w *worker) setCircuitCapacity(check bool) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.checkCircuitCapacity = check
 }
 
 // setRecommitInterval updates the interval for miner sealing work recommitting.
@@ -934,7 +942,7 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	var accRows *types.RowConsumption
 
 	// do not do CCC checks on follower nodes
-	if w.isRunning() {
+	if w.isRunning() && w.checkCircuitCapacity {
 		snap := w.current.state.Snapshot()
 
 		log.Trace(
@@ -1371,7 +1379,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	for {
 		if !w.isRunning() {
 			log.Info("Terminating block", "count", count)
-			break;
+			break
 		}
 
 		log.Trace("Tx reading loop", "w.current.nextLine", w.current.nextLine, "count", count)

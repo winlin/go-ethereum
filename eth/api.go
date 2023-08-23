@@ -120,6 +120,14 @@ func (api *PrivateMinerAPI) SetExtra(extra string) (bool, error) {
 	return true, nil
 }
 
+// SetCircuitCapacity
+func (api *PrivateMinerAPI) SetCircuitCapacity(check bool) (bool, error) {
+	if err := api.e.Miner().SetCircuitCapacity(check); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 // SetGasPrice sets the minimum accepted gas price for the miner.
 func (api *PrivateMinerAPI) SetGasPrice(gasPrice hexutil.Big) bool {
 	api.e.lock.Lock()
