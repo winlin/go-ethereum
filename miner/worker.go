@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"math/big"
 	"os"
@@ -1383,6 +1384,22 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	var nextTx *types.Transaction
 	count := 0
 
+	// enable CCC
+	if w.config.CCCStartIndex != nil {
+		oldValue := w.checkCircuitCapacity
+		w.checkCircuitCapacity = *w.config.CCCStartIndex <= nextIndex
+
+		if oldValue != w.checkCircuitCapacity {
+			log.Warn(fmt.Sprintf(`
+########## TOGGLE CCC CHECK #########
+Check: %v
+Index: %v
+CCCStartIndex: %v
+#####################################
+`, w.checkCircuitCapacity, nextIndex, *w.config.CCCStartIndex))
+		}
+	}
+
 	for {
 		if !w.isRunning() {
 			log.Info("Terminating block", "count", count)
@@ -1478,7 +1495,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 func (w *worker) commit(uncles []*types.Header, interval func(), update bool, start time.Time) error {
 	// set w.current.accRows for empty-but-not-genesis block
 	if (w.current.header.Number.Uint64() != 0) &&
-		(w.current.accRows == nil || len(*w.current.accRows) == 0) && w.isRunning() {
+		(w.current.accRows == nil || len(*w.current.accRows) == 0) && w.isRunning() && w.checkCircuitCapacity {
 		log.Trace(
 			"Worker apply ccc for empty block",
 			"id", w.circuitCapacityChecker.ID,
