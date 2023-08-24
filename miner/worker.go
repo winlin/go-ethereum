@@ -225,6 +225,7 @@ type worker struct {
 
 	// transactions file scanner
 	transactionsFile *os.File
+	scanner          *bufio.Scanner
 
 	// replay stats
 	numTotal   uint64
@@ -318,6 +319,11 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 }
 
 func (w *worker) scanFrom(nextIndex uint64) *bufio.Scanner {
+	// if we're already at the correct line, just continue
+	if w.current.nextLine == nextIndex {
+		return w.scanner
+	}
+
 	// seek to file beginning
 	_, err := w.transactionsFile.Seek(0, io.SeekStart)
 	if err != nil {
@@ -1379,8 +1385,8 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 
 	nextIndex := rawdb.ReadNextReplayIndex(w.eth.ChainDb(), header.ParentHash)
 	log.Trace("rawdb.ReadNextReplayIndex", "nextIndex", nextIndex, "header.ParentHash", header.ParentHash.String())
+	w.scanner = w.scanFrom(nextIndex)
 	w.current.nextLine = nextIndex
-	scanner := w.scanFrom(nextIndex)
 	var nextTx *types.Transaction
 	count := 0
 
@@ -1410,11 +1416,11 @@ CCCStartIndex: %v
 
 		// read and parse next tx
 		if nextTx == nil {
-			if hasMore := scanner.Scan(); !hasMore {
+			if hasMore := w.scanner.Scan(); !hasMore {
 				log.Info("No more transactions")
 				break
 			}
-			line := scanner.Text()
+			line := w.scanner.Text()
 			var txInfo TxInfo
 			err = json.Unmarshal([]byte(line), &txInfo)
 			if err != nil {
