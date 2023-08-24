@@ -119,9 +119,6 @@ type environment struct {
 	traceEnv       *core.TraceEnv        // env for tracing
 	accRows        *types.RowConsumption // accumulated row consumption for a block
 	nextL1MsgIndex uint64                // next L1 queue index to be processed
-
-	// replay
-	nextLine uint64
 }
 
 // task contains all information for consensus engine sealing and result submitting.
@@ -226,6 +223,8 @@ type worker struct {
 	// transactions file scanner
 	transactionsFile *os.File
 	scanner          *bufio.Scanner
+	nextTx           *types.Transaction
+	nextLine         uint64
 
 	// replay stats
 	numTotal   uint64
@@ -321,9 +320,11 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 
 func (w *worker) scanFrom(nextIndex uint64) *bufio.Scanner {
 	// if we're already at the correct line, just continue
-	if w.current.nextLine != 0 && w.current.nextLine == nextIndex {
+	if w.nextLine != 0 && w.nextLine == nextIndex {
 		return w.scanner
 	}
+
+	log.Error("Preparing to rewind scanner", "w.nextLine", w.nextLine, "nextIndex", nextIndex)
 
 	// seek to file beginning
 	_, err := w.transactionsFile.Seek(0, io.SeekStart)
@@ -1383,8 +1384,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	log.Trace("rawdb.ReadNextReplayIndex", "nextIndex", nextIndex, "header.ParentHash", header.ParentHash.String())
 
 	w.scanner = w.scanFrom(nextIndex)
-	w.current.nextLine = nextIndex
-	var nextTx *types.Transaction
+	w.nextLine = nextIndex
 	count := 0
 
 	// enable CCC
@@ -1414,10 +1414,10 @@ CCCStartIndex: %v
 			break
 		}
 
-		log.Trace("Tx reading loop", "w.current.nextLine", w.current.nextLine, "count", count)
+		log.Trace("Tx reading loop", "w.nextLine", w.nextLine, "count", count)
 
 		// read and parse next tx
-		if nextTx == nil {
+		if w.nextTx == nil {
 			if hasMore := w.scanner.Scan(); !hasMore {
 				log.Info("No more transactions")
 				break
@@ -1432,12 +1432,12 @@ CCCStartIndex: %v
 			if err := tx.UnmarshalBinary(txInfo.Raw); err != nil {
 				log.Crit("Failed to unmarshal raw transaction", "err", err)
 			}
-			nextTx = tx
-			log.Trace("Read next tx done", "hash", nextTx.Hash().String())
+			w.nextTx = tx
+			log.Trace("Read next tx done", "hash", w.nextTx.Hash().String())
 		}
 
 		// convert into transaction set
-		tx := nextTx
+		tx := w.nextTx
 		txs := make(map[common.Address]types.Transactions)
 		acc, _ := types.Sender(w.current.signer, tx)
 		txs[acc] = types.Transactions{tx}
@@ -1458,16 +1458,16 @@ CCCStartIndex: %v
 			} else {
 				w.numSuccess++
 			}
-			log.Warn("Transaction processed", "index", w.current.nextLine, "status", status, "hash", tx.Hash().String())
-			nextTx = nil
-			w.current.nextLine++
+			log.Warn("Transaction processed", "index", w.nextLine, "status", status, "hash", tx.Hash().String())
+			w.nextTx = nil
+			w.nextLine++
 			count++
 		} else if txAction == TxActionSkipped {
 			w.numTotal++
 			w.numSkipped++
-			log.Error("Transaction skipped", "index", w.current.nextLine, "hash", tx.Hash().String())
-			nextTx = nil
-			w.current.nextLine++
+			log.Error("Transaction skipped", "index", w.nextLine, "hash", tx.Hash().String())
+			w.nextTx = nil
+			w.nextLine++
 		}
 		if sealBlock && count == 0 {
 			w.circuitCapacityChecker.Reset()
@@ -1546,7 +1546,7 @@ func (w *worker) commit(uncles []*types.Header, interval func(), update bool, st
 			interval()
 		}
 		select {
-		case w.taskCh <- &task{receipts: receipts, state: s, block: block, createdAt: time.Now(), accRows: w.current.accRows, nextL1MsgIndex: w.current.nextL1MsgIndex, nextLine: w.current.nextLine}:
+		case w.taskCh <- &task{receipts: receipts, state: s, block: block, createdAt: time.Now(), accRows: w.current.accRows, nextL1MsgIndex: w.current.nextL1MsgIndex, nextLine: w.nextLine}:
 			w.unconfirmed.Shift(block.NumberU64() - 1)
 			log.Info("Commit new mining work", "number", block.Number(), "sealhash", w.engine.SealHash(block.Header()),
 				"uncles", len(uncles), "txs", w.current.tcount,
