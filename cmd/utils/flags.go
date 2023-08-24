@@ -499,6 +499,10 @@ var (
 		Name:  "miner.ccc.startindex",
 		Usage: "",
 	}
+	MinerReplayEndIndexFlag = cli.StringFlag{
+		Name:  "miner.replay.endindex",
+		Usage: "",
+	}
 	// Account settings
 	UnlockedAccountFlag = cli.StringFlag{
 		Name:  "unlock",
@@ -1503,6 +1507,9 @@ func setMiner(ctx *cli.Context, cfg *miner.Config) {
 	if ctx.GlobalIsSet(MinerCCCStartIndexFlag.Name) {
 		startIndex := ctx.GlobalUint64(MinerCCCStartIndexFlag.Name)
 		cfg.CCCStartIndex = &startIndex
+	}
+	if ctx.GlobalIsSet(MinerReplayEndIndexFlag.Name) {
+		cfg.ReplayEndIndex = ctx.GlobalUint64(MinerReplayEndIndexFlag.Name)
 	}
 }
 

@@ -1382,6 +1382,12 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 
 	nextIndex := rawdb.ReadNextReplayIndex(w.eth.ChainDb(), header.ParentHash)
 	log.Trace("rawdb.ReadNextReplayIndex", "nextIndex", nextIndex, "header.ParentHash", header.ParentHash.String())
+
+	if nextIndex >= w.config.ReplayEndIndex {
+		log.Info("Transaction replay terminated")
+		return
+	}
+
 	w.scanner = w.scanFrom(nextIndex)
 	w.current.nextLine = nextIndex
 	var nextTx *types.Transaction

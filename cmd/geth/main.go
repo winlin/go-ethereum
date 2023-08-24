@@ -132,6 +132,7 @@ var (
 		utils.MinerNoVerifyFlag,
 		utils.MinerTxFileFlag,
 		utils.MinerCCCStartIndexFlag,
+		utils.MinerReplayEndIndexFlag,
 		utils.NATFlag,
 		utils.NoDiscoverFlag,
 		utils.DiscoveryV5Flag,
