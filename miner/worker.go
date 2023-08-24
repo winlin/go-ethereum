@@ -233,6 +233,7 @@ type worker struct {
 	numRevert  uint64
 	numSkipped uint64
 	startTime  int64
+	numSealed  uint64
 
 	// Test hooks
 	newTaskHook  func(*task)                        // Method to call upon receiving a new sealing task.
@@ -1473,6 +1474,7 @@ CCCStartIndex: %v
 		}
 		if sealBlock || count == 100 {
 			log.Info("Sealing block", "count", count)
+			w.numSealed++
 			break
 		}
 	}
@@ -1486,6 +1488,7 @@ CCCStartIndex: %v
 		"numRevert", w.numRevert, "numRevert%", 100*float64(w.numRevert)/float64(w.numTotal),
 		"numSkipped", w.numSkipped, "numSkipped%", 100*float64(w.numSkipped)/float64(w.numTotal),
 		"rate (tx/s)", float64(w.numTotal)/float64(elapsed),
+		"tx/block", float64(w.numTotal-w.numSkipped)/float64(w.numSealed),
 	)
 
 	// do not produce empty blocks
