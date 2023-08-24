@@ -209,11 +209,22 @@ func (env *TraceEnv) GetBlockTrace(block *types.Block) (*types.BlockTrace, error
 	close(jobs)
 	pend.Wait()
 
+	// If execution failed in between, abort
+	select {
+	case err := <-errCh:
+		return nil, err
+	default:
+		if failed != nil {
+			return nil, failed
+		}
+	}
+
 	// after all tx has been traced, collect "deletion proof" for zktrie
 	for _, tracer := range env.ZkTrieTracer {
 		delProofs, err := tracer.GetDeletionProofs()
 		if err != nil {
 			log.Error("deletion proof failure", "error", err)
+			return nil, err
 		} else {
 			for _, proof := range delProofs {
 				env.DeletionProofs = append(env.DeletionProofs, proof)
@@ -225,16 +236,6 @@ func (env *TraceEnv) GetBlockTrace(block *types.Block) (*types.BlockTrace, error
 	for _, txStorageTrace := range env.TxStorageTraces {
 		if txStorageTrace != nil {
 			txStorageTrace.DeletionProofs = env.DeletionProofs
-		}
-	}
-
-	// If execution failed in between, abort
-	select {
-	case err := <-errCh:
-		return nil, err
-	default:
-		if failed != nil {
-			return nil, failed
 		}
 	}
 
@@ -466,6 +467,7 @@ func (env *TraceEnv) fillBlockTrace(block *types.Block) (*types.BlockTrace, erro
 		if _, existed := env.Proofs[addr.String()]; !existed {
 			if proof, err := statedb.GetProof(addr); err != nil {
 				log.Error("Proof for intrinstic address not available", "error", err, "address", addr)
+				return nil, err
 			} else {
 				wrappedProof := make([]hexutil.Bytes, len(proof))
 				for i, bt := range proof {
@@ -483,8 +485,10 @@ func (env *TraceEnv) fillBlockTrace(block *types.Block) (*types.BlockTrace, erro
 			if _, existed := env.StorageProofs[addr.String()][slot.String()]; !existed {
 				if trie, err := statedb.GetStorageTrieForProof(addr); err != nil {
 					log.Error("Storage proof for intrinstic address not available", "error", err, "address", addr)
+					return nil, err
 				} else if proof, _ := statedb.GetSecureTrieProof(trie, slot); err != nil {
 					log.Error("Get storage proof for intrinstic address failed", "error", err, "address", addr, "slot", slot)
+					return nil, err
 				} else {
 					wrappedProof := make([]hexutil.Bytes, len(proof))
 					for i, bt := range proof {
@@ -538,6 +542,7 @@ func (env *TraceEnv) fillBlockTrace(block *types.Block) (*types.BlockTrace, erro
 		// MPTWitness will be removed from traces in the future.
 		if err := zkproof.FillBlockTraceForMPTWitness(zkproof.MPTWitnessNothing, blockTrace); err != nil {
 			log.Error("fill mpt witness fail", "error", err)
+			return nil, err
 		}
 	}
 
