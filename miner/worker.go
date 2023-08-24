@@ -321,7 +321,7 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 
 func (w *worker) scanFrom(nextIndex uint64) *bufio.Scanner {
 	// if we're already at the correct line, just continue
-	if w.current.nextLine == nextIndex {
+	if w.current.nextLine != 0 && w.current.nextLine == nextIndex {
 		return w.scanner
 	}
 
@@ -1383,11 +1383,6 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	nextIndex := rawdb.ReadNextReplayIndex(w.eth.ChainDb(), header.ParentHash)
 	log.Trace("rawdb.ReadNextReplayIndex", "nextIndex", nextIndex, "header.ParentHash", header.ParentHash.String())
 
-	if nextIndex >= w.config.ReplayEndIndex {
-		log.Info("Transaction replay terminated")
-		return
-	}
-
 	w.scanner = w.scanFrom(nextIndex)
 	w.current.nextLine = nextIndex
 	var nextTx *types.Transaction
@@ -1410,6 +1405,11 @@ CCCStartIndex: %v
 	}
 
 	for {
+		if nextIndex >= w.config.ReplayEndIndex {
+			log.Info("Transaction replay terminated")
+			break
+		}
+
 		if !w.isRunning() {
 			log.Info("Terminating block", "count", count)
 			break
