@@ -1234,7 +1234,7 @@ loop:
 				log.Info("Skipping L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "strange error", "err", err)
 				w.current.nextL1MsgIndex = queueIndex + 1
 			}
-			sealBlock = true
+			sealBlock = false
 			txAction = TxActionSkipped
 			break loop
 		}
