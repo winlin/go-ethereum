@@ -1153,7 +1153,6 @@ loop:
 				// only consider block size limit for L2 transactions
 				w.current.blockSize += tx.Size()
 			}
-			w.current.tcount++
 			sealBlock = false
 			txAction = TxActionExecuted
 			break loop
