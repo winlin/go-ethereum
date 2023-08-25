@@ -331,12 +331,16 @@ func (w *worker) scanFrom(nextIndex uint64) *bufio.Scanner {
 	if err != nil {
 		log.Crit("Failed to rewind file")
 	}
+	// create new scanner
 	scanner := bufio.NewScanner(w.transactionsFile)
+	// set buffer
+	buf := make([]byte, 0, 64*1024)
+	scanner.Buffer(buf, 130*1024*1024) // 130KB/tx
 	// skip already replayed txs
 	log.Info("Rewinding scanner...")
 	for nextIndex > 0 {
 		if hasMore := scanner.Scan(); !hasMore {
-			log.Crit("File too short", "file", w.config.TxFile, "nextIndex", nextIndex)
+			log.Crit("File too short", "file", w.config.TxFile, "nextIndex", nextIndex, "err", scanner.Err())
 		}
 		nextIndex--
 	}
@@ -1419,18 +1423,18 @@ CCCStartIndex: %v
 		// read and parse next tx
 		if w.nextTx == nil {
 			if hasMore := w.scanner.Scan(); !hasMore {
-				log.Info("No more transactions")
+				log.Info("No more transactions", "index", w.nextLine, "err", w.scanner.Err())
 				break
 			}
 			line := w.scanner.Text()
 			var txInfo TxInfo
 			err = json.Unmarshal([]byte(line), &txInfo)
 			if err != nil {
-				log.Crit("Failed to unmarshal transaction", "err", err)
+				log.Crit("Failed to unmarshal transaction", "index", w.nextLine, "err", err, "scannerRrr", w.scanner.Err())
 			}
 			tx := new(types.Transaction)
 			if err := tx.UnmarshalBinary(txInfo.Raw); err != nil {
-				log.Crit("Failed to unmarshal raw transaction", "err", err)
+				log.Crit("Failed to unmarshal raw transaction", "index", w.nextLine, "err", err, "scannerRrr", w.scanner.Err())
 			}
 			w.nextTx = tx
 			log.Trace("Read next tx done", "hash", w.nextTx.Hash().String())
