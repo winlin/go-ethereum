@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"os"
 	"runtime"
 	"strconv"
@@ -31,10 +32,12 @@ import (
 	"github.com/scroll-tech/go-ethereum/cmd/utils"
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
+	"github.com/scroll-tech/go-ethereum/consensus/clique"
 	"github.com/scroll-tech/go-ethereum/core"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/state"
 	"github.com/scroll-tech/go-ethereum/core/types"
+	"github.com/scroll-tech/go-ethereum/core/vm"
 	"github.com/scroll-tech/go-ethereum/crypto"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/log"
@@ -131,6 +134,17 @@ Optional second and third arguments control the first and
 last block to write. In this mode, the file will be appended
 if already existing. If the file ends with .gz, the output will
 be gzipped.`,
+	}
+	traceTxCommand = cli.Command{
+		Action:    utils.MigrateFlags(traceTx),
+		Name:      "trace-tx",
+		Usage:     "Trace transaction",
+		ArgsUsage: "<genesisfile> <tx-file> <traces-file>",
+		Flags: []cli.Flag{
+			utils.DataDirFlag,
+		},
+		Category:    "BLOCKCHAIN COMMANDS",
+		Description: "",
 	}
 	importPreimagesCommand = cli.Command{
 		Action:    utils.MigrateFlags(importPreimages),
@@ -349,6 +363,103 @@ func exportChain(ctx *cli.Context) error {
 		utils.Fatalf("Export error: %v\n", err)
 	}
 	fmt.Printf("Export done in %v\n", time.Since(start))
+	return nil
+}
+
+func traceTx(ctx *cli.Context) error {
+	if len(ctx.Args()) < 3 {
+		utils.Fatalf("This command requires an argument.")
+	}
+
+	genesisPath := ctx.Args().Get(0)
+	txFile := ctx.Args().Get(1)
+	tracesFile := ctx.Args().Get(2)
+
+	stack, _ := makeConfigNode(ctx)
+	defer stack.Close()
+
+	// initialize genesis
+	genesisFile, err := os.Open(genesisPath)
+	if err != nil {
+		utils.Fatalf("Failed to read genesis file: %v", err)
+	}
+	defer genesisFile.Close()
+	genesis := new(core.Genesis)
+	if err := json.NewDecoder(genesisFile).Decode(genesis); err != nil {
+		utils.Fatalf("invalid genesis file: %v", err)
+	}
+	chaindb, err := stack.OpenDatabase("chaindata", 0, 0, "", false)
+	defer chaindb.Close()
+	if err != nil {
+		utils.Fatalf("Failed to open database: %v", err)
+	}
+	config, hash, err := core.SetupGenesisBlock(chaindb, genesis)
+	if err != nil {
+		utils.Fatalf("Failed to write genesis block: %v", err)
+	}
+	log.Info("Successfully wrote genesis state", "database", "chaindata", "hash", hash.Hex())
+
+	log.Info("Parsing transaction", "file", txFile)
+	jsonStr, err := os.ReadFile(txFile)
+	if err != nil {
+		utils.Fatalf("Failed to open transaction file %s: %v", txFile, err)
+	}
+	var rawTx []byte
+	if err := json.Unmarshal(jsonStr, &rawTx); err != nil {
+		utils.Fatalf("Failed to unmarshal raw transaction as json: %v", err)
+	}
+	tx := new(types.Transaction)
+	if err := tx.UnmarshalBinary(rawTx); err != nil {
+		utils.Fatalf("Failed to unmarshal raw transaction: %v", err)
+	}
+	log.Info("Read transaction", "hash", tx.Hash().Hex())
+
+	engine := clique.New(config.Clique, chaindb)
+	vmcfg := vm.Config{}
+	blockchain, err := core.NewBlockChain(chaindb, nil, config, engine, vmcfg, nil, nil, false)
+	if err != nil {
+		log.Crit("Can't create BlockChain", "err", err)
+	}
+
+	genesisBlock := genesis.ToBlock(chaindb)
+	header := &types.Header{
+		ParentHash: genesisBlock.Hash(),
+		Number:     big.NewInt(1), // TODO
+		GasLimit:   genesisBlock.GasLimit(),
+		Extra:      nil,
+		Time:       genesisBlock.Time(),
+		Difficulty: big.NewInt(0),
+	}
+	block := types.NewBlockWithHeader(header).WithBody([]*types.Transaction{tx}, nil)
+
+	state, err := blockchain.StateAt(genesisBlock.Root())
+	if err != nil {
+		log.Crit("Failed to initialize state", "err", err)
+	}
+	traceEnv, err := core.CreateTraceEnv(config, blockchain, engine, chaindb, state, genesisBlock, block, false)
+	if err != nil {
+		log.Crit("Failed to create traceEnv", "err", err)
+	}
+	snap := state.Snapshot()
+	traces, err := traceEnv.GetBlockTrace(block)
+	if err != nil {
+		log.Crit("Failed to trace block", "err", err)
+	}
+	log.Info("Tracing completed")
+	state.RevertToSnapshot(snap)
+
+	gasPool := new(core.GasPool).AddGas(header.GasLimit)
+	receipt, err := core.ApplyTransaction(config, blockchain, &common.Address{}, gasPool, state, header, tx, &header.GasUsed, *blockchain.GetVMConfig())
+	if err != nil {
+		log.Crit("Failed to execute transaction", "err", err)
+	}
+	if receipt.Status != types.ReceiptStatusSuccessful {
+		log.Crit("Failed to execute transaction", "err", "execution reverted")
+	}
+
+	tracesJson, err := json.Marshal(traces)
+	os.WriteFile(tracesFile, tracesJson, 0644)
+
 	return nil
 }
 

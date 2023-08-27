@@ -219,6 +219,7 @@ func init() {
 		initCommand,
 		importCommand,
 		exportCommand,
+		traceTxCommand,
 		importPreimagesCommand,
 		exportPreimagesCommand,
 		removedbCommand,
