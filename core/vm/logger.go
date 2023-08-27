@@ -294,6 +294,7 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 			extraData := structLog.getOrInitExtraData()
 			wrappedStatus := getWrappedAccountForAddr(l, address)
 			extraData.StateList = append(extraData.StateList, wrappedStatus)
+			l.statesAffected[address] = struct{}{}
 		}
 	}
 
