@@ -277,7 +277,7 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 	}
 
 	// in reality it is impossible for CREATE to trigger ErrContractAddressCollision
-	if op == CREATE2 && stack.len() >= 4 {
+	if op == CREATE2 && opErr == nil {
 		_ = stack.data[stack.len()-1] // value
 		offset := stack.data[stack.len()-2]
 		size := stack.data[stack.len()-3]
