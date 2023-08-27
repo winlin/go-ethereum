@@ -276,9 +276,8 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 		extraData.Caller = append(extraData.Caller, getWrappedAccountForAddr(l, scope.Contract.Address()))
 	}
 
-	switch op {
 	// in reality it is impossible for CREATE to trigger ErrContractAddressCollision
-	case CREATE2:
+	if op == CREATE2 && stack.len() >= 4 {
 		_ = stack.data[stack.len()-1] // value
 		offset := stack.data[stack.len()-2]
 		size := stack.data[stack.len()-3]
