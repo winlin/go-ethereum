@@ -23,6 +23,7 @@ import (
 	"os"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -404,17 +405,14 @@ func traceTx(ctx *cli.Context) error {
 	}
 
 	// parse transaction
-	log.Info("Parsing transaction", "file", txFile)
-	jsonStr, err := os.ReadFile(txFile)
+	rawTx, err := os.ReadFile(txFile)
 	if err != nil {
 		utils.Fatalf("Failed to open transaction file %s: %v", txFile, err)
 	}
-	var rawTx []byte
-	if err := json.Unmarshal(jsonStr, &rawTx); err != nil {
-		utils.Fatalf("Failed to unmarshal raw transaction as json: %v", err)
-	}
+
+	rawTx2 := common.FromHex(strings.TrimRight(string(rawTx), "\r\n"))
 	tx := new(types.Transaction)
-	if err := tx.UnmarshalBinary(rawTx); err != nil {
+	if err := tx.UnmarshalBinary(rawTx2); err != nil {
 		utils.Fatalf("Failed to unmarshal raw transaction: %v", err)
 	}
 	log.Info("Successfully read transaction", "hash", tx.Hash().Hex())
