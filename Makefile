@@ -37,7 +37,6 @@ ios:
 	@echo "Import \"$(GOBIN)/Geth.framework\" to use the library."
 
 test: all
-	git submodule update --init --recursive
 	# genesis test
 	cd ${PWD}/cmd/geth; go test -test.run TestCustomGenesis
 	# module test
