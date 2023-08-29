@@ -1105,7 +1105,7 @@ loop:
 					// Skip L2 transaction and all other transactions from the same sender account
 					log.Info("Skipping L2 message", "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "first tx row consumption overflow")
 					txs.Pop()
-					w.skippedL2Txs[tx.Hash()] = struct{}{}
+					// w.skippedL2Txs[tx.Hash()] = struct{}{}
 				}
 
 				// Reset ccc so that we can process other transactions for this block
@@ -1141,7 +1141,7 @@ loop:
 			// Normally we would do `txs.Pop()` here.
 			// However, after `ErrUnknown`, ccc might remain in an
 			// inconsistent state, so we cannot pack more transactions.
-			w.skippedL2Txs[tx.Hash()] = struct{}{}
+			// w.skippedL2Txs[tx.Hash()] = struct{}{}
 			circuitCapacityReached = true
 			break loop
 
