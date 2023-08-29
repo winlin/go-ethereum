@@ -606,7 +606,7 @@ func testGenerateBlockWithL1Msg(t *testing.T, isClique bool) {
 	}
 }
 
-func TestExcludeL1MsgFromTxlimit(t *testing.T) {
+func TestAcceptableTxlimit(t *testing.T) {
 	assert := assert.New(t)
 	var (
 		engine      consensus.Engine
@@ -617,8 +617,72 @@ func TestExcludeL1MsgFromTxlimit(t *testing.T) {
 	chainConfig.Clique = &params.CliqueConfig{Period: 1, Epoch: 30000}
 	engine = clique.New(chainConfig.Clique, db)
 
-	// Set maxTxPerBlock = 2 and NumL1MessagesPerBlock = 2
-	maxTxPerBlock := 2
+	// Set maxTxPerBlock = 4, which >= non-l1msg + non-skipped l1msg txs
+	maxTxPerBlock := 4
+	chainConfig.Scroll.MaxTxPerBlock = &maxTxPerBlock
+	chainConfig.Scroll.L1Config = &params.L1Config{
+		NumL1MessagesPerBlock: 3,
+	}
+
+	// Insert 3 l1msgs, with one be skipped.
+	l1msgs := []types.L1MessageTx{
+		{QueueIndex: 0, Gas: 10000000, To: &common.Address{3}, Data: []byte{0x01}, Sender: common.Address{4}}, // over gas limit
+		{QueueIndex: 1, Gas: 21016, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{4}},
+		{QueueIndex: 2, Gas: 21016, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}}}
+	rawdb.WriteL1Messages(db, l1msgs)
+
+	chainConfig.LondonBlock = big.NewInt(0)
+	w, b := newTestWorker(t, chainConfig, engine, db, 0)
+	defer w.close()
+
+	// This test chain imports the mined blocks.
+	b.genesis.MustCommit(db)
+	chain, _ := core.NewBlockChain(db, nil, b.chain.Config(), engine, vm.Config{
+		Debug:  true,
+		Tracer: vm.NewStructLogger(&vm.LogConfig{EnableMemory: true, EnableReturnData: true})}, nil, nil, false)
+	defer chain.Stop()
+
+	// Ignore empty commit here for less noise.
+	w.skipSealHook = func(task *task) bool {
+		return len(task.receipts) == 0
+	}
+
+	// Wait for mined blocks.
+	sub := w.mux.Subscribe(core.NewMinedBlockEvent{})
+	defer sub.Unsubscribe()
+
+	// Insert 2 non-l1msg txs
+	b.txPool.AddLocal(b.newRandomTx(true))
+	b.txPool.AddLocal(b.newRandomTx(false))
+
+	// Start mining!
+	w.start()
+
+	select {
+	case ev := <-sub.Chan():
+		block := ev.Data.(core.NewMinedBlockEvent).Block
+		if _, err := chain.InsertChain([]*types.Block{block}); err != nil {
+			t.Fatalf("failed to insert new mined block %d: %v", block.NumberU64(), err)
+		}
+		assert.Equal(4, len(block.Transactions()))
+	case <-time.After(3 * time.Second):
+		t.Fatalf("timeout")
+	}
+}
+
+func TestUnacceptableTxlimit(t *testing.T) {
+	assert := assert.New(t)
+	var (
+		engine      consensus.Engine
+		chainConfig *params.ChainConfig
+		db          = rawdb.NewMemoryDatabase()
+	)
+	chainConfig = params.AllCliqueProtocolChanges
+	chainConfig.Clique = &params.CliqueConfig{Period: 1, Epoch: 30000}
+	engine = clique.New(chainConfig.Clique, db)
+
+	// Set maxTxPerBlock = 3, which < non-l1msg + l1msg txs
+	maxTxPerBlock := 3
 	chainConfig.Scroll.MaxTxPerBlock = &maxTxPerBlock
 	chainConfig.Scroll.L1Config = &params.L1Config{
 		NumL1MessagesPerBlock: 2,
@@ -663,7 +727,7 @@ func TestExcludeL1MsgFromTxlimit(t *testing.T) {
 		if _, err := chain.InsertChain([]*types.Block{block}); err != nil {
 			t.Fatalf("failed to insert new mined block %d: %v", block.NumberU64(), err)
 		}
-		assert.Equal(4, len(block.Transactions()))
+		assert.Equal(3, len(block.Transactions()))
 	case <-time.After(3 * time.Second):
 		t.Fatalf("timeout")
 	}
@@ -680,6 +744,8 @@ func TestL1MsgCorrectOrder(t *testing.T) {
 	chainConfig.Clique = &params.CliqueConfig{Period: 1, Epoch: 30000}
 	engine = clique.New(chainConfig.Clique, db)
 
+	maxTxPerBlock := 4
+	chainConfig.Scroll.MaxTxPerBlock = &maxTxPerBlock
 	chainConfig.Scroll.L1Config = &params.L1Config{
 		NumL1MessagesPerBlock: 10,
 	}
@@ -744,6 +810,8 @@ func l1MessageTest(t *testing.T, msgs []types.L1MessageTx, withL2Tx bool, callba
 	chainConfig = params.AllCliqueProtocolChanges
 	chainConfig.Clique = &params.CliqueConfig{Period: 1, Epoch: 30000}
 	engine = clique.New(chainConfig.Clique, db)
+	maxTxPerBlock := 4
+	chainConfig.Scroll.MaxTxPerBlock = &maxTxPerBlock
 
 	maxPayload := 1024
 	chainConfig.Scroll.MaxTxPayloadBytesPerBlock = &maxPayload
@@ -895,13 +963,13 @@ func TestLargeL1MessageSkipPayloadCheck(t *testing.T) {
 		{QueueIndex: 2, Gas: 21016, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{3}}, // different sender
 	}
 
-	l1MessageTest(t, msgs, false, func(blockNum int, block *types.Block, db ethdb.Database, w *worker) bool {
+	l1MessageTest(t, msgs, true, func(blockNum int, block *types.Block, db ethdb.Database, w *worker) bool {
 		switch blockNum {
 		case 0:
 			return false
 		case 1:
-			// include #0, #1 and #2
-			assert.Equal(3, len(block.Transactions()))
+			// include #0, #1 and #2 + one L2 tx
+			assert.Equal(4, len(block.Transactions()))
 
 			assert.True(block.Transactions()[0].IsL1MessageTx())
 			assert.Equal(uint64(0), block.Transactions()[0].AsL1MessageTx().QueueIndex)
@@ -909,6 +977,10 @@ func TestLargeL1MessageSkipPayloadCheck(t *testing.T) {
 			assert.Equal(uint64(1), block.Transactions()[1].AsL1MessageTx().QueueIndex)
 			assert.True(block.Transactions()[2].IsL1MessageTx())
 			assert.Equal(uint64(2), block.Transactions()[2].AsL1MessageTx().QueueIndex)
+
+			// since L1 messages do not count against the block size limit,
+			// we can include additional L2 transaction
+			assert.False(block.Transactions()[3].IsL1MessageTx())
 
 			// db is updated correctly
 			queueIndex := rawdb.ReadFirstQueueIndexNotInL2Block(db, block.Hash())
@@ -1006,10 +1078,10 @@ func TestOversizedTxThenNormal(t *testing.T) {
 		switch blockNum {
 		case 0:
 			// schedule to skip 2nd call to ccc
-			w.getCCC().ScheduleError(2, circuitcapacitychecker.ErrTxRowConsumptionOverflow)
+			w.getCCC().ScheduleError(2, circuitcapacitychecker.ErrBlockRowConsumptionOverflow)
 			return false
 		case 1:
-			// include #0, skip #1, then terminate
+			// include #0, fail on #1, then seal the block
 			assert.Equal(1, len(block.Transactions()))
 
 			assert.True(block.Transactions()[0].IsL1MessageTx())
@@ -1018,8 +1090,84 @@ func TestOversizedTxThenNormal(t *testing.T) {
 			// db is updated correctly
 			queueIndex := rawdb.ReadFirstQueueIndexNotInL2Block(db, block.Hash())
 			assert.NotNil(queueIndex)
+			assert.Equal(uint64(1), *queueIndex)
+
+			// schedule to skip next call to ccc
+			w.getCCC().ScheduleError(1, circuitcapacitychecker.ErrBlockRowConsumptionOverflow)
+
+			return false
+		case 2:
+			// skip #1, include #2, then seal the block
+			assert.Equal(1, len(block.Transactions()))
+
+			assert.True(block.Transactions()[0].IsL1MessageTx())
+			assert.Equal(uint64(2), block.Transactions()[0].AsL1MessageTx().QueueIndex)
+
+			// db is updated correctly
+			queueIndex := rawdb.ReadFirstQueueIndexNotInL2Block(db, block.Hash())
+			assert.NotNil(queueIndex)
+			assert.Equal(uint64(3), *queueIndex)
+
+			return true
+		default:
+			return true
+		}
+	})
+}
+
+func TestSkippedTransactionDatabaseEntries(t *testing.T) {
+	assert := assert.New(t)
+
+	msgs := []types.L1MessageTx{
+		{QueueIndex: 0, Gas: 10000000, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}}, // over gas limit
+		{QueueIndex: 1, Gas: 21016, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}},
+	}
+
+	l1MessageTest(t, msgs, false, func(blockNum int, block *types.Block, db ethdb.Database, w *worker) bool {
+		switch blockNum {
+		case 0:
+			return false
+		case 1:
+			// skip #0, include #1
+			assert.Equal(1, len(block.Transactions()))
+
+			assert.True(block.Transactions()[0].IsL1MessageTx())
+			assert.Equal(uint64(1), block.Transactions()[0].AsL1MessageTx().QueueIndex)
+
+			// db is updated correctly
+			queueIndex := rawdb.ReadFirstQueueIndexNotInL2Block(db, block.Hash())
+			assert.NotNil(queueIndex)
+
 			assert.Equal(uint64(2), *queueIndex)
 
+			l1msg := rawdb.ReadL1Message(db, 0)
+			assert.NotNil(l1msg)
+			hash := types.NewTx(l1msg).Hash()
+
+			stx := rawdb.ReadSkippedTransaction(db, hash)
+			assert.NotNil(stx)
+			assert.True(stx.Tx.IsL1MessageTx())
+			assert.Equal(uint64(0), stx.Tx.AsL1MessageTx().QueueIndex)
+			assert.Equal("gas limit exceeded", stx.Reason)
+			assert.Equal(block.NumberU64(), stx.BlockNumber)
+			assert.Nil(stx.BlockHash)
+
+			numSkipped := rawdb.ReadNumSkippedTransactions(db)
+			assert.Equal(uint64(1), numSkipped)
+
+			hash2 := rawdb.ReadSkippedTransactionHash(db, 0)
+			assert.NotNil(hash2)
+			assert.Equal(&hash, hash2)
+
+			// iterator API
+			it := rawdb.IterateSkippedTransactionsFrom(db, 0)
+			hasMore := it.Next()
+			assert.True(hasMore)
+			assert.Equal(uint64(0), it.Index())
+			hash3 := it.TransactionHash()
+			assert.Equal(hash, hash3)
+			hasMore = it.Next()
+			assert.False(hasMore)
 			return true
 		default:
 			return true
