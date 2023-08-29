@@ -30,9 +30,6 @@ func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) (*
 			return nil, err
 		}
 	}
-
-	return nil, ErrBlockRowConsumptionOverflow
-
 	return &types.RowConsumption{types.SubCircuitRowUsage{
 		Name:      "mock",
 		RowNumber: 1,

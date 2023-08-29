@@ -947,6 +947,8 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 
 	var coalescedLogs []*types.Log
 
+	log.Info("again111111111111111111111111111111111111111111111")
+
 loop:
 	for {
 		// In the following three cases, we will interrupt the execution of the transaction.
@@ -979,6 +981,8 @@ loop:
 		if tx == nil {
 			break
 		}
+
+		log.Info("again2222222222222222222222222222222222222222")
 
 		// skipped before, due to circuitcapacitychecker.ErrBlockRowConsumptionOverflow or circuitcapacitychecker.ErrUnknown
 		if _,ok:= w.skippedL2Txs[tx.Hash()];ok {
@@ -1022,6 +1026,7 @@ loop:
 		// Start executing the transaction
 		w.current.state.Prepare(tx.Hash(), w.current.tcount)
 
+		log.Info("again3333333333333333333333333333333333333333333333333")
 		logs, err := w.commitTransaction(tx, coinbase)
 		switch {
 		case errors.Is(err, core.ErrGasLimitReached) && tx.IsL1MessageTx():
