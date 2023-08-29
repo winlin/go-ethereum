@@ -1013,6 +1013,7 @@ loop:
 		w.current.state.Prepare(tx.Hash(), w.current.tcount)
 
 		logs, err := w.commitTransaction(tx, coinbase)
+		log.Info("again")
 		switch {
 		case errors.Is(err, core.ErrGasLimitReached) && tx.IsL1MessageTx():
 			// If this block already contains some L1 messages,
