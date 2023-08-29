@@ -50,8 +50,6 @@ func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) (*
 	ccc.Lock()
 	defer ccc.Unlock()
 
-	return nil, ErrBlockRowConsumptionOverflow
-
 	if len(traces.Transactions) != 1 || len(traces.ExecutionResults) != 1 || len(traces.TxStorageTraces) != 1 {
 		log.Error("malformatted BlockTrace in ApplyTransaction", "id", ccc.ID,
 			"len(traces.Transactions)", len(traces.Transactions),
