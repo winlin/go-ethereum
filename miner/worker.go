@@ -200,6 +200,7 @@ type worker struct {
 	isLocalBlock func(block *types.Block) bool // Function used to determine whether the specified block is mined by local miner.
 
 	circuitCapacityChecker *circuitcapacitychecker.CircuitCapacityChecker
+	skippedL2Txs map[common.Hash]struct{}
 
 	// Test hooks
 	newTaskHook  func(*task)                        // Method to call upon receiving a new sealing task.
@@ -977,6 +978,14 @@ loop:
 		if tx == nil {
 			break
 		}
+
+		// skipped before, due to circuitcapacitychecker.ErrBlockRowConsumptionOverflow or circuitcapacitychecker.ErrUnknown
+		if _,ok:= w.skippedL2Txs[tx.Hash()];ok {
+			// skip again, otherwise it will stuck in mempool
+			txs.Shift()
+			continue
+		}
+
 		// If we have collected enough transactions then we're done
 		// Originally we only limit l2txs count, but now strictly limit total txs number.
 		if !w.chainConfig.Scroll.IsValidTxCount(w.current.tcount + 1) {
@@ -1013,7 +1022,6 @@ loop:
 		w.current.state.Prepare(tx.Hash(), w.current.tcount)
 
 		logs, err := w.commitTransaction(tx, coinbase)
-		log.Info("again")
 		switch {
 		case errors.Is(err, core.ErrGasLimitReached) && tx.IsL1MessageTx():
 			// If this block already contains some L1 messages,
@@ -1091,6 +1099,7 @@ loop:
 					// Skip L2 transaction and all other transactions from the same sender account
 					log.Info("Skipping L2 message", "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "first tx row consumption overflow")
 					txs.Pop()
+					w.skippedL2Txs[tx.Hash()] = struct{}{}
 				}
 
 				// Reset ccc so that we can process other transactions for this block
@@ -1126,6 +1135,7 @@ loop:
 			// Normally we would do `txs.Pop()` here.
 			// However, after `ErrUnknown`, ccc might remain in an
 			// inconsistent state, so we cannot pack more transactions.
+			w.skippedL2Txs[tx.Hash()] = struct{}{}
 			circuitCapacityReached = true
 			break loop
 
