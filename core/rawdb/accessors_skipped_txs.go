@@ -3,6 +3,7 @@ package rawdb
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/json"
 	"math/big"
 	"sync"
 
@@ -52,8 +53,10 @@ type SkippedTransaction struct {
 	Tx *types.Transaction
 
 	// Traces is the wrapped traces of the skipped transaction.
-	// We only store it when `MinerStoreSkippedTxTracesFlag` is enabled, so it may return nil.
-	Traces *types.BlockTrace
+	// We only store it when `MinerStoreSkippedTxTracesFlag` is enabled, so it might be empty.
+	// Note that we don't use *types.BlockTrace directly because types.BlockTrace.StorageTrace.Proofs is of
+	// type map[string][]hexutil.Bytes, and is not RLP-serializable.
+	TracesBytes []byte
 
 	// Reason is the skip reason.
 	Reason string
@@ -71,10 +74,14 @@ func writeSkippedTransaction(db ethdb.KeyValueWriter, tx *types.Transaction, tra
 	if blockHash == nil {
 		blockHash = &common.Hash{}
 	}
-	stx := SkippedTransaction{Tx: tx, Traces: traces, Reason: reason, BlockNumber: blockNumber, BlockHash: blockHash}
+	b, err := json.Marshal(traces)
+	if err != nil {
+		log.Crit("Failed to json marshal skipped transaction", "hash", tx.Hash().String(), "err", err)
+	}
+	stx := SkippedTransaction{Tx: tx, TracesBytes: b, Reason: reason, BlockNumber: blockNumber, BlockHash: blockHash}
 	bytes, err := rlp.EncodeToBytes(stx)
 	if err != nil {
-		log.Crit("Failed to RLP encode skipped transaction", "err", err)
+		log.Crit("Failed to RLP encode skipped transaction", "hash", tx.Hash().String(), "err", err)
 	}
 	if err := db.Put(SkippedTransactionKey(tx.Hash()), bytes); err != nil {
 		log.Crit("Failed to store skipped transaction", "hash", tx.Hash().String(), "err", err)

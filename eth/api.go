@@ -19,6 +19,7 @@ package eth
 import (
 	"compress/gzip"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -728,8 +729,14 @@ func (api *ScrollAPI) GetSkippedTransaction(ctx context.Context, hash common.Has
 	if stx == nil {
 		return nil, nil
 	}
+	var traces *types.BlockTrace
+	if len(stx.TracesBytes) != 0 {
+		if err := json.Unmarshal(stx.TracesBytes, traces); err != nil {
+			return nil, fmt.Errorf("fail to Unmarshal traces for skipped tx, hash: %s, err: %w", hash.String(), err)
+		}
+	}
 	var rpcTx RPCTransaction
-	rpcTx.RPCTransaction = *ethapi.NewRPCTransaction(stx.Tx, stx.Traces, common.Hash{}, 0, 0, nil, api.eth.blockchain.Config())
+	rpcTx.RPCTransaction = *ethapi.NewRPCTransaction(stx.Tx, traces, common.Hash{}, 0, 0, nil, api.eth.blockchain.Config())
 	rpcTx.SkipReason = stx.Reason
 	rpcTx.SkipBlockNumber = (*hexutil.Big)(new(big.Int).SetUint64(stx.BlockNumber))
 	rpcTx.SkipBlockHash = stx.BlockHash
