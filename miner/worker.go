@@ -1038,7 +1038,11 @@ loop:
 			log.Info("Skipping L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "gas limit exceeded")
 			w.current.nextL1MsgIndex = queueIndex + 1
 			txs.Shift()
-			rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, "gas limit exceeded", w.current.header.Number.Uint64(), nil)
+			if false {
+				rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, "gas limit exceeded", w.current.header.Number.Uint64(), nil)
+			} else {
+				rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, "gas limit exceeded", w.current.header.Number.Uint64(), nil)
+			}
 			l1TxGasLimitExceededCounter.Inc(1)
 
 		case errors.Is(err, core.ErrGasLimitReached):
@@ -1115,7 +1119,11 @@ loop:
 				circuitCapacityReached = false
 
 				// Store skipped transaction in local db
-				rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, "row consumption overflow", w.current.header.Number.Uint64(), nil)
+				if false {
+					rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, "row consumption overflow", w.current.header.Number.Uint64(), nil)
+				} else {
+					rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, "row consumption overflow", w.current.header.Number.Uint64(), nil)
+				}
 			}
 
 		case (errors.Is(err, circuitcapacitychecker.ErrUnknown) && tx.IsL1MessageTx()):
@@ -1126,7 +1134,11 @@ loop:
 			log.Info("Skipping L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "unknown row consumption error")
 			w.current.nextL1MsgIndex = queueIndex + 1
 			// TODO: propagate more info about the error from CCC
-			rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, "unknown circuit capacity checker error", w.current.header.Number.Uint64(), nil)
+			if false {
+				rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, "unknown circuit capacity checker error", w.current.header.Number.Uint64(), nil)
+			} else {
+				rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, "unknown circuit capacity checker error", w.current.header.Number.Uint64(), nil)				
+			}
 			l1TxCccUnknownErrCounter.Inc(1)
 
 			// Normally we would do `txs.Shift()` here.
@@ -1140,7 +1152,11 @@ loop:
 			log.Trace("Unknown circuit capacity checker error for L2MessageTx", "tx", tx.Hash().String())
 			log.Info("Skipping L2 message", "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "unknown row consumption error")
 			// TODO: propagate more info about the error from CCC
-			rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, "unknown circuit capacity checker error", w.current.header.Number.Uint64(), nil)
+			if false {
+				rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, "unknown circuit capacity checker error", w.current.header.Number.Uint64(), nil)
+			} else {
+				rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, "unknown circuit capacity checker error", w.current.header.Number.Uint64(), nil)			
+			}
 			l2TxCccUnknownErrCounter.Inc(1)
 
 			// Normally we would do `txs.Pop()` here.
@@ -1158,7 +1174,11 @@ loop:
 				queueIndex := tx.AsL1MessageTx().QueueIndex
 				log.Info("Skipping L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "strange error", "err", err)
 				w.current.nextL1MsgIndex = queueIndex + 1
-				rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, fmt.Sprintf("strange error: %v", err), w.current.header.Number.Uint64(), nil)
+				if false {
+					rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, fmt.Sprintf("strange error: %v", err), w.current.header.Number.Uint64(), nil)
+				} else {
+					rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, fmt.Sprintf("strange error: %v", err), w.current.header.Number.Uint64(), nil)			
+				}
 				l1TxStrangeErrCounter.Inc(1)
 			}
 			txs.Shift()
