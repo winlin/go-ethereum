@@ -57,7 +57,7 @@ pub mod checker {
     /// # Safety
     #[no_mangle]
     pub unsafe extern "C" fn apply_tx(id: u64, tx_traces: *const c_char) -> *const c_char {
-        let result = panic::catch_unwind(|| {
+        let result = {
             log::debug!(
                 "ccc apply_tx raw input, id: {:?}, tx_traces: {:?}",
                 id,
@@ -67,27 +67,15 @@ pub mod checker {
             let traces = serde_json::from_slice::<BlockTrace>(&tx_traces_vec)
                 .unwrap_or_else(|_| panic!("id: {id:?}, fail to deserialize tx_traces"));
 
-            assert_eq!(traces.transactions.len(), 1, "traces.transactions.len() != 1");
-            assert_eq!(traces.execution_results.len(), 1, "traces.execution_results.len() != 1");
-            assert_eq!(traces.tx_storage_trace.len(), 1, "traces.tx_storage_trace.len() != 1");
-
             CHECKERS
                 .get_mut()
                 .expect("fail to get circuit capacity checkers map in apply_tx")
                 .get_mut(&id)
                 .unwrap_or_else(|| {
-                    panic!(
-                        "fail to get circuit capacity checker (id: {id:?}) in apply_tx"
-                    )
+                    panic!("fail to get circuit capacity checker (id: {id:?}) in apply_tx")
                 })
-                .estimate_circuit_capacity(&[traces.clone()])
-                .unwrap_or_else(|e| {
-                    panic!(
-                        "id: {:?}, fail to estimate_circuit_capacity in apply_tx, block_hash: {:?}, tx_hash: {:?}, error: {:?}",
-                        id, traces.header.hash, traces.transactions[0].tx_hash, e
-                    )
-                })
-        });
+                .estimate_circuit_capacity(&[traces])
+        };
         let r = match result {
             Ok(acc_row_usage) => {
                 log::debug!(
@@ -111,7 +99,7 @@ pub mod checker {
     /// # Safety
     #[no_mangle]
     pub unsafe extern "C" fn apply_block(id: u64, block_trace: *const c_char) -> *const c_char {
-        let result = panic::catch_unwind(|| {
+        let result = {
             log::debug!(
                 "ccc apply_block raw input, id: {:?}, block_trace: {:?}",
                 id,
@@ -125,18 +113,10 @@ pub mod checker {
                 .expect("fail to get circuit capacity checkers map in apply_block")
                 .get_mut(&id)
                 .unwrap_or_else(|| {
-                    panic!(
-                        "fail to get circuit capacity checker (id: {id:?}) in apply_block"
-                    )
+                    panic!("fail to get circuit capacity checker (id: {id:?}) in apply_block")
                 })
-                .estimate_circuit_capacity(&[traces.clone()])
-                .unwrap_or_else(|e| {
-                    panic!(
-                        "id: {:?}, fail to estimate_circuit_capacity in apply_block, block_hash: {:?}, error: {:?}",
-                        id, traces.header.hash, e
-                    )
-                })
-        });
+                .estimate_circuit_capacity(&[traces])
+        };
         let r = match result {
             Ok(acc_row_usage) => {
                 log::debug!(
