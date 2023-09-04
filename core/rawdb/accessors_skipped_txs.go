@@ -104,6 +104,22 @@ func writeSkippedTransaction(db ethdb.KeyValueWriter, tx *types.Transaction, tra
 	}
 }
 
+// writeSkippedTransactionV1 is the old version of writeSkippedTransaction, we keep it for testing compatibility purpose.
+func writeSkippedTransactionV1(db ethdb.KeyValueWriter, tx *types.Transaction, reason string, blockNumber uint64, blockHash *common.Hash) {
+	// workaround: RLP decoding fails if this is nil
+	if blockHash == nil {
+		blockHash = &common.Hash{}
+	}
+	stx := SkippedTransaction{Tx: tx, Reason: reason, BlockNumber: blockNumber, BlockHash: blockHash}
+	bytes, err := rlp.EncodeToBytes(stx)
+	if err != nil {
+		log.Crit("Failed to RLP encode skipped transaction", "hash", tx.Hash().String(), "err", err)
+	}
+	if err := db.Put(SkippedTransactionKey(tx.Hash()), bytes); err != nil {
+		log.Crit("Failed to store skipped transaction", "hash", tx.Hash().String(), "err", err)
+	}
+}
+
 // readSkippedTransactionRLP retrieves a skipped transaction in its raw RLP database encoding.
 func readSkippedTransactionRLP(db ethdb.Reader, txHash common.Hash) rlp.RawValue {
 	data, err := db.Get(SkippedTransactionKey(txHash))
