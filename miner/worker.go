@@ -884,8 +884,10 @@ func (w *worker) updateSnapshot() {
 	w.snapshotState = w.current.state.Copy()
 }
 
-func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Address) ([]*types.Log, error) {
+func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Address) ([]*types.Log, *types.BlockTrace, error) {
 	var accRows *types.RowConsumption
+	var traces *types.BlockTrace
+	var err error
 
 	// do not do CCC checks on follower nodes
 	if w.isRunning() {
@@ -904,18 +906,18 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 		// 2.1 when starting handling the first tx, `state.refund` is 0 by default,
 		// 2.2 after tracing, the state is either committed in `core.ApplyTransaction`, or reverted, so the `state.refund` can be cleared,
 		// 2.3 when starting handling the following txs, `state.refund` comes as 0
-		traces, err := w.current.traceEnv.GetBlockTrace(
+		traces, err = w.current.traceEnv.GetBlockTrace(
 			types.NewBlockWithHeader(w.current.header).WithBody([]*types.Transaction{tx}, nil),
 		)
 		// `w.current.traceEnv.State` & `w.current.state` share a same pointer to the state, so only need to revert `w.current.state`
 		// revert to snapshot for calling `core.ApplyMessage` again, (both `traceEnv.GetBlockTrace` & `core.ApplyTransaction` will call `core.ApplyMessage`)
 		w.current.state.RevertToSnapshot(snap)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		accRows, err = w.circuitCapacityChecker.ApplyTransaction(traces)
 		if err != nil {
-			return nil, err
+			return nil, traces, err
 		}
 		log.Trace(
 			"Worker apply ccc for tx result",
@@ -931,14 +933,14 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	receipt, err := core.ApplyTransaction(w.chainConfig, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &w.current.header.GasUsed, *w.chain.GetVMConfig())
 	if err != nil {
 		w.current.state.RevertToSnapshot(snap)
-		return nil, err
+		return nil, traces, err
 	}
 
 	w.current.txs = append(w.current.txs, tx)
 	w.current.receipts = append(w.current.receipts, receipt)
 	w.current.accRows = accRows
 
-	return receipt.Logs, nil
+	return receipt.Logs, traces, nil
 }
 
 func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coinbase common.Address, interrupt *int32) (bool, bool) {
@@ -1023,7 +1025,7 @@ loop:
 		// Start executing the transaction
 		w.current.state.Prepare(tx.Hash(), w.current.tcount)
 
-		logs, err := w.commitTransaction(tx, coinbase)
+		logs, _, err := w.commitTransaction(tx, coinbase)
 		switch {
 		case errors.Is(err, core.ErrGasLimitReached) && tx.IsL1MessageTx():
 			// If this block already contains some L1 messages,
