@@ -52,6 +52,22 @@ type SkippedTransaction struct {
 	// We store the tx itself because otherwise geth will discard it after skipping.
 	Tx *types.Transaction
 
+	// Reason is the skip reason.
+	Reason string
+
+	// BlockNumber is the number of the block in which this transaction was skipped.
+	BlockNumber uint64
+
+	// BlockNumber is the hash of the block in which this transaction was skipped or nil.
+	BlockHash *common.Hash
+}
+
+// SkippedTransactionV2 stores the SkippedTransaction object, along with the traces serialization.
+type SkippedTransactionV2 struct {
+	// Tx is the skipped transaction.
+	// We store the tx itself because otherwise geth will discard it after skipping.
+	Tx *types.Transaction
+
 	// Traces is the wrapped traces of the skipped transaction.
 	// We only store it when `MinerStoreSkippedTxTracesFlag` is enabled, so it might be empty.
 	// Note that we don't use *types.BlockTrace directly because types.BlockTrace.StorageTrace.Proofs is of
@@ -78,7 +94,7 @@ func writeSkippedTransaction(db ethdb.KeyValueWriter, tx *types.Transaction, tra
 	if err != nil {
 		log.Crit("Failed to json marshal skipped transaction", "hash", tx.Hash().String(), "err", err)
 	}
-	stx := SkippedTransaction{Tx: tx, TracesBytes: b, Reason: reason, BlockNumber: blockNumber, BlockHash: blockHash}
+	stx := SkippedTransactionV2{Tx: tx, TracesBytes: b, Reason: reason, BlockNumber: blockNumber, BlockHash: blockHash}
 	bytes, err := rlp.EncodeToBytes(stx)
 	if err != nil {
 		log.Crit("Failed to RLP encode skipped transaction", "hash", tx.Hash().String(), "err", err)
@@ -101,19 +117,27 @@ func readSkippedTransactionRLP(db ethdb.Reader, txHash common.Hash) rlp.RawValue
 }
 
 // ReadSkippedTransaction retrieves a skipped transaction by its hash, along with its skipped reason.
-func ReadSkippedTransaction(db ethdb.Reader, txHash common.Hash) *SkippedTransaction {
+func ReadSkippedTransaction(db ethdb.Reader, txHash common.Hash) *SkippedTransactionV2 {
 	data := readSkippedTransactionRLP(db, txHash)
 	if len(data) == 0 {
 		return nil
 	}
+	var stxV2 SkippedTransactionV2
 	var stx SkippedTransaction
-	if err := rlp.Decode(bytes.NewReader(data), &stx); err != nil {
-		log.Crit("Invalid skipped transaction RLP", "hash", txHash.String(), "data", data, "err", err)
+	if err := rlp.Decode(bytes.NewReader(data), &stxV2); err != nil {
+		if err := rlp.Decode(bytes.NewReader(data), &stx); err != nil {
+			log.Crit("Invalid skipped transaction RLP", "hash", txHash.String(), "data", data, "err", err)
+		}
+		stxV2.Tx = stx.Tx
+		stxV2.Reason = stx.Reason
+		stxV2.BlockNumber = stx.BlockNumber
+		stxV2.BlockHash = stx.BlockHash
 	}
-	if stx.BlockHash != nil && *stx.BlockHash == (common.Hash{}) {
-		stx.BlockHash = nil
+
+	if stxV2.BlockHash != nil && *stxV2.BlockHash == (common.Hash{}) {
+		stxV2.BlockHash = nil
 	}
-	return &stx
+	return &stxV2
 }
 
 // writeSkippedTransactionHash writes the hash of a skipped transaction to the database.
