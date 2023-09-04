@@ -626,9 +626,9 @@ web3._extend({
 			params: 1
 		}),
 		new web3._extend.Method({
-			name: 'setNextQueueIndex',
-			call: 'miner_setNextQueueIndex',
-			params: 1
+			name: 'addSkipRange',
+			call: 'miner_addSkipRange',
+			params: 2
 		}),
 		new web3._extend.Method({
 			name: 'setGasPrice',

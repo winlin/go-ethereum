@@ -185,9 +185,9 @@ func (miner *Miner) SetExtra(extra []byte) error {
 	return nil
 }
 
-// SetNextQueueIndex sets the next L1 queue index to include.
-func (miner *Miner) SetNextQueueIndex(queueIndex uint64) error {
-	miner.worker.setNextQueueIndex(queueIndex)
+// AddSkipRange adds a new skip range.
+func (miner *Miner) AddSkipRange(startQueueIndex, endQueueIndex uint64) error {
+	miner.worker.addSkipRange(startQueueIndex, endQueueIndex)
 	return nil
 }
 

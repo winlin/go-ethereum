@@ -92,6 +92,11 @@ var (
 	l1TxStrangeErrCounter             = metrics.NewRegisteredCounter("miner/skipped_txs/l1/strange_err", nil)
 )
 
+type skipRange struct {
+	start uint64
+	end   uint64
+}
+
 // environment is the worker's current environment and holds all of the current state information.
 type environment struct {
 	signer types.Signer
@@ -219,7 +224,7 @@ type worker struct {
 	resubmitHook func(time.Duration, time.Duration) // Method to call upon updating resubmitting interval.
 
 	// extensions
-	nextQueueIndex uint64
+	skip []skipRange
 }
 
 func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus.Engine, eth Backend, mux *event.TypeMux, isLocalBlock func(*types.Block) bool, init bool) *worker {
@@ -314,11 +319,11 @@ func (w *worker) setExtra(extra []byte) {
 	w.extra = extra
 }
 
-// setNextQueueIndex sets the next L1 queue index to include.
-func (w *worker) setNextQueueIndex(queueIndex uint64) {
+// addSkipRange adds a new skip range.
+func (w *worker) addSkipRange(startQueueIndex, endQueueIndex uint64) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	w.nextQueueIndex = queueIndex
+	w.skip = append(w.skip, skipRange{start: startQueueIndex, end: endQueueIndex})
 }
 
 // setRecommitInterval updates the interval for miner sealing work recommitting.
@@ -1034,12 +1039,16 @@ loop:
 		w.current.state.Prepare(tx.Hash(), w.current.tcount)
 
 		// check queue index
-		if l1msg := tx.AsL1MessageTx(); l1msg != nil && l1msg.QueueIndex < w.nextQueueIndex {
-			log.Info("Skipping L1 message", "queueIndex", l1msg.QueueIndex, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "skip requested")
-			w.current.nextL1MsgIndex = l1msg.QueueIndex + 1
-			txs.Shift()
-			rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, "skip requested", w.current.header.Number.Uint64(), nil)
-			continue
+		if l1msg := tx.AsL1MessageTx(); l1msg != nil {
+			for _, skipRange := range w.skip {
+				if l1msg.QueueIndex >= skipRange.start && l1msg.QueueIndex <= skipRange.end {
+					log.Info("Skipping L1 message", "queueIndex", l1msg.QueueIndex, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "skip requested")
+					w.current.nextL1MsgIndex = l1msg.QueueIndex + 1
+					txs.Shift()
+					rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, "skip requested", w.current.header.Number.Uint64(), nil)
+					continue loop
+				}
+			}
 		}
 
 		logs, err := w.commitTransaction(tx, coinbase)

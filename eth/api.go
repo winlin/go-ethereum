@@ -120,9 +120,9 @@ func (api *PrivateMinerAPI) SetExtra(extra string) (bool, error) {
 	return true, nil
 }
 
-// SetNextQueueIndex sets the next L1 queue index to include.
-func (api *PrivateMinerAPI) SetNextQueueIndex(queueIndex uint64) (bool, error) {
-	if err := api.e.Miner().SetNextQueueIndex(queueIndex); err != nil {
+// AddSkipRange adds a new skip range.
+func (api *PrivateMinerAPI) AddSkipRange(startQueueIndex, endQueueIndex uint64) (bool, error) {
+	if err := api.e.Miner().AddSkipRange(startQueueIndex, endQueueIndex); err != nil {
 		return false, err
 	}
 	return true, nil
