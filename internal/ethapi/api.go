@@ -1336,7 +1336,7 @@ type RPCTransaction struct {
 	Sender     common.Address  `json:"sender,omitempty"`
 	QueueIndex *hexutil.Uint64 `json:"queueIndex,omitempty"`
 
-	// wrapped traces, currently only available for `scroll_getSkippedTransaction` API, when flag is set
+	// wrapped traces, currently only available for `scroll_getSkippedTransaction` API, when `MinerStoreSkippedTxTracesFlag` is set
 	Traces *types.BlockTrace `json:"traces,omitempty"`
 }
 

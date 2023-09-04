@@ -52,7 +52,7 @@ type SkippedTransaction struct {
 	Tx *types.Transaction
 
 	// Traces is the wrapped traces of the skipped transaction.
-	// We only store it when flag is enabled, so it may return nil.
+	// We only store it when `MinerStoreSkippedTxTracesFlag` is enabled, so it may return nil.
 	Traces *types.BlockTrace
 
 	// Reason is the skip reason.
