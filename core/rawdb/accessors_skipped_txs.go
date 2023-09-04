@@ -51,6 +51,10 @@ type SkippedTransaction struct {
 	// We store the tx itself because otherwise geth will discard it after skipping.
 	Tx *types.Transaction
 
+	// Traces is the wrapped traces of the skipped transaction.
+	// We only store it when flag is enabled, so it may return nil.
+	Traces *types.BlockTrace
+
 	// Reason is the skip reason.
 	Reason string
 
@@ -62,12 +66,12 @@ type SkippedTransaction struct {
 }
 
 // writeSkippedTransaction writes a skipped transaction to the database.
-func writeSkippedTransaction(db ethdb.KeyValueWriter, tx *types.Transaction, reason string, blockNumber uint64, blockHash *common.Hash) {
+func writeSkippedTransaction(db ethdb.KeyValueWriter, tx *types.Transaction, traces *types.BlockTrace, reason string, blockNumber uint64, blockHash *common.Hash) {
 	// workaround: RLP decoding fails if this is nil
 	if blockHash == nil {
 		blockHash = &common.Hash{}
 	}
-	stx := SkippedTransaction{Tx: tx, Reason: reason, BlockNumber: blockNumber, BlockHash: blockHash}
+	stx := SkippedTransaction{Tx: tx, Traces: traces, Reason: reason, BlockNumber: blockNumber, BlockHash: blockHash}
 	bytes, err := rlp.EncodeToBytes(stx)
 	if err != nil {
 		log.Crit("Failed to RLP encode skipped transaction", "err", err)
@@ -136,7 +140,7 @@ func WriteSkippedTransaction(db ethdb.Database, tx *types.Transaction, traces *t
 
 	// update in a batch
 	batch := db.NewBatch()
-	writeSkippedTransaction(db, tx, reason, blockNumber, blockHash)
+	writeSkippedTransaction(db, tx, traces, reason, blockNumber, blockHash)
 	writeSkippedTransactionHash(db, index, tx.Hash())
 	writeNumSkippedTransactions(db, index+1)
 
