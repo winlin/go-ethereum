@@ -1137,7 +1137,7 @@ loop:
 			if w.config.StoreSkippedTxTraces {
 				rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, traces, "unknown circuit capacity checker error", w.current.header.Number.Uint64(), nil)
 			} else {
-				rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, nil, "unknown circuit capacity checker error", w.current.header.Number.Uint64(), nil)				
+				rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, nil, "unknown circuit capacity checker error", w.current.header.Number.Uint64(), nil)
 			}
 			l1TxCccUnknownErrCounter.Inc(1)
 
@@ -1155,7 +1155,7 @@ loop:
 			if w.config.StoreSkippedTxTraces {
 				rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, traces, "unknown circuit capacity checker error", w.current.header.Number.Uint64(), nil)
 			} else {
-				rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, nil, "unknown circuit capacity checker error", w.current.header.Number.Uint64(), nil)			
+				rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, nil, "unknown circuit capacity checker error", w.current.header.Number.Uint64(), nil)
 			}
 			l2TxCccUnknownErrCounter.Inc(1)
 
@@ -1177,7 +1177,7 @@ loop:
 				if w.config.StoreSkippedTxTraces {
 					rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, traces, fmt.Sprintf("strange error: %v", err), w.current.header.Number.Uint64(), nil)
 				} else {
-					rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, nil, fmt.Sprintf("strange error: %v", err), w.current.header.Number.Uint64(), nil)			
+					rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, nil, fmt.Sprintf("strange error: %v", err), w.current.header.Number.Uint64(), nil)
 				}
 				l1TxStrangeErrCounter.Inc(1)
 			}

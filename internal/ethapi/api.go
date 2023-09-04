@@ -1360,7 +1360,7 @@ func NewRPCTransaction(tx *types.Transaction, traces *types.BlockTrace, blockHas
 		R:        (*hexutil.Big)(r),
 		S:        (*hexutil.Big)(s),
 
-		Traces:   traces,
+		Traces: traces,
 	}
 	if blockHash != (common.Hash{}) {
 		result.BlockHash = &blockHash
