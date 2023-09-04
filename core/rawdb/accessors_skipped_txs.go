@@ -127,7 +127,7 @@ func ReadSkippedTransactionHash(db ethdb.Reader, index uint64) *common.Hash {
 
 // WriteSkippedTransaction writes a skipped transaction to the database and also updates the count and lookup index.
 // Note: The lookup index and count will include duplicates if there are chain reorgs.
-func WriteSkippedTransaction(db ethdb.Database, tx *types.Transaction, reason string, blockNumber uint64, blockHash *common.Hash) {
+func WriteSkippedTransaction(db ethdb.Database, tx *types.Transaction, traces *types.BlockTrace, reason string, blockNumber uint64, blockHash *common.Hash) {
 	// this method is not accessed concurrently, but just to be sure...
 	mu.Lock()
 	defer mu.Unlock()

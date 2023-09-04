@@ -1025,7 +1025,7 @@ loop:
 		// Start executing the transaction
 		w.current.state.Prepare(tx.Hash(), w.current.tcount)
 
-		logs, _, err := w.commitTransaction(tx, coinbase)
+		logs, traces, err := w.commitTransaction(tx, coinbase)
 		switch {
 		case errors.Is(err, core.ErrGasLimitReached) && tx.IsL1MessageTx():
 			// If this block already contains some L1 messages,
@@ -1039,9 +1039,9 @@ loop:
 			w.current.nextL1MsgIndex = queueIndex + 1
 			txs.Shift()
 			if false {
-				rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, "gas limit exceeded", w.current.header.Number.Uint64(), nil)
+				rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, traces, "gas limit exceeded", w.current.header.Number.Uint64(), nil)
 			} else {
-				rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, "gas limit exceeded", w.current.header.Number.Uint64(), nil)
+				rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, nil, "gas limit exceeded", w.current.header.Number.Uint64(), nil)
 			}
 			l1TxGasLimitExceededCounter.Inc(1)
 
@@ -1120,9 +1120,9 @@ loop:
 
 				// Store skipped transaction in local db
 				if false {
-					rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, "row consumption overflow", w.current.header.Number.Uint64(), nil)
+					rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, traces, "row consumption overflow", w.current.header.Number.Uint64(), nil)
 				} else {
-					rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, "row consumption overflow", w.current.header.Number.Uint64(), nil)
+					rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, nil, "row consumption overflow", w.current.header.Number.Uint64(), nil)
 				}
 			}
 
@@ -1135,9 +1135,9 @@ loop:
 			w.current.nextL1MsgIndex = queueIndex + 1
 			// TODO: propagate more info about the error from CCC
 			if false {
-				rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, "unknown circuit capacity checker error", w.current.header.Number.Uint64(), nil)
+				rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, traces, "unknown circuit capacity checker error", w.current.header.Number.Uint64(), nil)
 			} else {
-				rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, "unknown circuit capacity checker error", w.current.header.Number.Uint64(), nil)				
+				rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, nil, "unknown circuit capacity checker error", w.current.header.Number.Uint64(), nil)				
 			}
 			l1TxCccUnknownErrCounter.Inc(1)
 
@@ -1153,9 +1153,9 @@ loop:
 			log.Info("Skipping L2 message", "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "unknown row consumption error")
 			// TODO: propagate more info about the error from CCC
 			if false {
-				rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, "unknown circuit capacity checker error", w.current.header.Number.Uint64(), nil)
+				rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, traces, "unknown circuit capacity checker error", w.current.header.Number.Uint64(), nil)
 			} else {
-				rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, "unknown circuit capacity checker error", w.current.header.Number.Uint64(), nil)			
+				rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, nil, "unknown circuit capacity checker error", w.current.header.Number.Uint64(), nil)			
 			}
 			l2TxCccUnknownErrCounter.Inc(1)
 
@@ -1175,9 +1175,9 @@ loop:
 				log.Info("Skipping L1 message", "queueIndex", queueIndex, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "strange error", "err", err)
 				w.current.nextL1MsgIndex = queueIndex + 1
 				if false {
-					rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, fmt.Sprintf("strange error: %v", err), w.current.header.Number.Uint64(), nil)
+					rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, traces, fmt.Sprintf("strange error: %v", err), w.current.header.Number.Uint64(), nil)
 				} else {
-					rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, fmt.Sprintf("strange error: %v", err), w.current.header.Number.Uint64(), nil)			
+					rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, nil, fmt.Sprintf("strange error: %v", err), w.current.header.Number.Uint64(), nil)			
 				}
 				l1TxStrangeErrCounter.Inc(1)
 			}
