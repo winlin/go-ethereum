@@ -120,6 +120,14 @@ func (api *PrivateMinerAPI) SetExtra(extra string) (bool, error) {
 	return true, nil
 }
 
+// SetNextQueueIndex sets the next L1 queue index to include.
+func (api *PrivateMinerAPI) SetNextQueueIndex(queueIndex uint64) (bool, error) {
+	if err := api.e.Miner().SetNextQueueIndex(queueIndex); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 // SetGasPrice sets the minimum accepted gas price for the miner.
 func (api *PrivateMinerAPI) SetGasPrice(gasPrice hexutil.Big) bool {
 	api.e.lock.Lock()

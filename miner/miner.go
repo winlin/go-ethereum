@@ -185,6 +185,12 @@ func (miner *Miner) SetExtra(extra []byte) error {
 	return nil
 }
 
+// SetNextQueueIndex sets the next L1 queue index to include.
+func (miner *Miner) SetNextQueueIndex(queueIndex uint64) error {
+	miner.worker.setNextQueueIndex(queueIndex)
+	return nil
+}
+
 // SetRecommitInterval sets the interval for sealing work resubmitting.
 func (miner *Miner) SetRecommitInterval(interval time.Duration) {
 	miner.worker.setRecommitInterval(interval)

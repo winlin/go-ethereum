@@ -217,6 +217,9 @@ type worker struct {
 	skipSealHook func(*task) bool                   // Method to decide whether skipping the sealing.
 	fullTaskHook func()                             // Method to call before pushing the full sealing task.
 	resubmitHook func(time.Duration, time.Duration) // Method to call upon updating resubmitting interval.
+
+	// extensions
+	nextQueueIndex uint64
 }
 
 func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus.Engine, eth Backend, mux *event.TypeMux, isLocalBlock func(*types.Block) bool, init bool) *worker {
@@ -309,6 +312,13 @@ func (w *worker) setExtra(extra []byte) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.extra = extra
+}
+
+// setNextQueueIndex sets the next L1 queue index to include.
+func (w *worker) setNextQueueIndex(queueIndex uint64) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.nextQueueIndex = queueIndex
 }
 
 // setRecommitInterval updates the interval for miner sealing work recommitting.
@@ -1022,6 +1032,15 @@ loop:
 		}
 		// Start executing the transaction
 		w.current.state.Prepare(tx.Hash(), w.current.tcount)
+
+		// check queue index
+		if l1msg := tx.AsL1MessageTx(); l1msg != nil && l1msg.QueueIndex < w.nextQueueIndex {
+			log.Info("Skipping L1 message", "queueIndex", l1msg.QueueIndex, "tx", tx.Hash().String(), "block", w.current.header.Number, "reason", "skip requested")
+			w.current.nextL1MsgIndex = l1msg.QueueIndex + 1
+			txs.Shift()
+			rawdb.WriteSkippedTransaction(w.eth.ChainDb(), tx, "skip requested", w.current.header.Number.Uint64(), nil)
+			continue
+		}
 
 		logs, err := w.commitTransaction(tx, coinbase)
 		switch {
