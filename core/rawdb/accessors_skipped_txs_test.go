@@ -51,6 +51,16 @@ func TestReadWriteSkippedTransactionNoIndex(t *testing.T) {
 	}
 }
 
+func TestReadSkippedTransactionV1AsV2(t *testing.T) {
+	tx := newTestTransaction(123)
+	db := NewMemoryDatabase()
+	writeSkippedTransactionV1(db, tx, "random reason", 1, &common.Hash{1})
+	got := ReadSkippedTransaction(db, tx.Hash())
+	if got == nil || got.Tx.Hash() != tx.Hash() || got.Reason != "random reason" || got.BlockNumber != 1 || got.BlockHash == nil || *got.BlockHash != (common.Hash{1}) {
+		t.Fatal("Skipped transaction mismatch", "got", got)
+	}
+}
+
 func TestReadWriteSkippedTransaction(t *testing.T) {
 	tx := newTestTransaction(123)
 	db := NewMemoryDatabase()
