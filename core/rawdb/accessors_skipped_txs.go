@@ -182,20 +182,7 @@ func WriteSkippedTransaction(db ethdb.Database, tx *types.Transaction, traces *t
 }
 
 func ResetSkippedTransactionTracesByHash(db ethdb.Database, txHash common.Hash) {
-	mu.Lock()
-	defer mu.Unlock()
-
-	data := readSkippedTransactionRLP(db, txHash)
-	if len(data) == 0 {
-		return
-	}
-	var stx SkippedTransaction
-	if err := rlp.Decode(bytes.NewReader(data), &stx); err != nil {
-		log.Crit("Invalid skipped transaction RLP", "hash", txHash.String(), "data", data, "err", err)
-	}
-	if stx.BlockHash != nil && *stx.BlockHash == (common.Hash{}) {
-		stx.BlockHash = nil
-	}
+	stx := ReadSkippedTransaction(db, txHash)
 	writeSkippedTransaction(db, stx.Tx, nil, stx.Reason, stx.BlockNumber, stx.BlockHash)
 }
 
