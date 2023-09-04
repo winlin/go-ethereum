@@ -778,7 +778,6 @@ func (api *ScrollAPI) ResetSkippedTransactionsTraces(ctx context.Context, from u
 }
 
 func (api *ScrollAPI) ResetSkippedTransactionTracesByHash(ctx context.Context, hash common.Hash) error {
-	stx := rawdb.ReadSkippedTransaction(api.eth.ChainDb(), hash)
-	rawdb.WriteSkippedTransaction(api.eth.ChainDb(), stx.Tx, nil, stx.Reason, stx.BlockNumber, stx.BlockHash)
+	rawdb.ResetSkippedTransactionTracesByHash(api.eth.ChainDb(), hash)
 	return nil
 }
