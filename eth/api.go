@@ -761,3 +761,15 @@ func (api *ScrollAPI) GetSkippedTransactionHashes(ctx context.Context, from uint
 
 	return hashes, nil
 }
+
+func (api *ScrollAPI) ResetSkippedTransactionTraces(ctx context.Context, from uint64, to uint64) ([]common.Hash, error) {
+	hashes, err := api.GetSkippedTransactionHashes(ctx, from, to)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, hash := range hashes {
+		log.Info("resetting skipped tx's traces", "txHash", hash)
+		log.Info("reset skipped tx's traces done", "txHash", hash)
+	}
+}
