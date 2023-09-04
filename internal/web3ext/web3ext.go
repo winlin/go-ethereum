@@ -897,6 +897,16 @@ web3._extend({
 			call: 'scroll_getSkippedTransactionHashes',
 			params: 2
 		}),
+		new web3._extend.Method({
+			name: 'resetSkippedTransactionsTraces',
+			call: 'scroll_resetSkippedTransactionsTraces',
+			params: 2
+		}),
+		new web3._extend.Method({
+			name: 'resetSkippedTransactionTracesByHash',
+			call: 'scroll_resetSkippedTransactionTracesByHash',
+			params: 1
+		}),
 	],
 	properties:
 	[
