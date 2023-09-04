@@ -762,7 +762,7 @@ func (api *ScrollAPI) GetSkippedTransactionHashes(ctx context.Context, from uint
 	return hashes, nil
 }
 
-func (api *ScrollAPI) ResetSkippedTransactionTraces(ctx context.Context, from uint64, to uint64) ([]common.Hash, error) {
+func (api *ScrollAPI) ResetSkippedTransactionsTraces(ctx context.Context, from uint64, to uint64) ([]common.Hash, error) {
 	hashes, err := api.GetSkippedTransactionHashes(ctx, from, to)
 	if err != nil {
 		return nil, err
@@ -770,6 +770,14 @@ func (api *ScrollAPI) ResetSkippedTransactionTraces(ctx context.Context, from ui
 
 	for _, hash := range hashes {
 		log.Info("resetting skipped tx's traces", "txHash", hash)
+		api.ResetSkippedTransactionTracesByHash(ctx, hash)
 		log.Info("reset skipped tx's traces done", "txHash", hash)
 	}
+
+	return hashes, nil
+}
+
+func (api *ScrollAPI) ResetSkippedTransactionTracesByHash(ctx context.Context, hash common.Hash) {
+	stx := rawdb.ReadSkippedTransaction(api.eth.ChainDb(), hash)
+	rawdb.WriteSkippedTransaction(api.eth.ChainDb(), stx.Tx, nil, stx.Reason, stx.BlockNumber, stx.BlockHash)
 }
