@@ -721,6 +721,9 @@ type RPCTransaction struct {
 	SkipReason      string       `json:"skipReason"`
 	SkipBlockNumber *hexutil.Big `json:"skipBlockNumber"`
 	SkipBlockHash   *common.Hash `json:"skipBlockHash,omitempty"`
+
+	// wrapped traces, currently only available for `scroll_getSkippedTransaction` API, when `MinerStoreSkippedTxTracesFlag` is set
+	Traces *types.BlockTrace `json:"traces,omitempty"`
 }
 
 // GetSkippedTransaction returns a skipped transaction by its hash.
@@ -729,17 +732,16 @@ func (api *ScrollAPI) GetSkippedTransaction(ctx context.Context, hash common.Has
 	if stx == nil {
 		return nil, nil
 	}
-	var traces *types.BlockTrace
-	if len(stx.TracesBytes) != 0 {
-		if err := json.Unmarshal(stx.TracesBytes, traces); err != nil {
-			return nil, fmt.Errorf("fail to Unmarshal traces for skipped tx, hash: %s, err: %w", hash.String(), err)
-		}
-	}
 	var rpcTx RPCTransaction
-	rpcTx.RPCTransaction = *ethapi.NewRPCTransaction(stx.Tx, traces, common.Hash{}, 0, 0, nil, api.eth.blockchain.Config())
+	rpcTx.RPCTransaction = *ethapi.NewRPCTransaction(stx.Tx, common.Hash{}, 0, 0, nil, api.eth.blockchain.Config())
 	rpcTx.SkipReason = stx.Reason
 	rpcTx.SkipBlockNumber = (*hexutil.Big)(new(big.Int).SetUint64(stx.BlockNumber))
 	rpcTx.SkipBlockHash = stx.BlockHash
+	if len(stx.TracesBytes) != 0 {
+		if err := json.Unmarshal(stx.TracesBytes, rpcTx.Traces); err != nil {
+			return nil, fmt.Errorf("fail to Unmarshal traces for skipped tx, hash: %s, err: %w", hash.String(), err)
+		}
+	}
 	return &rpcTx, nil
 }
 
