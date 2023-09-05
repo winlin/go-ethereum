@@ -2,7 +2,7 @@
 
 pub mod checker {
     use crate::utils::{c_char_to_str, c_char_to_vec, vec_to_c_char};
-    use anyhow::Error;
+    use anyhow::{anyhow, Error};
     use libc::c_char;
     use prover::zkevm::{CircuitCapacityChecker, RowUsage};
     use serde_derive::{Deserialize, Serialize};
@@ -92,9 +92,9 @@ pub mod checker {
             .get_mut()
             .expect("fail to get circuit capacity checkers map in apply_tx")
             .get_mut(&id)
-            .unwrap_or_else(|| {
-                panic!("fail to get circuit capacity checker (id: {id:?}) in apply_tx")
-            })
+            .ok_or(anyhow!(
+                "fail to get circuit capacity checker (id: {id:?}) in apply_tx"
+            ))?
             .estimate_circuit_capacity(&[traces])
     }
 
@@ -134,9 +134,9 @@ pub mod checker {
             .get_mut()
             .expect("fail to get circuit capacity checkers map in apply_block")
             .get_mut(&id)
-            .unwrap_or_else(|| {
-                panic!("fail to get circuit capacity checker (id: {id:?}) in apply_block")
-            })
+            .ok_or(anyhow!(
+                "fail to get circuit capacity checker (id: {id:?}) in apply_block"
+            ))?
             .estimate_circuit_capacity(&[traces])
     }
 }
