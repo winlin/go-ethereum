@@ -83,14 +83,16 @@ pub mod checker {
         log::debug!(
             "ccc apply_tx raw input, id: {:?}, tx_traces: {:?}",
             id,
-            c_char_to_str(tx_traces)
+            c_char_to_str(tx_traces)?
         );
         let tx_traces_vec = c_char_to_vec(tx_traces);
         let traces = serde_json::from_slice::<BlockTrace>(&tx_traces_vec)?;
 
         CHECKERS
             .get_mut()
-            .expect("fail to get circuit capacity checkers map in apply_tx")
+            .ok_or(anyhow!(
+                "fail to get circuit capacity checkers map in apply_tx"
+            ))?
             .get_mut(&id)
             .ok_or(anyhow!(
                 "fail to get circuit capacity checker (id: {id:?}) in apply_tx"
@@ -126,13 +128,15 @@ pub mod checker {
         log::debug!(
             "ccc apply_block raw input, id: {:?}, block_trace: {:?}",
             id,
-            c_char_to_str(block_trace)
+            c_char_to_str(block_trace)?
         );
         let block_trace = c_char_to_vec(block_trace);
         let traces = serde_json::from_slice::<BlockTrace>(&block_trace)?;
         CHECKERS
             .get_mut()
-            .expect("fail to get circuit capacity checkers map in apply_block")
+            .ok_or(anyhow!(
+                "fail to get circuit capacity checkers map in apply_block"
+            ))?
             .get_mut(&id)
             .ok_or(anyhow!(
                 "fail to get circuit capacity checker (id: {id:?}) in apply_block"
@@ -144,11 +148,12 @@ pub mod checker {
 pub(crate) mod utils {
     use std::ffi::{CStr, CString};
     use std::os::raw::c_char;
+    use std::str::Utf8Error;
 
     #[allow(dead_code)]
-    pub(crate) fn c_char_to_str(c: *const c_char) -> &'static str {
+    pub(crate) fn c_char_to_str(c: *const c_char) -> Result<&'static str, Utf8Error> {
         let cstr = unsafe { CStr::from_ptr(c) };
-        cstr.to_str().expect("fail to cast cstr to str")
+        cstr.to_str()
     }
 
     #[allow(dead_code)]
