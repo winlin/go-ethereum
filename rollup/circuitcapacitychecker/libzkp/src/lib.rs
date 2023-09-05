@@ -2,6 +2,7 @@
 
 pub mod checker {
     use crate::utils::{c_char_to_str, c_char_to_vec, vec_to_c_char};
+    use anyhow::Error;
     use libc::c_char;
     use prover::zkevm::{CircuitCapacityChecker, RowUsage};
     use serde_derive::{Deserialize, Serialize};
@@ -57,25 +58,7 @@ pub mod checker {
     /// # Safety
     #[no_mangle]
     pub unsafe extern "C" fn apply_tx(id: u64, tx_traces: *const c_char) -> *const c_char {
-        let result = {
-            log::debug!(
-                "ccc apply_tx raw input, id: {:?}, tx_traces: {:?}",
-                id,
-                c_char_to_str(tx_traces)
-            );
-            let tx_traces_vec = c_char_to_vec(tx_traces);
-            let traces = serde_json::from_slice::<BlockTrace>(&tx_traces_vec)
-                .unwrap_or_else(|_| panic!("id: {id:?}, fail to deserialize tx_traces"));
-
-            CHECKERS
-                .get_mut()
-                .expect("fail to get circuit capacity checkers map in apply_tx")
-                .get_mut(&id)
-                .unwrap_or_else(|| {
-                    panic!("fail to get circuit capacity checker (id: {id:?}) in apply_tx")
-                })
-                .estimate_circuit_capacity(&[traces])
-        };
+        let result = apply_tx_inner(id, tx_traces);
         let r = match result {
             Ok(acc_row_usage) => {
                 log::debug!(
@@ -96,27 +79,29 @@ pub mod checker {
         serde_json::to_vec(&r).map_or(null(), vec_to_c_char)
     }
 
+    unsafe fn apply_tx_inner(id: u64, tx_traces: *const c_char) -> Result<RowUsage, Error> {
+        log::debug!(
+            "ccc apply_tx raw input, id: {:?}, tx_traces: {:?}",
+            id,
+            c_char_to_str(tx_traces)
+        );
+        let tx_traces_vec = c_char_to_vec(tx_traces);
+        let traces = serde_json::from_slice::<BlockTrace>(&tx_traces_vec)?;
+
+        CHECKERS
+            .get_mut()
+            .expect("fail to get circuit capacity checkers map in apply_tx")
+            .get_mut(&id)
+            .unwrap_or_else(|| {
+                panic!("fail to get circuit capacity checker (id: {id:?}) in apply_tx")
+            })
+            .estimate_circuit_capacity(&[traces])
+    }
+
     /// # Safety
     #[no_mangle]
     pub unsafe extern "C" fn apply_block(id: u64, block_trace: *const c_char) -> *const c_char {
-        let result = {
-            log::debug!(
-                "ccc apply_block raw input, id: {:?}, block_trace: {:?}",
-                id,
-                c_char_to_str(block_trace)
-            );
-            let block_trace = c_char_to_vec(block_trace);
-            let traces = serde_json::from_slice::<BlockTrace>(&block_trace)
-                .unwrap_or_else(|_| panic!("id: {id:?}, fail to deserialize block_trace"));
-            CHECKERS
-                .get_mut()
-                .expect("fail to get circuit capacity checkers map in apply_block")
-                .get_mut(&id)
-                .unwrap_or_else(|| {
-                    panic!("fail to get circuit capacity checker (id: {id:?}) in apply_block")
-                })
-                .estimate_circuit_capacity(&[traces])
-        };
+        let result = apply_block_inner(id, block_trace);
         let r = match result {
             Ok(acc_row_usage) => {
                 log::debug!(
@@ -135,6 +120,25 @@ pub mod checker {
             },
         };
         serde_json::to_vec(&r).map_or(null(), vec_to_c_char)
+    }
+
+    unsafe fn apply_block_inner(id: u64, block_trace: *const c_char) -> Result<RowUsage, Error> {
+        log::debug!(
+            "ccc apply_block raw input, id: {:?}, block_trace: {:?}",
+            id,
+            c_char_to_str(block_trace)
+        );
+        let block_trace = c_char_to_vec(block_trace);
+        let traces = serde_json::from_slice::<BlockTrace>(&block_trace)
+            .unwrap_or_else(|_| panic!("id: {id:?}, fail to deserialize block_trace"));
+        CHECKERS
+            .get_mut()
+            .expect("fail to get circuit capacity checkers map in apply_block")
+            .get_mut(&id)
+            .unwrap_or_else(|| {
+                panic!("fail to get circuit capacity checker (id: {id:?}) in apply_block")
+            })
+            .estimate_circuit_capacity(&[traces])
     }
 }
 
