@@ -129,8 +129,7 @@ pub mod checker {
             c_char_to_str(block_trace)
         );
         let block_trace = c_char_to_vec(block_trace);
-        let traces = serde_json::from_slice::<BlockTrace>(&block_trace)
-            .unwrap_or_else(|_| panic!("id: {id:?}, fail to deserialize block_trace"));
+        let traces = serde_json::from_slice::<BlockTrace>(&block_trace)?;
         CHECKERS
             .get_mut()
             .expect("fail to get circuit capacity checkers map in apply_block")
