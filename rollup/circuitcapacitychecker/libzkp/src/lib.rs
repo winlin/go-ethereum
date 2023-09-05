@@ -88,6 +88,16 @@ pub mod checker {
         let tx_traces_vec = c_char_to_vec(tx_traces);
         let traces = serde_json::from_slice::<BlockTrace>(&tx_traces_vec)?;
 
+        if traces.transactions.len() != 1 {
+            return Err(anyhow!("traces.transactions.len() != 1"));
+        }
+        if traces.execution_results.len() != 1 {
+            return Err(anyhow!("traces.execution_results.len() != 1"));
+        }
+        if traces.tx_storage_trace.len() != 1 {
+            return Err(anyhow!("traces.tx_storage_trace.len() != 1"));
+        }
+
         CHECKERS
             .get_mut()
             .ok_or(anyhow!(
