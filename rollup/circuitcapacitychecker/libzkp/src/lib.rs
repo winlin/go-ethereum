@@ -98,16 +98,26 @@ pub mod checker {
             return Err(anyhow!("traces.tx_storage_trace.len() != 1"));
         }
 
-        CHECKERS
-            .get_mut()
-            .ok_or(anyhow!(
-                "fail to get circuit capacity checkers map in apply_tx"
-            ))?
-            .get_mut(&id)
-            .ok_or(anyhow!(
-                "fail to get circuit capacity checker (id: {id:?}) in apply_tx"
-            ))?
-            .estimate_circuit_capacity(&[traces])
+        let r = panic::catch_unwind(|| {
+            CHECKERS
+                .get_mut()
+                .ok_or(anyhow!(
+                    "fail to get circuit capacity checkers map in apply_tx"
+                ))?
+                .get_mut(&id)
+                .ok_or(anyhow!(
+                    "fail to get circuit capacity checker (id: {id:?}) in apply_tx"
+                ))?
+                .estimate_circuit_capacity(&[traces])
+        });
+        match r {
+            Ok(result) => result,
+            Err(_) => {
+                return Err(anyhow!(
+                    "estimate_circuit_capacity (id: {id:?}) panics in apply_tx"
+                ))
+            }
+        }
     }
 
     /// # Safety
@@ -142,16 +152,27 @@ pub mod checker {
         );
         let block_trace = c_char_to_vec(block_trace);
         let traces = serde_json::from_slice::<BlockTrace>(&block_trace)?;
-        CHECKERS
-            .get_mut()
-            .ok_or(anyhow!(
-                "fail to get circuit capacity checkers map in apply_block"
-            ))?
-            .get_mut(&id)
-            .ok_or(anyhow!(
-                "fail to get circuit capacity checker (id: {id:?}) in apply_block"
-            ))?
-            .estimate_circuit_capacity(&[traces])
+
+        let r = panic::catch_unwind(|| {
+            CHECKERS
+                .get_mut()
+                .ok_or(anyhow!(
+                    "fail to get circuit capacity checkers map in apply_block"
+                ))?
+                .get_mut(&id)
+                .ok_or(anyhow!(
+                    "fail to get circuit capacity checker (id: {id:?}) in apply_block"
+                ))?
+                .estimate_circuit_capacity(&[traces])
+        });
+        match r {
+            Ok(result) => result,
+            Err(_) => {
+                return Err(anyhow!(
+                    "estimate_circuit_capacity (id: {id:?}) panics in apply_block"
+                ))
+            }
+        }
     }
 }
 
