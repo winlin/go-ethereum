@@ -114,7 +114,7 @@ pub mod checker {
             Ok(result) => result,
             Err(_) => {
                 return Err(anyhow!(
-                    "estimate_circuit_capacity (id: {id:?}) panics in apply_tx"
+                    "estimate_circuit_capacity (id: {id:?}) errors in apply_tx"
                 ))
             }
         }
@@ -169,7 +169,7 @@ pub mod checker {
             Ok(result) => result,
             Err(_) => {
                 return Err(anyhow!(
-                    "estimate_circuit_capacity (id: {id:?}) panics in apply_block"
+                    "estimate_circuit_capacity (id: {id:?}) error in apply_block"
                 ))
             }
         }
