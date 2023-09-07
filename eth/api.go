@@ -19,6 +19,7 @@ package eth
 import (
 	"compress/gzip"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -720,6 +721,9 @@ type RPCTransaction struct {
 	SkipReason      string       `json:"skipReason"`
 	SkipBlockNumber *hexutil.Big `json:"skipBlockNumber"`
 	SkipBlockHash   *common.Hash `json:"skipBlockHash,omitempty"`
+
+	// wrapped traces, currently only available for `scroll_getSkippedTransaction` API, when `MinerStoreSkippedTxTracesFlag` is set
+	Traces *types.BlockTrace `json:"traces,omitempty"`
 }
 
 // GetSkippedTransaction returns a skipped transaction by its hash.
@@ -733,6 +737,13 @@ func (api *ScrollAPI) GetSkippedTransaction(ctx context.Context, hash common.Has
 	rpcTx.SkipReason = stx.Reason
 	rpcTx.SkipBlockNumber = (*hexutil.Big)(new(big.Int).SetUint64(stx.BlockNumber))
 	rpcTx.SkipBlockHash = stx.BlockHash
+	if len(stx.TracesBytes) != 0 {
+		traces := &types.BlockTrace{}
+		if err := json.Unmarshal(stx.TracesBytes, traces); err != nil {
+			return nil, fmt.Errorf("fail to Unmarshal traces for skipped tx, hash: %s, err: %w", hash.String(), err)
+		}
+		rpcTx.Traces = traces
+	}
 	return &rpcTx, nil
 }
 
