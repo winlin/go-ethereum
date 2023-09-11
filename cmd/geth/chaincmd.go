@@ -409,7 +409,6 @@ func traceTx(ctx *cli.Context) error {
 	if err != nil {
 		utils.Fatalf("Failed to open transaction file %s: %v", txFile, err)
 	}
-
 	rawTx2 := common.FromHex(strings.TrimRight(string(rawTx), "\r\n"))
 	tx := new(types.Transaction)
 	if err := tx.UnmarshalBinary(rawTx2); err != nil {
@@ -417,12 +416,29 @@ func traceTx(ctx *cli.Context) error {
 	}
 	log.Info("Successfully read transaction", "hash", tx.Hash().Hex())
 
-	// initialize trace env
+	// execute transaction
 	genesisBlock := genesis.ToBlock(chainDb)
 	header := genesisBlock.Header()
-	block := types.NewBlockWithHeader(header).WithBody([]*types.Transaction{tx}, nil)
 
 	state, err := blockchain.StateAt(genesisBlock.Root())
+	if err != nil {
+		log.Crit("Failed to initialize state", "err", err)
+	}
+
+	gasPool := new(core.GasPool).AddGas(header.GasLimit)
+	receipt, err := core.ApplyTransaction(config, blockchain, &common.Address{}, gasPool, state, header, tx, &header.GasUsed, *blockchain.GetVMConfig())
+	if err != nil {
+		log.Crit("Failed to execute transaction", "err", err)
+	}
+	if receipt.Status != types.ReceiptStatusSuccessful {
+		log.Warn("Transaction executed but failed")
+	}
+
+	// initialize trace env
+	header.Root = state.IntermediateRoot(false)
+	block := types.NewBlockWithHeader(header).WithBody([]*types.Transaction{tx}, nil)
+
+	state, err = blockchain.StateAt(genesisBlock.Root()) // reset state
 	if err != nil {
 		log.Crit("Failed to initialize state", "err", err)
 	}
@@ -433,27 +449,22 @@ func traceTx(ctx *cli.Context) error {
 	}
 
 	// compute block trace
-	snap := state.Snapshot()
 	traces, err := traceEnv.GetBlockTrace(block)
 	if err != nil {
 		log.Crit("Failed to trace block", "err", err)
 	}
 	log.Info("Tracing completed")
-	state.RevertToSnapshot(snap)
-
-	// optional: check transaction status (success or revert)
-	// gasPool := new(core.GasPool).AddGas(header.GasLimit)
-	// receipt, err := core.ApplyTransaction(config, blockchain, &common.Address{}, gasPool, state, header, tx, &header.GasUsed, *blockchain.GetVMConfig())
-	// if err != nil {
-	// 	log.Crit("Failed to execute transaction", "err", err)
-	// }
-	// if receipt.Status != types.ReceiptStatusSuccessful {
-	// 	log.Crit("Failed to execute transaction", "err", "execution reverted")
-	// }
 
 	// write traces to file
 	tracesJson, err := json.Marshal(traces)
-	os.WriteFile(tracesFile, tracesJson, 0644)
+	if err != nil {
+		log.Crit("Failed to marshal traces", "err", err)
+	}
+
+	err = os.WriteFile(tracesFile, tracesJson, 0644)
+	if err != nil {
+		log.Crit("Failed to write traces to file", "file", tracesFile, "err", err)
+	}
 
 	return nil
 }
