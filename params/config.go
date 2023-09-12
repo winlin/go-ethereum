@@ -348,7 +348,7 @@ var (
 			EnableEIP1559:             true,
 			MaxTxPerBlock:             nil,
 			MaxTxPayloadBytesPerBlock: nil,
-			L1Config:                  &L1Config{5, common.HexToAddress("0x0000000000000000000000000000000000000000"), 0},
+			L1Config:                  &L1Config{5, common.HexToAddress("0x0000000000000000000000000000000000000000"), 0, common.HexToAddress("0x0000000000000000000000000000000000000000")},
 		}}
 
 	// AllCliqueProtocolChanges contains every protocol change (EIPs) introduced
@@ -364,7 +364,7 @@ var (
 			EnableEIP1559:             true,
 			MaxTxPerBlock:             nil,
 			MaxTxPayloadBytesPerBlock: nil,
-			L1Config:                  &L1Config{5, common.HexToAddress("0x0000000000000000000000000000000000000000"), 0},
+			L1Config:                  &L1Config{5, common.HexToAddress("0x0000000000000000000000000000000000000000"), 0, common.HexToAddress("0x0000000000000000000000000000000000000000")},
 		}}
 
 	TestChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, new(EthashConfig), nil,
@@ -375,7 +375,7 @@ var (
 			EnableEIP1559:             true,
 			MaxTxPerBlock:             nil,
 			MaxTxPayloadBytesPerBlock: nil,
-			L1Config:                  &L1Config{5, common.HexToAddress("0x0000000000000000000000000000000000000000"), 0},
+			L1Config:                  &L1Config{5, common.HexToAddress("0x0000000000000000000000000000000000000000"), 0, common.HexToAddress("0x0000000000000000000000000000000000000000")},
 		}}
 	TestRules = TestChainConfig.Rules(new(big.Int))
 
@@ -387,7 +387,7 @@ var (
 			EnableEIP1559:             true,
 			MaxTxPerBlock:             nil,
 			MaxTxPayloadBytesPerBlock: nil,
-			L1Config:                  &L1Config{5, common.HexToAddress("0x0000000000000000000000000000000000000000"), 0},
+			L1Config:                  &L1Config{5, common.HexToAddress("0x0000000000000000000000000000000000000000"), 0, common.HexToAddress("0x0000000000000000000000000000000000000000")},
 		}}
 )
 
@@ -505,11 +505,12 @@ type ScrollConfig struct {
 	L1Config *L1Config `json:"l1Config,omitempty"`
 }
 
-// L1Config contains the l1 parameters needed to collect l1 messages in the sequencer
+// L1Config contains the l1 parameters needed to sync l1 contract events (e.g., l1 messages, commit/revert/finalize batches) in the sequencer
 type L1Config struct {
 	L1ChainId             uint64         `json:"l1ChainId,string,omitempty"`
 	L1MessageQueueAddress common.Address `json:"l1MessageQueueAddress,omitempty"`
 	NumL1MessagesPerBlock uint64         `json:"numL1MessagesPerBlock,string,omitempty"`
+	ScrollChainAddress    common.Address `json:"scrollChainAddress,omitempty"`
 }
 
 func (c *L1Config) String() string {
@@ -517,8 +518,8 @@ func (c *L1Config) String() string {
 		return "<nil>"
 	}
 
-	return fmt.Sprintf("{l1ChainId: %v, l1MessageQueueAddress: %v, numL1MessagesPerBlock: %v}",
-		c.L1ChainId, c.L1MessageQueueAddress, c.NumL1MessagesPerBlock)
+	return fmt.Sprintf("{l1ChainId: %v, l1MessageQueueAddress: %v, numL1MessagesPerBlock: %v, ScrollChainAddress: %v}",
+		c.L1ChainId, c.L1MessageQueueAddress.Hex(), c.NumL1MessagesPerBlock, c.ScrollChainAddress.Hex())
 }
 
 func (s ScrollConfig) BaseFeeEnabled() bool {

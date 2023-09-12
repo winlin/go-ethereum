@@ -55,6 +55,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/p2p/enode"
 	"github.com/scroll-tech/go-ethereum/params"
 	"github.com/scroll-tech/go-ethereum/rlp"
+	"github.com/scroll-tech/go-ethereum/rollup/eventwatcher"
 	"github.com/scroll-tech/go-ethereum/rollup/sync_service"
 	"github.com/scroll-tech/go-ethereum/rpc"
 )
@@ -70,6 +71,7 @@ type Ethereum struct {
 	// Handlers
 	txPool             *core.TxPool
 	syncService        *sync_service.SyncService
+	eventWatcher       *eventwatcher.EventWatcher
 	blockchain         *core.BlockChain
 	handler            *handler
 	ethDialCandidates  enode.Iterator
@@ -215,6 +217,13 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 		return nil, fmt.Errorf("cannot initialize L1 sync service: %w", err)
 	}
 	eth.syncService.Start()
+
+	// initialize and start batch event sync service
+	eth.eventWatcher, err = eventwatcher.NewEventWatcher(context.Background(), chainConfig, stack.Config(), eth.chainDb, l1Client, eth.blockchain)
+	if err != nil {
+		return nil, fmt.Errorf("cannot initialize batch event sync service: %w", err)
+	}
+	go eth.eventWatcher.Start() // run as a background routine
 
 	// Permit the downloader to use the trie cache allowance during fast sync
 	cacheLimit := cacheConfig.TrieCleanLimit + cacheConfig.TrieDirtyLimit + cacheConfig.SnapshotLimit
