@@ -58,7 +58,7 @@ type SkippedTransaction struct {
 	// BlockNumber is the number of the block in which this transaction was skipped.
 	BlockNumber uint64
 
-	// BlockNumber is the hash of the block in which this transaction was skipped or nil.
+	// BlockHash is the hash of the block in which this transaction was skipped or nil.
 	BlockHash *common.Hash
 }
 
@@ -80,21 +80,23 @@ type SkippedTransactionV2 struct {
 	// BlockNumber is the number of the block in which this transaction was skipped.
 	BlockNumber uint64
 
-	// BlockNumber is the hash of the block in which this transaction was skipped or nil.
+	// BlockHash is the hash of the block in which this transaction was skipped or nil.
 	BlockHash *common.Hash
 }
 
 // writeSkippedTransaction writes a skipped transaction to the database.
 func writeSkippedTransaction(db ethdb.KeyValueWriter, tx *types.Transaction, traces *types.BlockTrace, reason string, blockNumber uint64, blockHash *common.Hash) {
+	var err error
 	// workaround: RLP decoding fails if this is nil
 	if blockHash == nil {
 		blockHash = &common.Hash{}
 	}
-	b, err := json.Marshal(traces)
-	if err != nil {
-		log.Crit("Failed to json marshal skipped transaction", "hash", tx.Hash().String(), "err", err)
+	stx := SkippedTransactionV2{Tx: tx, Reason: reason, BlockNumber: blockNumber, BlockHash: blockHash}
+	if traces != nil {
+		if stx.TracesBytes, err = json.Marshal(traces); err != nil {
+			log.Crit("Failed to json marshal skipped transaction", "hash", tx.Hash().String(), "err", err)
+		}
 	}
-	stx := SkippedTransactionV2{Tx: tx, TracesBytes: b, Reason: reason, BlockNumber: blockNumber, BlockHash: blockHash}
 	bytes, err := rlp.EncodeToBytes(stx)
 	if err != nil {
 		log.Crit("Failed to RLP encode skipped transaction", "hash", tx.Hash().String(), "err", err)
