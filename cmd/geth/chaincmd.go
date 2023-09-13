@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"os"
 	"runtime"
 	"strconv"
@@ -436,6 +437,7 @@ func traceTx(ctx *cli.Context) error {
 
 	// initialize trace env
 	header.Root = state.IntermediateRoot(false)
+	header.Number = big.NewInt(1)
 	block := types.NewBlockWithHeader(header).WithBody([]*types.Transaction{tx}, nil)
 
 	state, err = blockchain.StateAt(genesisBlock.Root()) // reset state
