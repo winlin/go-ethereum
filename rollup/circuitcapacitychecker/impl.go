@@ -74,7 +74,7 @@ func (ccc *CircuitCapacityChecker) ApplyTransaction(traces *types.BlockTrace) (*
 		C.free(unsafe.Pointer(tracesStr))
 	}()
 
-	log.Debug("start to check circuit capacity for tx", "id", ccc.ID, "TxHash", traces.Transactions[0].TxHash)
+	log.Debug("start to check circuit capacity for tx", "id", ccc.ID, "TxHash", traces.Transactions[0].TxHash, "trace", string(tracesByt))
 	rawResult := C.apply_tx(C.uint64_t(ccc.ID), tracesStr)
 	defer func() {
 		C.free(unsafe.Pointer(rawResult))
