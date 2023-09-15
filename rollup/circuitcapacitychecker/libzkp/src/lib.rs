@@ -2,11 +2,11 @@
 
 pub mod checker {
     use crate::utils::{c_char_to_str, c_char_to_vec, vec_to_c_char};
-    use anyhow::{anyhow, Error};
+    use anyhow::{anyhow, bail, Error};
     use libc::c_char;
     use prover::{
-        types::eth::BlockTrace,
         zkevm::{CircuitCapacityChecker, RowUsage},
+        BlockTrace,
     };
     use serde_derive::{Deserialize, Serialize};
     use std::cell::OnceCell;
@@ -17,6 +17,12 @@ pub mod checker {
     #[derive(Debug, Clone, Deserialize, Serialize)]
     pub struct RowUsageResult {
         pub acc_row_usage: Option<RowUsage>,
+        pub error: Option<String>,
+    }
+
+    #[derive(Debug, Clone, Deserialize, Serialize)]
+    pub struct TxNumResult {
+        pub tx_num: u64,
         pub error: Option<String>,
     }
 
@@ -91,13 +97,13 @@ pub mod checker {
         let traces = serde_json::from_slice::<BlockTrace>(&tx_traces_vec)?;
 
         if traces.transactions.len() != 1 {
-            return Err(anyhow!("traces.transactions.len() != 1"));
+            bail!("traces.transactions.len() != 1");
         }
         if traces.execution_results.len() != 1 {
-            return Err(anyhow!("traces.execution_results.len() != 1"));
+            bail!("traces.execution_results.len() != 1");
         }
         if traces.tx_storage_trace.len() != 1 {
-            return Err(anyhow!("traces.tx_storage_trace.len() != 1"));
+            bail!("traces.tx_storage_trace.len() != 1");
         }
 
         let r = panic::catch_unwind(|| {
@@ -114,10 +120,8 @@ pub mod checker {
         });
         match r {
             Ok(result) => result,
-            Err(_) => {
-                return Err(anyhow!(
-                    "estimate_circuit_capacity (id: {id:?}) error in apply_tx"
-                ))
+            Err(e) => {
+                bail!("estimate_circuit_capacity (id: {id:?}) error in apply_tx, error: {e:?}")
             }
         }
     }
@@ -169,12 +173,50 @@ pub mod checker {
         });
         match r {
             Ok(result) => result,
-            Err(_) => {
-                return Err(anyhow!(
-                    "estimate_circuit_capacity (id: {id:?}) error in apply_block"
-                ))
+            Err(e) => {
+                bail!("estimate_circuit_capacity (id: {id:?}) error in apply_block, error: {e:?}")
             }
         }
+    }
+
+    /// # Safety
+    #[no_mangle]
+    pub unsafe extern "C" fn get_tx_num(id: u64) -> *const c_char {
+        let result = get_tx_num_inner(id);
+        let r = match result {
+            Ok(tx_num) => {
+                log::debug!("id: {id}, tx_num: {tx_num}");
+                TxNumResult {
+                    tx_num,
+                    error: None,
+                }
+            }
+            Err(e) => TxNumResult {
+                tx_num: 0,
+                error: Some(format!("{e:?}")),
+            },
+        };
+        serde_json::to_vec(&r).map_or(null(), vec_to_c_char)
+    }
+
+    unsafe fn get_tx_num_inner(id: u64) -> Result<u64, Error> {
+        log::debug!("ccc get_tx_num raw input, id: {id}");
+        panic::catch_unwind(|| {
+            Ok(CHECKERS
+                .get_mut()
+                .ok_or(anyhow!(
+                    "fail to get circuit capacity checkers map in get_tx_num"
+                ))?
+                .get_mut(&id)
+                .ok_or(anyhow!(
+                    "fail to get circuit capacity checker (id: {id}) in get_tx_num"
+                ))?
+                .get_tx_num() as u64)
+        })
+        .map_or_else(
+            |e| bail!("circuit capacity checker (id: {id}) error in get_tx_num: {e:?}"),
+            |result| result,
+        )
     }
 }
 
