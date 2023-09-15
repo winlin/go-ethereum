@@ -436,7 +436,7 @@ func traceTx(ctx *cli.Context) error {
 	}
 
 	// initialize trace env
-	header.Root = state.IntermediateRoot(false)
+	header.Root = state.IntermediateRoot(true)
 	header.Number = big.NewInt(1)
 	block := types.NewBlockWithHeader(header).WithBody([]*types.Transaction{tx}, nil)
 
