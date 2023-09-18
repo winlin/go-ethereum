@@ -293,6 +293,7 @@ var (
 				L1ChainId:             5,
 				L1MessageQueueAddress: common.HexToAddress("0x79DB48002Aa861C8cb189cabc21c6B1468BC83BB"),
 				NumL1MessagesPerBlock: 0,
+				ScrollChainAddress:    common.HexToAddress("0x3C584eC7f0f2764CC715ac3180Ae9828465E9833"),
 			},
 		},
 	}
@@ -331,6 +332,7 @@ var (
 				L1ChainId:             11155111,
 				L1MessageQueueAddress: common.HexToAddress("0xF0B2293F5D834eAe920c6974D50957A1732de763"),
 				NumL1MessagesPerBlock: 10,
+				ScrollChainAddress:    common.HexToAddress("0x2D567EcE699Eabe5afCd141eDB7A4f2D0D6ce8a0"),
 			},
 		},
 	}

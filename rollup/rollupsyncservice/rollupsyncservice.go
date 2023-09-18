@@ -67,7 +67,10 @@ func NewRollupSyncService(ctx context.Context, genesisConfig *params.ChainConfig
 
 	// Initialize the latestProcessedBlock with the block just before the L1 deployment block.
 	// This serves as a default value when there's no L1 rollup events synced in the database.
-	latestProcessedBlock := nodeConfig.L1DeploymentBlock - 1
+	var latestProcessedBlock uint64
+	if nodeConfig.L1DeploymentBlock > 0 {
+		latestProcessedBlock = nodeConfig.L1DeploymentBlock - 1
+	}
 
 	block := rawdb.ReadRollupEventSyncedL1BlockNumber(db)
 	if block != nil {
@@ -308,6 +311,8 @@ func (s *RollupSyncService) getBlocksInRange(chunkRanges []*rawdb.ChunkBlockRang
 		for i := chunkRange.StartBlockNumber; i <= chunkRange.EndBlockNumber; i++ {
 			block := s.bc.GetBlockByNumber(i)
 			if block == nil {
+				// sleep for some time to wait for block syncing.
+				time.Sleep(120 * time.Second)
 				return nil, fmt.Errorf("failed to get block by number: %v", i)
 			}
 			blocks = append(blocks, block)
