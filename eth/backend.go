@@ -218,10 +218,10 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 	}
 	eth.syncService.Start()
 
-	// initialize and start batch event sync service
+	// initialize and start rollup event sync service
 	eth.eventWatcher, err = eventwatcher.NewEventWatcher(context.Background(), chainConfig, stack.Config(), eth.chainDb, l1Client, eth.blockchain)
 	if err != nil {
-		return nil, fmt.Errorf("cannot initialize batch event sync service: %w", err)
+		return nil, fmt.Errorf("cannot initialize rollup event sync service: %w", err)
 	}
 	eth.eventWatcher.Start()
 

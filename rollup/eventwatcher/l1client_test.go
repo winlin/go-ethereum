@@ -10,29 +10,27 @@ import (
 	"github.com/scroll-tech/go-ethereum"
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
-	"github.com/scroll-tech/go-ethereum/rpc"
 )
 
 func TestL1Client(t *testing.T) {
 	ctx := context.Background()
 	mockClient := &mockEthClient{}
-	confirmations := rpc.LatestBlockNumber
 
 	scrollChainABI, err := scrollChainMetaData.GetAbi()
 	if err != nil {
 		t.Fatal("failed to get scroll chain abi", "err", err)
 	}
 	scrollChainAddress := common.HexToAddress("0x0123456789abcdef")
-	l1Client, err := newL1Client(ctx, mockClient, 1, confirmations, scrollChainAddress, scrollChainABI)
+	l1Client, err := newL1Client(ctx, mockClient, 1, scrollChainAddress, scrollChainABI)
 	assert.Nil(t, err, "Failed to initialize L1Client")
 
 	blockNumber, err := l1Client.getLatestFinalizedBlockNumber(ctx)
 	assert.Nil(t, err, "Error getting latest confirmed block number")
 	assert.Equal(t, uint64(36), blockNumber, "Unexpected block number")
 
-	logs, err := l1Client.fetchBatchEventsInRange(ctx, 0, blockNumber)
-	assert.Empty(t, logs, "Expected no logs from fetchBatchEventsInRange")
-	assert.Nil(t, err, "Error fetching batch events in range")
+	logs, err := l1Client.fetchRollupEventsInRange(ctx, 0, blockNumber)
+	assert.Empty(t, logs, "Expected no logs from fetchRollupEventsInRange")
+	assert.Nil(t, err, "Error fetching rollup events in range")
 }
 
 type mockEthClient struct{}

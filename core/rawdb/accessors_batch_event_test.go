@@ -6,7 +6,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/common"
 )
 
-func TestWriteBatchEventSyncedL1BlockNumber(t *testing.T) {
+func TestWriteRollupEventSyncedL1BlockNumber(t *testing.T) {
 	blockNumbers := []uint64{
 		1,
 		1 << 2,
@@ -18,13 +18,13 @@ func TestWriteBatchEventSyncedL1BlockNumber(t *testing.T) {
 	db := NewMemoryDatabase()
 
 	// read non-existing value
-	if got := ReadBatchEventSyncedL1BlockNumber(db); got != nil {
+	if got := ReadRollupEventSyncedL1BlockNumber(db); got != nil {
 		t.Fatal("Expected 0 for non-existing value", "got", *got)
 	}
 
 	for _, num := range blockNumbers {
-		WriteBatchEventSyncedL1BlockNumber(db, num)
-		got := ReadBatchEventSyncedL1BlockNumber(db)
+		WriteRollupEventSyncedL1BlockNumber(db, num)
+		got := ReadRollupEventSyncedL1BlockNumber(db)
 
 		if *got != num {
 			t.Fatal("Block number mismatch", "expected", num, "got", got)
@@ -112,7 +112,7 @@ func TestFinalizedBatchMeta(t *testing.T) {
 }
 
 func TestBatchChunkRanges(t *testing.T) {
-	chunks := [][]*ChunkRange{
+	chunks := [][]*ChunkBlockRange{
 		{
 			{StartBlockNumber: 1, EndBlockNumber: 100},
 			{StartBlockNumber: 101, EndBlockNumber: 200},
@@ -148,7 +148,7 @@ func TestBatchChunkRanges(t *testing.T) {
 	}
 
 	// over-write
-	newRange := []*ChunkRange{{StartBlockNumber: 1001, EndBlockNumber: 1100}}
+	newRange := []*ChunkBlockRange{{StartBlockNumber: 1001, EndBlockNumber: 1100}}
 	WriteBatchChunkRanges(db, 0, newRange)
 	readChunkRange := ReadBatchChunkRanges(db, 0)
 	if len(readChunkRange) != 1 || readChunkRange[0].StartBlockNumber != 1001 || readChunkRange[0].EndBlockNumber != 1100 {

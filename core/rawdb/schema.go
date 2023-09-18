@@ -108,11 +108,11 @@ var (
 	l1MessagePrefix                   = []byte("l1") // l1MessagePrefix + queueIndex (uint64 big endian) -> L1MessageTx
 	firstQueueIndexNotInL2BlockPrefix = []byte("q")  // firstQueueIndexNotInL2BlockPrefix + L2 block hash -> enqueue index
 
-	// Scroll batch event store
-	batchEventSyncedL1BlockNumberKey = []byte("LastBatchEventSyncedL1BlockNumber")
-	batchChunkRangesPrefix           = []byte("bcr")
-	batchMetaPrefix                  = []byte("bm")
-	finalizedL2BlockNumberKey        = []byte("finalized")
+	// Scroll rollup event store
+	rollupEventSyncedL1BlockNumberKey = []byte("LastRollupEventSyncedL1BlockNumber")
+	batchChunkRangesPrefix            = []byte("bcr")
+	batchMetaPrefix                   = []byte("bm")
+	finalizedL2BlockNumberKey         = []byte("finalized")
 
 	// Row consumption
 	rowConsumptionPrefix = []byte("rc") // rowConsumptionPrefix + hash -> row consumption by block

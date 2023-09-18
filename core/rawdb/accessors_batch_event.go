@@ -11,8 +11,8 @@ import (
 	"github.com/scroll-tech/go-ethereum/rlp"
 )
 
-// ChunkRange represents the range of blocks within a chunk.
-type ChunkRange struct {
+// ChunkBlockRange represents the range of blocks within a chunk.
+type ChunkBlockRange struct {
 	StartBlockNumber uint64
 	EndBlockNumber   uint64
 }
@@ -23,17 +23,17 @@ type FinalizedBatchMeta struct {
 	TotalL1MessagePopped uint64
 }
 
-// WriteBatchEventSyncedL1BlockNumber updates the database with the latest synced L1 block number related to batch events in the database.
-func WriteBatchEventSyncedL1BlockNumber(db ethdb.KeyValueWriter, l1BlockNumber uint64) {
+// WriteRollupEventSyncedL1BlockNumber updates the database with the latest synced L1 block number related to rollup events in the database.
+func WriteRollupEventSyncedL1BlockNumber(db ethdb.KeyValueWriter, l1BlockNumber uint64) {
 	value := big.NewInt(0).SetUint64(l1BlockNumber).Bytes()
-	if err := db.Put(batchEventSyncedL1BlockNumberKey, value); err != nil {
-		log.Crit("failed to update synced L1 block number for batch event", "err", err)
+	if err := db.Put(rollupEventSyncedL1BlockNumberKey, value); err != nil {
+		log.Crit("failed to update synced L1 block number for rollup event", "err", err)
 	}
 }
 
-// ReadBatchEventSyncedL1BlockNumber fetches the highest synced L1 block number associated with batch events from the database.
-func ReadBatchEventSyncedL1BlockNumber(db ethdb.Reader) *uint64 {
-	data, err := db.Get(batchEventSyncedL1BlockNumberKey)
+// ReadRollupEventSyncedL1BlockNumber fetches the highest synced L1 block number associated with rollup events from the database.
+func ReadRollupEventSyncedL1BlockNumber(db ethdb.Reader) *uint64 {
+	data, err := db.Get(rollupEventSyncedL1BlockNumberKey)
 	if err != nil && isNotFoundErr(err) {
 		return nil
 	}
@@ -46,14 +46,13 @@ func ReadBatchEventSyncedL1BlockNumber(db ethdb.Reader) *uint64 {
 		log.Crit("unexpected synced L1 block number in database", "number", number)
 	}
 
-	batchEventSyncedL1BlockNumber := number.Uint64()
-	return &batchEventSyncedL1BlockNumber
+	rollupEventSyncedL1BlockNumber := number.Uint64()
+	return &rollupEventSyncedL1BlockNumber
 }
 
 // WriteBatchChunkRanges writes the block ranges for each chunk within a batch to the database.
 // It serializes the chunk ranges using RLP and stores them under a key derived from the batch index.
-func WriteBatchChunkRanges(db ethdb.KeyValueWriter, batchIndex uint64, chunkRanges []*ChunkRange) {
-	var err error
+func WriteBatchChunkRanges(db ethdb.KeyValueWriter, batchIndex uint64, chunkRanges []*ChunkBlockRange) {
 	bytes, err := rlp.EncodeToBytes(chunkRanges)
 	if err != nil {
 		log.Crit("failed to RLP encode batch block range", "batch index", batchIndex, "err", err)
@@ -66,24 +65,23 @@ func WriteBatchChunkRanges(db ethdb.KeyValueWriter, batchIndex uint64, chunkRang
 // DeleteBatchChunkRanges removes the block ranges of all chunks associated with a specific batch from the database.
 // Note: Only committed batches can be reverted.
 func DeleteBatchChunkRanges(db ethdb.KeyValueWriter, batchIndex uint64) {
-	err := db.Delete(batchChunkRangesKey(batchIndex))
-	if err != nil {
+	if err := db.Delete(batchChunkRangesKey(batchIndex)); err != nil {
 		log.Crit("failed to delete batch block range", "batch index", batchIndex, "err", err)
 	}
 }
 
 // ReadBatchChunkRanges retrieves the block ranges of all chunks associated with a specific batch from the database.
-// It returns a list of ChunkRange pointers, or nil if no chunk ranges are found for the given batch index.
-func ReadBatchChunkRanges(db ethdb.Reader, batchIndex uint64) []*ChunkRange {
+// It returns a list of ChunkBlockRange pointers, or nil if no chunk ranges are found for the given batch index.
+func ReadBatchChunkRanges(db ethdb.Reader, batchIndex uint64) []*ChunkBlockRange {
 	data, err := db.Get(batchChunkRangesKey(batchIndex))
 	if err != nil && isNotFoundErr(err) {
 		return nil
 	}
 	if err != nil {
-		log.Crit("failed to read synced L1 block number from database", "err", err)
+		log.Crit("failed to read batch chunk ranges from database", "err", err)
 	}
 
-	cr := new([]*ChunkRange)
+	cr := new([]*ChunkBlockRange)
 	if err := rlp.Decode(bytes.NewReader(data), cr); err != nil {
 		log.Crit("Invalid BatchBlockRange RLP", "batch index", batchIndex, "data", data, "err", err)
 	}
@@ -109,21 +107,21 @@ func ReadFinalizedBatchMeta(db ethdb.Reader, batchIndex uint64) *FinalizedBatchM
 		return nil
 	}
 	if err != nil {
-		log.Crit("failed to read synced L1 block number from database", "err", err)
+		log.Crit("failed to read finalized batch metadata from database", "err", err)
 	}
 
 	fbm := new(FinalizedBatchMeta)
 	if err := rlp.Decode(bytes.NewReader(data), fbm); err != nil {
-		log.Crit("Invalid BatchBlockRange RLP", "batch index", batchIndex, "data", data, "err", err)
+		log.Crit("Invalid FinalizedBatchMeta RLP", "batch index", batchIndex, "data", data, "err", err)
 	}
 	return fbm
 }
 
-// WriteFinalizedL2BlockNumber updates the database with the highest finalized L2 block number in the database.
+// WriteFinalizedL2BlockNumber stores the highest finalized L2 block number in the database.
 func WriteFinalizedL2BlockNumber(db ethdb.KeyValueWriter, l2BlockNumber uint64) {
 	value := big.NewInt(0).SetUint64(l2BlockNumber).Bytes()
 	if err := db.Put(finalizedL2BlockNumberKey, value); err != nil {
-		log.Crit("failed to update finalized L2 block number for batch event", "err", err)
+		log.Crit("failed to update finalized L2 block number for rollup event", "err", err)
 	}
 }
 

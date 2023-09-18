@@ -17,21 +17,19 @@ import (
 )
 
 // L1Client is a wrapper around EthClient that adds
-// methods for conveniently collecting batch events of ScrollChain contract.
+// methods for conveniently collecting rollup events of ScrollChain contract.
 type L1Client struct {
 	ctx                           context.Context
 	client                        sync_service.EthClient
-	confirmations                 rpc.BlockNumber
 	scrollChainAddress            common.Address
 	l1CommitBatchEventSignature   common.Hash
 	l1RevertBatchEventSignature   common.Hash
 	l1FinalizeBatchEventSignature common.Hash
 }
 
-// newL1Client initializes a new L1Client instance with provided configuration.
+// newL1Client initializes a new L1Client instance with the provided configuration.
 // It checks for a valid scrollChainAddress and verifies the chain ID.
-func newL1Client(ctx context.Context, l1Client sync_service.EthClient, l1ChainId uint64, confirmations rpc.BlockNumber,
-	scrollChainAddress common.Address, scrollChainABI *abi.ABI) (*L1Client, error) {
+func newL1Client(ctx context.Context, l1Client sync_service.EthClient, l1ChainId uint64, scrollChainAddress common.Address, scrollChainABI *abi.ABI) (*L1Client, error) {
 	if scrollChainAddress == (common.Address{}) {
 		return nil, errors.New("must pass non-zero scrollChainAddress to L1Client")
 	}
@@ -48,7 +46,6 @@ func newL1Client(ctx context.Context, l1Client sync_service.EthClient, l1ChainId
 	client := L1Client{
 		ctx:                           ctx,
 		client:                        l1Client,
-		confirmations:                 confirmations,
 		scrollChainAddress:            scrollChainAddress,
 		l1CommitBatchEventSignature:   scrollChainABI.Events["CommitBatch"].ID,
 		l1RevertBatchEventSignature:   scrollChainABI.Events["RevertBatch"].ID,
@@ -58,9 +55,9 @@ func newL1Client(ctx context.Context, l1Client sync_service.EthClient, l1ChainId
 	return &client, nil
 }
 
-// fetcBatchEventsInRange retrieves and parses commit/revert/finalize batch events between block numbers: [from, to].
-func (c *L1Client) fetchBatchEventsInRange(ctx context.Context, from, to uint64) ([]types.Log, error) {
-	log.Trace("L1Client fetchBatchEventsInRange", "fromBlock", from, "toBlock", to)
+// fetcRollupEventsInRange retrieves and parses commit/revert/finalize rollup events between block numbers: [from, to].
+func (c *L1Client) fetchRollupEventsInRange(ctx context.Context, from, to uint64) ([]types.Log, error) {
+	log.Trace("L1Client fetchRollupEventsInRange", "fromBlock", from, "toBlock", to)
 
 	query := ethereum.FilterQuery{
 		FromBlock: big.NewInt(int64(from)), // inclusive
