@@ -781,7 +781,7 @@ func (api *ScrollAPI) ResetSkippedTransactionsTraces(ctx context.Context, from u
 	return hashes, nil
 }
 
-// ResetSkippedTransactionTracesByHash reset a specified skipped tx's traces stored in db.
+// ResetSkippedTransactionTracesByHash resets a specified skipped tx's traces stored in db.
 func (api *ScrollAPI) ResetSkippedTransactionTracesByHash(ctx context.Context, hash common.Hash) error {
 	rawdb.ResetSkippedTransactionTracesByHash(api.eth.ChainDb(), hash)
 	return nil

@@ -199,8 +199,13 @@ func WriteSkippedTransaction(db ethdb.Database, tx *types.Transaction, traces *t
 	}
 }
 
+// ResetSkippedTransactionTracesByHash resets the traces stored in local db, by reading the tx and its associated fields,
+// and overwritting it with empty trace
 func ResetSkippedTransactionTracesByHash(db ethdb.Database, txHash common.Hash) {
 	stx := ReadSkippedTransaction(db, txHash)
+	if stx == nil {
+		return
+	}
 	writeSkippedTransaction(db, stx.Tx, nil, stx.Reason, stx.BlockNumber, stx.BlockHash)
 }
 
