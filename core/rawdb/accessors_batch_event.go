@@ -107,7 +107,7 @@ func ReadFinalizedBatchMeta(db ethdb.Reader, batchIndex uint64) *FinalizedBatchM
 		return nil
 	}
 	if err != nil {
-		log.Crit("failed to read finalized batch metadata from database", "err", err)
+		log.Crit("failed to read finalized batch meta from database", "err", err)
 	}
 
 	fbm := new(FinalizedBatchMeta)
