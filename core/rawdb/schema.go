@@ -289,3 +289,13 @@ func SkippedTransactionKey(txHash common.Hash) []byte {
 func SkippedTransactionHashKey(index uint64) []byte {
 	return append(skippedTransactionHashPrefix, encodeBigEndian(index)...)
 }
+
+// batchChunkRangesKey = batchChunkRangesPrefix + batch index
+func batchChunkRangesKey(batchIndex uint64) []byte {
+	return append(batchChunkRangesPrefix, encodeBigEndian(batchIndex)...)
+}
+
+// batchMetaKey = batchMetaPrefix + batch index
+func batchMetaKey(batchIndex uint64) []byte {
+	return append(batchMetaPrefix, encodeBigEndian(batchIndex)...)
+}

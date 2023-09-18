@@ -200,8 +200,8 @@ func (s *EventWatcher) parseAndUpdateRollupEventLogs(logs []types.Log, lastBlock
 				return fmt.Errorf("failed to get local node info, batch index: %v, err: %w", batchIndex, err)
 			}
 
-			if err := reconciliation(batchIndex, batchHash, stateRoot, withdrawRoot, parentBatchMeta, chunks); err != nil {
-				return fmt.Errorf("fatal: reconciliation failed: batch index: %v, err: %w", batchIndex, err)
+			if err := validateBatch(batchIndex, batchHash, stateRoot, withdrawRoot, parentBatchMeta, chunks); err != nil {
+				return fmt.Errorf("fatal: validateBatch failed: batch index: %v, err: %w", batchIndex, err)
 			}
 			rawdb.WriteFinalizedL2BlockNumber(s.db, batchIndex)
 			rawdb.WriteFinalizedBatchMeta(s.db, batchIndex, s.getFinalizedBatchMeta(batchHash, parentBatchMeta, chunks))
@@ -348,9 +348,9 @@ func (s *EventWatcher) convertBlocksToChunks(blocks []*types.Block, chunkRanges 
 	return chunks, nil
 }
 
-// reconciliation verifies the consistency between l1 contract and l2 node data.
+// validateBatch verifies the consistency between l1 contract and l2 node data.
 // crash once any consistency check fails.
-func reconciliation(batchIndex uint64, batchHash common.Hash, stateRoot common.Hash, withdrawRoot common.Hash, parentBatchMeta *rawdb.FinalizedBatchMeta, chunks []*Chunk) error {
+func validateBatch(batchIndex uint64, batchHash common.Hash, stateRoot common.Hash, withdrawRoot common.Hash, parentBatchMeta *rawdb.FinalizedBatchMeta, chunks []*Chunk) error {
 	if len(chunks) == 0 {
 		return fmt.Errorf("invalid arg: length of chunks is 0")
 	}
