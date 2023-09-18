@@ -171,8 +171,7 @@ func (s *EventWatcher) fetchBatchEvents() {
 		}
 
 		if err := s.parseAndUpdateBatchEventLogs(logs, to); err != nil {
-			// crash once update failed to avoid data inconsistency
-			log.Crit("failed to parse and update batch event logs", "err", err)
+			log.Error("failed to parse and update batch event logs", "err", err)
 		}
 	}
 }
@@ -181,31 +180,42 @@ func (s *EventWatcher) parseAndUpdateBatchEventLogs(logs []types.Log, lastBlock 
 	for _, vLog := range logs {
 		switch vLog.Topics[0] {
 		case s.l1CommitBatchEventSignature:
+			event := L1CommitBatchEvent{}
+			if err := UnpackLog(s.scrollChainABI, event, "CommitBatch", vLog); err != nil {
+				return fmt.Errorf("failed to unpack commit batch event log, err: %w", err)
+			}
 			batchIndex := vLog.Topics[1].Big().Uint64()
-			chunkRanges, err := s.getChunkRanges(batchIndex, vLog)
+			chunkRanges, err := s.getChunkRanges(batchIndex, &vLog)
 			if err != nil {
 				return fmt.Errorf("failed to get chunk ranges, err: %w", err)
 			}
 			rawdb.WriteBatchChunkRanges(s.db, batchIndex, chunkRanges)
 
 		case s.l1RevertBatchEventSignature:
+			event := L1RevertBatchEvent{}
+			if err := UnpackLog(s.scrollChainABI, event, "RevertBatch", vLog); err != nil {
+				return fmt.Errorf("failed to unpack revert batch event log, err: %w", err)
+			}
 			batchIndex := vLog.Topics[1].Big().Uint64()
 			rawdb.DeleteBatchChunkRanges(s.db, batchIndex)
 
 		case s.l1FinalizeBatchEventSignature:
-			batchIndex := vLog.Topics[1].Big().Uint64()
-			batchHash := vLog.Topics[2]
-			stateRoot := common.BytesToHash(vLog.Data[0:32])
-			withdrawRoot := common.BytesToHash(vLog.Data[32:64])
+			event := L1FinalizeBatchEvent{}
+			if err := UnpackLog(s.scrollChainABI, event, "FinalizeBatch", vLog); err != nil {
+				return fmt.Errorf("failed to unpack finalized batch event log, err: %w", err)
+			}
+			batchIndex := event.BatchIndex.Uint64()
+			batchHash := event.BatchHash
+			stateRoot := event.StateRoot
+			withdrawRoot := event.WithdrawRoot
 
 			parentBatchMeta, chunks, err := s.getLocalInfo(batchIndex)
 			if err != nil {
 				return fmt.Errorf("failed to get local node info, batch index: %v, err: %w", batchIndex, err)
 			}
 
-			valid, err := reconciliation(batchIndex, batchHash, stateRoot, withdrawRoot, parentBatchMeta, chunks)
-			if err != nil || !valid {
-				return fmt.Errorf("fatal: reconciliation failed: batch index: %v, valid: %v, err: %w", batchIndex, valid, err)
+			if err := reconciliation(batchIndex, batchHash, stateRoot, withdrawRoot, parentBatchMeta, chunks); err != nil {
+				return fmt.Errorf("fatal: reconciliation failed: batch index: %v, err: %w", batchIndex, err)
 			}
 			rawdb.WriteFinalizedL2BlockNumber(s.db, batchIndex)
 			rawdb.WriteFinalizedBatchMeta(s.db, batchIndex, s.getFinalizedBatchMeta(batchHash, parentBatchMeta, chunks))
@@ -252,7 +262,7 @@ func (s *EventWatcher) getLocalInfo(batchIndex uint64) (*rawdb.FinalizedBatchMet
 	return parentBatchMeta, chunks, nil
 }
 
-func (s *EventWatcher) getChunkRanges(batchIndex uint64, vLog types.Log) ([]*rawdb.ChunkRange, error) {
+func (s *EventWatcher) getChunkRanges(batchIndex uint64, vLog *types.Log) ([]*rawdb.ChunkRange, error) {
 	if batchIndex == 0 {
 		return []*rawdb.ChunkRange{{StartBlockNumber: 0, EndBlockNumber: 0}}, nil
 	}
@@ -353,31 +363,35 @@ func (s *EventWatcher) convertBlocksToChunks(blocks []*types.Block, chunkRanges 
 }
 
 // reconciliation verifies the consistency between l1 contract and l2 node data.
-func reconciliation(batchIndex uint64, batchHash common.Hash, stateRoot common.Hash, withdrawRoot common.Hash, parentBatchMeta *rawdb.FinalizedBatchMeta, chunks []*Chunk) (bool, error) {
+// crash once the consistency check fails.
+func reconciliation(batchIndex uint64, batchHash common.Hash, stateRoot common.Hash, withdrawRoot common.Hash, parentBatchMeta *rawdb.FinalizedBatchMeta, chunks []*Chunk) error {
 	if len(chunks) == 0 {
-		return false, fmt.Errorf("invalid arg: chunks length is 0")
+		return fmt.Errorf("invalid arg: length of chunks is 0")
 	}
 	lastChunk := chunks[len(chunks)-1]
+	if len(lastChunk.Blocks) == 0 {
+		return fmt.Errorf("invalid arg: block number of last chunk is 0")
+	}
 	lastBlock := lastChunk.Blocks[len(lastChunk.Blocks)-1]
 	localWithdrawRoot := lastBlock.WithdrawRoot
 	if localWithdrawRoot != withdrawRoot {
-		return false, fmt.Errorf("fatal: withdraw root mismatch, l1 withdraw root: %v, l2 withdraw root: %v", withdrawRoot.Hex(), localWithdrawRoot.Hex())
+		log.Crit("Withdraw root mismatch", "l1 withdraw root", withdrawRoot.Hex(), "l2 withdraw root", localWithdrawRoot.Hex())
 	}
 
 	localStateRoot := lastBlock.Header.Root
 	if localStateRoot != stateRoot {
-		return false, fmt.Errorf("fatal: state root mismatch, l1 state root: %v, l2 state root: %v", stateRoot.Hex(), localStateRoot.Hex())
+		log.Crit("State root mismatch", "l1 state root", stateRoot.Hex(), "l2 state root", localStateRoot.Hex())
 	}
 
 	batchHeader, err := NewBatchHeader(batchHeaderVersion, batchIndex, parentBatchMeta.TotalL1MessagePopped, parentBatchMeta.BatchHash, chunks)
 	if err != nil {
-		return false, fmt.Errorf("failed to construct batch header, err: %w", err)
+		return fmt.Errorf("failed to construct batch header, err: %w", err)
 	}
 
 	localBatchHash := batchHeader.Hash()
 	if localBatchHash != batchHash {
-		return false, fmt.Errorf("fatal: batch hash mismatch, expected: %v, got: %v", batchHash.Hex(), localBatchHash.Hex())
+		log.Crit("Batch hash mismatch", "l1 batch hash", batchHash.Hex(), "l2 batch hash", localBatchHash.Hex())
 	}
 
-	return true, nil
+	return nil
 }
