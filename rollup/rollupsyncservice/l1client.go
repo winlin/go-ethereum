@@ -1,4 +1,4 @@
-package eventwatcher
+package rollupsyncservice
 
 import (
 	"context"

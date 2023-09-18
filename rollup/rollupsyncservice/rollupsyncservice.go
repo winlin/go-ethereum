@@ -1,4 +1,4 @@
-package eventwatcher
+package rollupsyncservice
 
 import (
 	"context"
@@ -30,8 +30,8 @@ const (
 	defaultPollInterval = time.Second * 60
 )
 
-// EventWatcher collects ScrollChain batch commit/revert/finalize events and stores metadata into db.
-type EventWatcher struct {
+// RollupSyncService collects ScrollChain batch commit/revert/finalize events and stores metadata into db.
+type RollupSyncService struct {
 	ctx                           context.Context
 	cancel                        context.CancelFunc
 	client                        *L1Client
@@ -44,7 +44,7 @@ type EventWatcher struct {
 	bc                            *core.BlockChain
 }
 
-func NewEventWatcher(ctx context.Context, genesisConfig *params.ChainConfig, nodeConfig *node.Config, db ethdb.Database, l1Client sync_service.EthClient, bc *core.BlockChain) (*EventWatcher, error) {
+func NewRollupSyncService(ctx context.Context, genesisConfig *params.ChainConfig, nodeConfig *node.Config, db ethdb.Database, l1Client sync_service.EthClient, bc *core.BlockChain) (*RollupSyncService, error) {
 	// terminate if the caller does not provide an L1 client (e.g. in tests)
 	if l1Client == nil || (reflect.ValueOf(l1Client).Kind() == reflect.Ptr && reflect.ValueOf(l1Client).IsNil()) {
 		log.Warn("No L1 client provided, L1 rollup sync service will not run")
@@ -77,7 +77,7 @@ func NewEventWatcher(ctx context.Context, genesisConfig *params.ChainConfig, nod
 
 	ctx, cancel := context.WithCancel(ctx)
 
-	service := EventWatcher{
+	service := RollupSyncService{
 		ctx:                           ctx,
 		cancel:                        cancel,
 		client:                        client,
@@ -93,7 +93,7 @@ func NewEventWatcher(ctx context.Context, genesisConfig *params.ChainConfig, nod
 	return &service, nil
 }
 
-func (s *EventWatcher) Start() {
+func (s *RollupSyncService) Start() {
 	if s == nil {
 		return
 	}
@@ -117,7 +117,7 @@ func (s *EventWatcher) Start() {
 	}()
 }
 
-func (s *EventWatcher) Stop() {
+func (s *RollupSyncService) Stop() {
 	if s == nil {
 		return
 	}
@@ -129,7 +129,7 @@ func (s *EventWatcher) Stop() {
 	}
 }
 
-func (s *EventWatcher) fetchRollupEvents() {
+func (s *RollupSyncService) fetchRollupEvents() {
 	latestConfirmed, err := s.client.getLatestFinalizedBlockNumber(s.ctx)
 	if err != nil {
 		log.Warn("failed to get latest confirmed block number", "err", err)
@@ -162,7 +162,7 @@ func (s *EventWatcher) fetchRollupEvents() {
 	}
 }
 
-func (s *EventWatcher) parseAndUpdateRollupEventLogs(logs []types.Log, lastBlock uint64) error {
+func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, lastBlock uint64) error {
 	for _, vLog := range logs {
 		switch vLog.Topics[0] {
 		case s.l1CommitBatchEventSignature:
@@ -203,7 +203,9 @@ func (s *EventWatcher) parseAndUpdateRollupEventLogs(logs []types.Log, lastBlock
 			if err := validateBatch(batchIndex, batchHash, stateRoot, withdrawRoot, parentBatchMeta, chunks); err != nil {
 				return fmt.Errorf("fatal: validateBatch failed: batch index: %v, err: %w", batchIndex, err)
 			}
-			rawdb.WriteFinalizedL2BlockNumber(s.db, batchIndex)
+			lastChunk := chunks[len(chunks)-1]
+			lastBlock := lastChunk.Blocks[len(lastChunk.Blocks)-1]
+			rawdb.WriteFinalizedL2BlockNumber(s.db, lastBlock.Header.Number.Uint64())
 			rawdb.WriteFinalizedBatchMeta(s.db, batchIndex, s.getFinalizedBatchMeta(batchHash, parentBatchMeta, chunks))
 
 		default:
@@ -211,13 +213,16 @@ func (s *EventWatcher) parseAndUpdateRollupEventLogs(logs []types.Log, lastBlock
 		}
 	}
 
+	// note: the batch updates above are idempotent, if we crash
+	// before this line and reexecute the previous steps, we will
+	// get the same result.
 	rawdb.WriteRollupEventSyncedL1BlockNumber(s.db, lastBlock)
 	s.latestProcessedBlock = lastBlock
 
 	return nil
 }
 
-func (s *EventWatcher) getFinalizedBatchMeta(batchHash common.Hash, parentBatchMeta *rawdb.FinalizedBatchMeta, chunks []*Chunk) rawdb.FinalizedBatchMeta {
+func (s *RollupSyncService) getFinalizedBatchMeta(batchHash common.Hash, parentBatchMeta *rawdb.FinalizedBatchMeta, chunks []*Chunk) rawdb.FinalizedBatchMeta {
 	totalL1MessagePopped := parentBatchMeta.TotalL1MessagePopped
 	for _, chunk := range chunks {
 		totalL1MessagePopped += chunk.NumL1Messages(totalL1MessagePopped)
@@ -228,7 +233,7 @@ func (s *EventWatcher) getFinalizedBatchMeta(batchHash common.Hash, parentBatchM
 	}
 }
 
-func (s *EventWatcher) getLocalInfo(batchIndex uint64) (*rawdb.FinalizedBatchMeta, []*Chunk, error) {
+func (s *RollupSyncService) getLocalInfo(batchIndex uint64) (*rawdb.FinalizedBatchMeta, []*Chunk, error) {
 	chunkRanges := rawdb.ReadBatchChunkRanges(s.db, batchIndex)
 	blocks, err := s.getBlocksInRange(chunkRanges)
 	if err != nil {
@@ -248,7 +253,7 @@ func (s *EventWatcher) getLocalInfo(batchIndex uint64) (*rawdb.FinalizedBatchMet
 	return parentBatchMeta, chunks, nil
 }
 
-func (s *EventWatcher) getChunkRanges(batchIndex uint64, vLog *types.Log) ([]*rawdb.ChunkBlockRange, error) {
+func (s *RollupSyncService) getChunkRanges(batchIndex uint64, vLog *types.Log) ([]*rawdb.ChunkBlockRange, error) {
 	if batchIndex == 0 {
 		return []*rawdb.ChunkBlockRange{{StartBlockNumber: 0, EndBlockNumber: 0}}, nil
 	}
@@ -261,7 +266,9 @@ func (s *EventWatcher) getChunkRanges(batchIndex uint64, vLog *types.Log) ([]*ra
 	return s.decodeChunkRanges(tx.Data())
 }
 
-func (s *EventWatcher) decodeChunkRanges(txData []byte) ([]*rawdb.ChunkBlockRange, error) {
+// decodeChunkRanges decodes chunks in a batch based on the commit batch transaction's calldata.
+// Note: We assume that `commitBatch` is always the outermost call, never an internal transaction.
+func (s *RollupSyncService) decodeChunkRanges(txData []byte) ([]*rawdb.ChunkBlockRange, error) {
 	decoded, err := s.scrollChainABI.Unpack("commitBatch", txData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode transaction data, err: %w", err)
@@ -294,7 +301,7 @@ func (s *EventWatcher) decodeChunkRanges(txData []byte) ([]*rawdb.ChunkBlockRang
 }
 
 // getBlocksInRange retrieves blocks from the blockchain within specified chunk ranges.
-func (s *EventWatcher) getBlocksInRange(chunkRanges []*rawdb.ChunkBlockRange) ([]*types.Block, error) {
+func (s *RollupSyncService) getBlocksInRange(chunkRanges []*rawdb.ChunkBlockRange) ([]*types.Block, error) {
 	var blocks []*types.Block
 
 	for _, chunkRange := range chunkRanges {
@@ -311,7 +318,7 @@ func (s *EventWatcher) getBlocksInRange(chunkRanges []*rawdb.ChunkBlockRange) ([
 }
 
 // convertBlocksToChunks processes and groups blocks into chunks based on the provided chunk ranges.
-func (s *EventWatcher) convertBlocksToChunks(blocks []*types.Block, chunkRanges []*rawdb.ChunkBlockRange) ([]*Chunk, error) {
+func (s *RollupSyncService) convertBlocksToChunks(blocks []*types.Block, chunkRanges []*rawdb.ChunkBlockRange) ([]*Chunk, error) {
 	if len(blocks) == 0 {
 		return nil, fmt.Errorf("invalid arg: empty blocks")
 	}
