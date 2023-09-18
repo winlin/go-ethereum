@@ -310,7 +310,7 @@ func (s *EventWatcher) getBlocksInRange(chunkRanges []*rawdb.ChunkBlockRange) ([
 	return blocks, nil
 }
 
-// convertBlocksToChunks processes and groups blocks into chunks based on provided chunk ranges.
+// convertBlocksToChunks processes and groups blocks into chunks based on the provided chunk ranges.
 func (s *EventWatcher) convertBlocksToChunks(blocks []*types.Block, chunkRanges []*rawdb.ChunkBlockRange) ([]*Chunk, error) {
 	if len(blocks) == 0 {
 		return nil, fmt.Errorf("invalid arg: empty blocks")
