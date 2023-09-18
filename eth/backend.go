@@ -223,7 +223,7 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 	if err != nil {
 		return nil, fmt.Errorf("cannot initialize batch event sync service: %w", err)
 	}
-	go eth.eventWatcher.Start() // run as a background routine
+	eth.eventWatcher.Start()
 
 	// Permit the downloader to use the trie cache allowance during fast sync
 	cacheLimit := cacheConfig.TrieCleanLimit + cacheConfig.TrieDirtyLimit + cacheConfig.SnapshotLimit

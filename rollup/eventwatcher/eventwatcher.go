@@ -205,7 +205,7 @@ func (s *EventWatcher) parseAndUpdateBatchEventLogs(logs []types.Log, lastBlock 
 
 			valid, err := reconciliation(batchIndex, batchHash, stateRoot, withdrawRoot, parentBatchMeta, chunks)
 			if err != nil || !valid {
-				return fmt.Errorf("fatal: reconciliation failed: batch index: %v, valid %v, err: %w", batchIndex, valid, err)
+				return fmt.Errorf("fatal: reconciliation failed: batch index: %v, valid: %v, err: %w", batchIndex, valid, err)
 			}
 			rawdb.WriteFinalizedL2BlockNumber(s.db, batchIndex)
 			rawdb.WriteFinalizedBatchMeta(s.db, batchIndex, s.getFinalizedBatchMeta(batchHash, parentBatchMeta, chunks))
