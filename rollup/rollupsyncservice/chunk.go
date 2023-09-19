@@ -51,7 +51,7 @@ func (c *Chunk) Encode(totalL1MessagePoppedBefore uint64) ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to encode block: %v", err)
 		}
-		totalL1MessagePoppedBefore += block.NumL1Messages(totalL1MessagePoppedBefore)
+		totalL1MessagePoppedBefore += block.numL1Messages(totalL1MessagePoppedBefore)
 
 		if len(blockBytes) != 60 {
 			return nil, fmt.Errorf("block encoding is not 60 bytes long %x", len(blockBytes))
