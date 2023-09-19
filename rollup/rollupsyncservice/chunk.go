@@ -22,7 +22,7 @@ type Chunk struct {
 func (c *Chunk) NumL1Messages(totalL1MessagePoppedBefore uint64) uint64 {
 	var numL1Messages uint64
 	for _, block := range c.Blocks {
-		numL1MessagesInBlock := block.NumL1Messages(totalL1MessagePoppedBefore)
+		numL1MessagesInBlock := block.numL1Messages(totalL1MessagePoppedBefore)
 		numL1Messages += numL1MessagesInBlock
 		totalL1MessagePoppedBefore += numL1MessagesInBlock
 	}

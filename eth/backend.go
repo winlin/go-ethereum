@@ -219,7 +219,7 @@ func New(stack *node.Node, config *ethconfig.Config, l1Client sync_service.EthCl
 	eth.syncService.Start()
 
 	// initialize and start rollup event sync service
-	eth.rollupSyncService, err = rollupsyncservice.NewRollupSyncService(context.Background(), chainConfig, stack.Config(), eth.chainDb, l1Client, eth.blockchain)
+	eth.rollupSyncService, err = rollupsyncservice.NewRollupSyncService(context.Background(), chainConfig, stack.Config(), eth.chainDb, l1Client, eth.blockchain, stack)
 	if err != nil {
 		return nil, fmt.Errorf("cannot initialize rollup event sync service: %w", err)
 	}

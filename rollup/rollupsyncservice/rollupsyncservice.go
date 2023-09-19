@@ -3,6 +3,7 @@ package rollupsyncservice
 import (
 	"context"
 	"fmt"
+	"os"
 	"reflect"
 	"strconv"
 	"time"
@@ -42,9 +43,10 @@ type RollupSyncService struct {
 	l1RevertBatchEventSignature   common.Hash
 	l1FinalizeBatchEventSignature common.Hash
 	bc                            *core.BlockChain
+	node                          *node.Node // to graceful shutdown the node
 }
 
-func NewRollupSyncService(ctx context.Context, genesisConfig *params.ChainConfig, nodeConfig *node.Config, db ethdb.Database, l1Client sync_service.EthClient, bc *core.BlockChain) (*RollupSyncService, error) {
+func NewRollupSyncService(ctx context.Context, genesisConfig *params.ChainConfig, nodeConfig *node.Config, db ethdb.Database, l1Client sync_service.EthClient, bc *core.BlockChain, node *node.Node) (*RollupSyncService, error) {
 	// terminate if the caller does not provide an L1 client (e.g. in tests)
 	if l1Client == nil || (reflect.ValueOf(l1Client).Kind() == reflect.Ptr && reflect.ValueOf(l1Client).IsNil()) {
 		log.Warn("No L1 client provided, L1 rollup sync service will not run")
@@ -91,6 +93,7 @@ func NewRollupSyncService(ctx context.Context, genesisConfig *params.ChainConfig
 		l1RevertBatchEventSignature:   scrollChainABI.Events["RevertBatch"].ID,
 		l1FinalizeBatchEventSignature: scrollChainABI.Events["FinalizeBatch"].ID,
 		bc:                            bc,
+		node:                          node,
 	}
 
 	return &service, nil
@@ -203,7 +206,7 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, last
 				return fmt.Errorf("failed to get local node info, batch index: %v, err: %w", batchIndex, err)
 			}
 
-			if err := validateBatch(batchIndex, batchHash, stateRoot, withdrawRoot, parentBatchMeta, chunks); err != nil {
+			if err := s.validateBatch(batchIndex, batchHash, stateRoot, withdrawRoot, parentBatchMeta, chunks); err != nil {
 				return fmt.Errorf("fatal: validateBatch failed: batch index: %v, err: %w", batchIndex, err)
 			}
 			lastChunk := chunks[len(chunks)-1]
@@ -361,8 +364,8 @@ func (s *RollupSyncService) convertBlocksToChunks(blocks []*types.Block, chunkRa
 }
 
 // validateBatch verifies the consistency between l1 contract and l2 node data.
-// crash once any consistency check fails.
-func validateBatch(batchIndex uint64, batchHash common.Hash, stateRoot common.Hash, withdrawRoot common.Hash, parentBatchMeta *rawdb.FinalizedBatchMeta, chunks []*Chunk) error {
+// close the node and exit once any consistency check fails.
+func (s *RollupSyncService) validateBatch(batchIndex uint64, batchHash common.Hash, stateRoot common.Hash, withdrawRoot common.Hash, parentBatchMeta *rawdb.FinalizedBatchMeta, chunks []*Chunk) error {
 	if len(chunks) == 0 {
 		return fmt.Errorf("invalid arg: length of chunks is 0")
 	}
@@ -373,12 +376,16 @@ func validateBatch(batchIndex uint64, batchHash common.Hash, stateRoot common.Ha
 	lastBlock := lastChunk.Blocks[len(lastChunk.Blocks)-1]
 	localWithdrawRoot := lastBlock.WithdrawRoot
 	if localWithdrawRoot != withdrawRoot {
-		log.Crit("Withdraw root mismatch", "l1 withdraw root", withdrawRoot.Hex(), "l2 withdraw root", localWithdrawRoot.Hex())
+		log.Error("Withdraw root mismatch", "l1 withdraw root", withdrawRoot.Hex(), "l2 withdraw root", localWithdrawRoot.Hex())
+		s.node.Close()
+		os.Exit(1)
 	}
 
 	localStateRoot := lastBlock.Header.Root
 	if localStateRoot != stateRoot {
-		log.Crit("State root mismatch", "l1 state root", stateRoot.Hex(), "l2 state root", localStateRoot.Hex())
+		log.Error("State root mismatch", "l1 state root", stateRoot.Hex(), "l2 state root", localStateRoot.Hex())
+		s.node.Close()
+		os.Exit(1)
 	}
 
 	batchHeader, err := NewBatchHeader(batchHeaderVersion, batchIndex, parentBatchMeta.TotalL1MessagePopped, parentBatchMeta.BatchHash, chunks)
@@ -388,7 +395,9 @@ func validateBatch(batchIndex uint64, batchHash common.Hash, stateRoot common.Ha
 
 	localBatchHash := batchHeader.Hash()
 	if localBatchHash != batchHash {
-		log.Crit("Batch hash mismatch", "l1 batch hash", batchHash.Hex(), "l2 batch hash", localBatchHash.Hex())
+		log.Error("Batch hash mismatch", "l1 batch hash", batchHash.Hex(), "l2 batch hash", localBatchHash.Hex())
+		s.node.Close()
+		os.Exit(1)
 	}
 
 	return nil

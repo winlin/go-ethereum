@@ -19,9 +19,9 @@ type WrappedBlock struct {
 	WithdrawRoot common.Hash              `json:"withdraw_trie_root,omitempty"`
 }
 
-// NumL1Messages returns the number of L1 messages in this block.
+// numL1Messages returns the number of L1 messages in this block.
 // This number is the sum of included and skipped L1 messages.
-func (w *WrappedBlock) NumL1Messages(totalL1MessagePoppedBefore uint64) uint64 {
+func (w *WrappedBlock) numL1Messages(totalL1MessagePoppedBefore uint64) uint64 {
 	var lastQueueIndex *uint64
 	for _, txData := range w.Transactions {
 		if txData.Type == types.L1MessageTxType {
@@ -45,7 +45,7 @@ func (w *WrappedBlock) Encode(totalL1MessagePoppedBefore uint64) ([]byte, error)
 	}
 
 	// note: numL1Messages includes skipped messages
-	numL1Messages := w.NumL1Messages(totalL1MessagePoppedBefore)
+	numL1Messages := w.numL1Messages(totalL1MessagePoppedBefore)
 	if numL1Messages > math.MaxUint16 {
 		return nil, errors.New("number of L1 messages exceeds max uint16")
 	}
