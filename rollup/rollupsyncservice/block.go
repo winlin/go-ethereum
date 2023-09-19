@@ -5,11 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"math/big"
 
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
 	"github.com/scroll-tech/go-ethereum/core/types"
 )
+
+const blockContextByteSize = 60
 
 // WrappedBlock contains the block's Header, Transactions and WithdrawTrieRoot hash.
 type WrappedBlock struct {
@@ -17,6 +20,19 @@ type WrappedBlock struct {
 	// Transactions is only used for recover types.Transactions, the from of types.TransactionData field is missing.
 	Transactions []*types.TransactionData `json:"transactions"`
 	WithdrawRoot common.Hash              `json:"withdraw_trie_root,omitempty"`
+}
+
+// BlockContext represents the essential data of a block in the ScrollChain.
+// It provides an overview of block attributes including hash values, block numbers, gas details, and transaction counts.
+type BlockContext struct {
+	BlockHash       common.Hash
+	ParentHash      common.Hash
+	BlockNumber     uint64
+	Timestamp       uint64
+	BaseFee         *big.Int
+	GasLimit        uint64
+	NumTransactions uint16
+	NumL1Messages   uint16
 }
 
 // numL1Messages returns the number of L1 messages in this block.
@@ -134,4 +150,18 @@ func (w *WrappedBlock) numL2Transactions() uint64 {
 		}
 	}
 	return count
+}
+
+func decodeBlockContext(encodedBlockContext []byte) (*BlockContext, error) {
+	if len(encodedBlockContext) != blockContextByteSize {
+		return nil, errors.New("block encoding is not 60 bytes long")
+	}
+
+	return &BlockContext{
+		BlockNumber:     binary.BigEndian.Uint64(encodedBlockContext[0:8]),
+		Timestamp:       binary.BigEndian.Uint64(encodedBlockContext[8:16]),
+		GasLimit:        binary.BigEndian.Uint64(encodedBlockContext[48:56]),
+		NumTransactions: binary.BigEndian.Uint16(encodedBlockContext[56:58]),
+		NumL1Messages:   binary.BigEndian.Uint16(encodedBlockContext[58:60]),
+	}, nil
 }

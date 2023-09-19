@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"reflect"
-	"strconv"
 	"time"
 
 	"github.com/scroll-tech/go-ethereum/accounts/abi"
@@ -284,26 +283,12 @@ func (s *RollupSyncService) decodeChunkRanges(txData []byte) ([]*rawdb.ChunkBloc
 		return nil, fmt.Errorf("invalid decoded length, expected: 4, got: %v,", len(decoded))
 	}
 
-	chunks := decoded[2].([]string)
-	var chunkRanges []*rawdb.ChunkBlockRange
-	startBlockNumber, err := strconv.ParseUint(chunks[0][4:20], 16, 64)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse blockNumber, err: %w", err)
+	chunks, ok := decoded[2].([][]byte)
+	if !ok {
+		return nil, fmt.Errorf("failed to cast chunks to slice of byte slices")
 	}
 
-	for _, chunk := range chunks {
-		numBlocks, err := strconv.ParseUint(chunk[0:4], 16, 8)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse numBlocks, err: %w", err)
-		}
-		chunkRanges = append(chunkRanges, &rawdb.ChunkBlockRange{
-			StartBlockNumber: startBlockNumber,
-			EndBlockNumber:   startBlockNumber + numBlocks - 1,
-		})
-		startBlockNumber += numBlocks
-	}
-
-	return chunkRanges, nil
+	return DecodeChunkRanges(chunks)
 }
 
 // getBlocksInRange retrieves blocks from the blockchain within specified chunk ranges.

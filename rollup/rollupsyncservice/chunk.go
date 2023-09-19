@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/scroll-tech/go-ethereum/common"
+	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/crypto"
 )
@@ -117,4 +118,38 @@ func (c *Chunk) Hash(totalL1MessagePoppedBefore uint64) (common.Hash, error) {
 
 	hash := crypto.Keccak256Hash(dataBytes)
 	return hash, nil
+}
+
+// DecodeChunkRanges decodes the provided chunks into a list of block ranges. Each chunk
+// contains information about multiple blocks, which are decoded and their ranges (from the
+// start block to the end block) are returned.
+func DecodeChunkRanges(chunks [][]byte) ([]*rawdb.ChunkBlockRange, error) {
+	var chunkRanges []*rawdb.ChunkBlockRange
+	for _, chunk := range chunks {
+		if len(chunk) < 1 {
+			return nil, fmt.Errorf("invalid chunk, length is less than 1")
+		}
+
+		numBlocks := int(chunk[0])
+		if len(chunk) < 1+numBlocks*blockContextByteSize {
+			return nil, fmt.Errorf("chunk size doesn't match with numBlocks")
+		}
+
+		blockContexts := make([]*BlockContext, numBlocks)
+		for i := 0; i < numBlocks; i++ {
+			startIdx := 1 + i*blockContextByteSize // add 1 to skip numBlocks byte
+			endIdx := startIdx + blockContextByteSize
+			blockContext, err := decodeBlockContext(chunk[startIdx:endIdx])
+			if err != nil {
+				return nil, err
+			}
+			blockContexts[i] = blockContext
+		}
+
+		chunkRanges = append(chunkRanges, &rawdb.ChunkBlockRange{
+			StartBlockNumber: blockContexts[0].BlockNumber,
+			EndBlockNumber:   blockContexts[len(blockContexts)-1].BlockNumber,
+		})
+	}
+	return chunkRanges, nil
 }
