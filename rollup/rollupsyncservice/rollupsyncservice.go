@@ -310,12 +310,24 @@ func (s *RollupSyncService) decodeChunkRanges(txData []byte) ([]*rawdb.ChunkBloc
 func (s *RollupSyncService) getBlocksInRange(chunkRanges []*rawdb.ChunkBlockRange) ([]*types.Block, error) {
 	var blocks []*types.Block
 
+	latestBlockNumber := s.bc.CurrentBlock().Number().Uint64()
+
+	var maxRequestedBlockNumber uint64
+	for _, chunkRange := range chunkRanges {
+		if chunkRange.EndBlockNumber > maxRequestedBlockNumber {
+			maxRequestedBlockNumber = chunkRange.EndBlockNumber
+		}
+	}
+
+	if latestBlockNumber < maxRequestedBlockNumber {
+		time.Sleep(180 * time.Second)
+		return nil, fmt.Errorf("local node is not synced up to the required block height: %v", maxRequestedBlockNumber)
+	}
+
 	for _, chunkRange := range chunkRanges {
 		for i := chunkRange.StartBlockNumber; i <= chunkRange.EndBlockNumber; i++ {
 			block := s.bc.GetBlockByNumber(i)
 			if block == nil {
-				// sleep for some time to wait for block syncing.
-				time.Sleep(120 * time.Second)
 				return nil, fmt.Errorf("failed to get block by number: %v", i)
 			}
 			blocks = append(blocks, block)
