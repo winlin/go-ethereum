@@ -214,7 +214,7 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 			rawdb.WriteFinalizedBatchMeta(s.db, batchIndex, calculateFinalizedBatchMeta(parentBatchMeta, event.BatchHash, chunks))
 
 			if batchIndex%100 == 0 {
-				log.Info("finalized batch progress", "BatchIdx", batchIndex, "L2BlockNum", endBlock.Header.Number.Uint64())
+				log.Info("finalized batch progress", "batch index", batchIndex, "finalized l2 block height", endBlock.Header.Number.Uint64())
 			}
 
 		default:
