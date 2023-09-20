@@ -6,8 +6,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/stretchr/testify/require"
+
+	"github.com/scroll-tech/go-ethereum/core/rawdb"
 )
 
 func TestDecodeChunkRanges(t *testing.T) {
@@ -30,6 +31,10 @@ func TestDecodeChunkRanges(t *testing.T) {
 	require.NoError(t, err, "Failed to unmarshal transaction json")
 
 	testTxData, err := hex.DecodeString(txObj.CallData[2:])
+	if err != nil {
+		t.Fatalf("Failed to decode string: %v", err)
+	}
+
 	ranges, err := service.decodeChunkRanges(testTxData)
 	if err != nil {
 		t.Fatalf("Failed to decode chunk ranges: %v", err)
