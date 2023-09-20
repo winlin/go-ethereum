@@ -176,6 +176,7 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 				return fmt.Errorf("failed to unpack commit rollup event log, err: %w", err)
 			}
 			batchIndex := vLog.Topics[1].Big().Uint64()
+
 			chunkBlockRanges, err := s.getChunkRanges(batchIndex, &vLog)
 			if err != nil {
 				return fmt.Errorf("failed to get chunk ranges, err: %w", err)
@@ -188,6 +189,7 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 				return fmt.Errorf("failed to unpack revert rollup event log, err: %w", err)
 			}
 			batchIndex := vLog.Topics[1].Big().Uint64()
+
 			rawdb.DeleteBatchChunkRanges(s.db, batchIndex)
 
 		case s.l1FinalizeBatchEventSignature:
@@ -203,7 +205,7 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 			}
 
 			if err := validateBatch(event, parentBatchMeta, chunks, s.node); err != nil {
-				return fmt.Errorf("fatal: validateBatch failed: finalize event: %v, err: %w", event, err)
+				return fmt.Errorf("fatal: validateBatch failed: finalize event: %v, err: %w", *event, err)
 			}
 			endChunk := chunks[len(chunks)-1]
 			endBlock := endChunk.Blocks[len(endChunk.Blocks)-1]
