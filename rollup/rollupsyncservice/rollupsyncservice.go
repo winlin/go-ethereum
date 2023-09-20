@@ -171,7 +171,7 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 	for _, vLog := range logs {
 		switch vLog.Topics[0] {
 		case s.l1CommitBatchEventSignature:
-			event := L1CommitBatchEvent{}
+			event := &L1CommitBatchEvent{}
 			if err := UnpackLog(s.scrollChainABI, event, "CommitBatch", vLog); err != nil {
 				return fmt.Errorf("failed to unpack commit rollup event log, err: %w", err)
 			}
@@ -183,7 +183,7 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 			rawdb.WriteBatchChunkRanges(s.db, batchIndex, chunkBlockRanges)
 
 		case s.l1RevertBatchEventSignature:
-			event := L1RevertBatchEvent{}
+			event := &L1RevertBatchEvent{}
 			if err := UnpackLog(s.scrollChainABI, event, "RevertBatch", vLog); err != nil {
 				return fmt.Errorf("failed to unpack revert rollup event log, err: %w", err)
 			}
@@ -191,14 +191,15 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 			rawdb.DeleteBatchChunkRanges(s.db, batchIndex)
 
 		case s.l1FinalizeBatchEventSignature:
-			event := L1FinalizeBatchEvent{}
+			event := &L1FinalizeBatchEvent{}
 			if err := UnpackLog(s.scrollChainABI, event, "FinalizeBatch", vLog); err != nil {
 				return fmt.Errorf("failed to unpack finalized rollup event log, err: %w", err)
 			}
+			batchIndex := event.BatchIndex.Uint64()
 
-			parentBatchMeta, chunks, err := s.getLocalInfoForBatch(event.BatchIndex.Uint64())
+			parentBatchMeta, chunks, err := s.getLocalInfoForBatch(batchIndex)
 			if err != nil {
-				return fmt.Errorf("failed to get local node info, batch index: %v, err: %w", event.BatchIndex.Uint64(), err)
+				return fmt.Errorf("failed to get local node info, batch index: %v, err: %w", batchIndex, err)
 			}
 
 			if err := validateBatch(event, parentBatchMeta, chunks, s.node); err != nil {
@@ -206,8 +207,13 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 			}
 			endChunk := chunks[len(chunks)-1]
 			endBlock := endChunk.Blocks[len(endChunk.Blocks)-1]
+
 			rawdb.WriteFinalizedL2BlockNumber(s.db, endBlock.Header.Number.Uint64())
-			rawdb.WriteFinalizedBatchMeta(s.db, event.BatchIndex.Uint64(), calculateFinalizedBatchMeta(parentBatchMeta, event.BatchHash, chunks))
+			rawdb.WriteFinalizedBatchMeta(s.db, batchIndex, calculateFinalizedBatchMeta(parentBatchMeta, event.BatchHash, chunks))
+
+			if batchIndex%100 == 0 {
+				log.Info("finalized batch progress", "BatchIdx", batchIndex, "L2BlockNum", endBlock.Header.Number.Uint64())
+			}
 
 		default:
 			return fmt.Errorf("unknown event, topic: %v, tx hash: %v", vLog.Topics[0].Hex(), vLog.TxHash.Hex())
@@ -242,7 +248,8 @@ func (s *RollupSyncService) getLocalInfoForBatch(batchIndex uint64) (*rawdb.Fina
 
 	chunks, err := s.convertBlocksToChunks(blocks, chunkBlockRanges)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to convert blocks to chunks, batch index: %v, chunk ranges: %v, err: %w", batchIndex, chunkBlockRanges, err)
+		return nil, nil, fmt.Errorf("failed to convert blocks to chunks, batch index: %v, start block: %v, end block: %v, err: %w",
+			batchIndex, chunkBlockRanges[0].StartBlockNumber, chunkBlockRanges[len(chunkBlockRanges)-1].EndBlockNumber, err)
 	}
 	return parentBatchMeta, chunks, nil
 }
@@ -372,7 +379,7 @@ func calculateFinalizedBatchMeta(parentBatchMeta *rawdb.FinalizedBatchMeta, batc
 
 // validateBatch verifies the consistency between l1 contract and l2 node data.
 // close the node and exit once any consistency check fails.
-func validateBatch(event L1FinalizeBatchEvent, parentBatchMeta *rawdb.FinalizedBatchMeta, chunks []*Chunk, node *node.Node) error {
+func validateBatch(event *L1FinalizeBatchEvent, parentBatchMeta *rawdb.FinalizedBatchMeta, chunks []*Chunk, node *node.Node) error {
 	if len(chunks) == 0 {
 		return fmt.Errorf("invalid arg: length of chunks is 0")
 	}
