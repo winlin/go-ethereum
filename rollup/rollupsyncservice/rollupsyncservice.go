@@ -339,7 +339,7 @@ func (s *RollupSyncService) convertBlocksToChunks(blocks []*types.Block, chunkBl
 	wrappedBlocks := make([]*WrappedBlock, len(blocks))
 	for i, block := range blocks {
 		txData := txsToTxsData(block.Transactions())
-		state, err := s.bc.StateAt(block.Hash())
+		state, err := s.bc.StateAt(block.Root())
 		if err != nil {
 			return nil, fmt.Errorf("failed to get block state, block: %v, err: %w", block.Hash().Hex(), err)
 		}
