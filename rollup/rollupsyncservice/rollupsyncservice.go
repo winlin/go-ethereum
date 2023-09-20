@@ -225,6 +225,10 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 
 func (s *RollupSyncService) getLocalInfoForBatch(batchIndex uint64) (*rawdb.FinalizedBatchMeta, []*Chunk, error) {
 	chunkBlockRanges := rawdb.ReadBatchChunkRanges(s.db, batchIndex)
+	if len(chunkBlockRanges) == 0 {
+		return nil, nil, fmt.Errorf("failed to get batch chunk ranges, empty chunk block ranges")
+	}
+
 	blocks, err := s.getBlocksInRange(chunkBlockRanges)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get blocks in range, err: %w", err)
@@ -299,27 +303,19 @@ func (s *RollupSyncService) getBlocksInRange(chunkBlockRanges []*rawdb.ChunkBloc
 	var blocks []*types.Block
 
 	latestBlockNumber := s.bc.CurrentBlock().Number().Uint64()
+	startBlockNumber, endBlockNumber := chunkBlockRanges[0].StartBlockNumber, chunkBlockRanges[len(chunkBlockRanges)-1].EndBlockNumber
 
-	var maxRequestedBlockNumber uint64
-	for _, chunkRange := range chunkBlockRanges {
-		if chunkRange.EndBlockNumber > maxRequestedBlockNumber {
-			maxRequestedBlockNumber = chunkRange.EndBlockNumber
-		}
-	}
-
-	if latestBlockNumber < maxRequestedBlockNumber {
+	if latestBlockNumber < endBlockNumber {
 		time.Sleep(180 * time.Second)
-		return nil, fmt.Errorf("local node is not synced up to the required block height: %v", maxRequestedBlockNumber)
+		return nil, fmt.Errorf("local node is not synced up to the required block height: %v, synced height: %v", endBlockNumber, latestBlockNumber)
 	}
 
-	for _, chunkRange := range chunkBlockRanges {
-		for i := chunkRange.StartBlockNumber; i <= chunkRange.EndBlockNumber; i++ {
-			block := s.bc.GetBlockByNumber(i)
-			if block == nil {
-				return nil, fmt.Errorf("failed to get block by number: %v", i)
-			}
-			blocks = append(blocks, block)
+	for i := startBlockNumber; i <= endBlockNumber; i++ {
+		block := s.bc.GetBlockByNumber(i)
+		if block == nil {
+			return nil, fmt.Errorf("failed to get block by number: %v", i)
 		}
+		blocks = append(blocks, block)
 	}
 
 	return blocks, nil
