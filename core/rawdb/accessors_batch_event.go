@@ -52,8 +52,8 @@ func ReadRollupEventSyncedL1BlockNumber(db ethdb.Reader) *uint64 {
 
 // WriteBatchChunkRanges writes the block ranges for each chunk within a batch to the database.
 // It serializes the chunk ranges using RLP and stores them under a key derived from the batch index.
-func WriteBatchChunkRanges(db ethdb.KeyValueWriter, batchIndex uint64, chunkRanges []*ChunkBlockRange) {
-	bytes, err := rlp.EncodeToBytes(chunkRanges)
+func WriteBatchChunkRanges(db ethdb.KeyValueWriter, batchIndex uint64, chunkBlockRanges []*ChunkBlockRange) {
+	bytes, err := rlp.EncodeToBytes(chunkBlockRanges)
 	if err != nil {
 		log.Crit("failed to RLP encode batch chunk ranges", "batch index", batchIndex, "err", err)
 	}

@@ -124,7 +124,7 @@ func (c *Chunk) Hash(totalL1MessagePoppedBefore uint64) (common.Hash, error) {
 // contains information about multiple blocks, which are decoded and their ranges (from the
 // start block to the end block) are returned.
 func DecodeChunkBlockRanges(chunks [][]byte) ([]*rawdb.ChunkBlockRange, error) {
-	var chunkRanges []*rawdb.ChunkBlockRange
+	var chunkBlockRanges []*rawdb.ChunkBlockRange
 	for _, chunk := range chunks {
 		if len(chunk) < 1 {
 			return nil, fmt.Errorf("invalid chunk, length is less than 1")
@@ -146,10 +146,10 @@ func DecodeChunkBlockRanges(chunks [][]byte) ([]*rawdb.ChunkBlockRange, error) {
 			blockContexts[i] = blockContext
 		}
 
-		chunkRanges = append(chunkRanges, &rawdb.ChunkBlockRange{
+		chunkBlockRanges = append(chunkBlockRanges, &rawdb.ChunkBlockRange{
 			StartBlockNumber: blockContexts[0].BlockNumber,
 			EndBlockNumber:   blockContexts[len(blockContexts)-1].BlockNumber,
 		})
 	}
-	return chunkRanges, nil
+	return chunkBlockRanges, nil
 }

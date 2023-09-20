@@ -167,7 +167,7 @@ func (s *RollupSyncService) fetchRollupEvents() {
 	}
 }
 
-func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, lastBlock uint64) error {
+func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endBlock uint64) error {
 	for _, vLog := range logs {
 		switch vLog.Topics[0] {
 		case s.l1CommitBatchEventSignature:
@@ -176,11 +176,11 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, last
 				return fmt.Errorf("failed to unpack commit rollup event log, err: %w", err)
 			}
 			batchIndex := vLog.Topics[1].Big().Uint64()
-			chunkRanges, err := s.getChunkRanges(batchIndex, &vLog)
+			chunkBlockRanges, err := s.getChunkRanges(batchIndex, &vLog)
 			if err != nil {
 				return fmt.Errorf("failed to get chunk ranges, err: %w", err)
 			}
-			rawdb.WriteBatchChunkRanges(s.db, batchIndex, chunkRanges)
+			rawdb.WriteBatchChunkRanges(s.db, batchIndex, chunkBlockRanges)
 
 		case s.l1RevertBatchEventSignature:
 			event := L1RevertBatchEvent{}
@@ -200,7 +200,7 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, last
 			stateRoot := event.StateRoot
 			withdrawRoot := event.WithdrawRoot
 
-			parentBatchMeta, chunks, err := s.getLocalInfo(batchIndex)
+			parentBatchMeta, chunks, err := s.getLocalInfoForBatch(batchIndex)
 			if err != nil {
 				return fmt.Errorf("failed to get local node info, batch index: %v, err: %w", batchIndex, err)
 			}
@@ -208,9 +208,9 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, last
 			if err := validateBatch(batchIndex, batchHash, stateRoot, withdrawRoot, parentBatchMeta, chunks, s.node); err != nil {
 				return fmt.Errorf("fatal: validateBatch failed: batch index: %v, err: %w", batchIndex, err)
 			}
-			lastChunk := chunks[len(chunks)-1]
-			lastBlock := lastChunk.Blocks[len(lastChunk.Blocks)-1]
-			rawdb.WriteFinalizedL2BlockNumber(s.db, lastBlock.Header.Number.Uint64())
+			endChunk := chunks[len(chunks)-1]
+			endBlock := endChunk.Blocks[len(endChunk.Blocks)-1]
+			rawdb.WriteFinalizedL2BlockNumber(s.db, endBlock.Header.Number.Uint64())
 			rawdb.WriteFinalizedBatchMeta(s.db, batchIndex, calculateFinalizedBatchMeta(parentBatchMeta, batchHash, chunks))
 
 		default:
@@ -221,15 +221,15 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, last
 	// note: the batch updates above are idempotent, if we crash
 	// before this line and reexecute the previous steps, we will
 	// get the same result.
-	rawdb.WriteRollupEventSyncedL1BlockNumber(s.db, lastBlock)
-	s.latestProcessedBlock = lastBlock
+	rawdb.WriteRollupEventSyncedL1BlockNumber(s.db, endBlock)
+	s.latestProcessedBlock = endBlock
 
 	return nil
 }
 
-func (s *RollupSyncService) getLocalInfo(batchIndex uint64) (*rawdb.FinalizedBatchMeta, []*Chunk, error) {
-	chunkRanges := rawdb.ReadBatchChunkRanges(s.db, batchIndex)
-	blocks, err := s.getBlocksInRange(chunkRanges)
+func (s *RollupSyncService) getLocalInfoForBatch(batchIndex uint64) (*rawdb.FinalizedBatchMeta, []*Chunk, error) {
+	chunkBlockRanges := rawdb.ReadBatchChunkRanges(s.db, batchIndex)
+	blocks, err := s.getBlocksInRange(chunkBlockRanges)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get blocks in range, err: %w", err)
 	}
@@ -240,9 +240,9 @@ func (s *RollupSyncService) getLocalInfo(batchIndex uint64) (*rawdb.FinalizedBat
 		parentBatchMeta = rawdb.ReadFinalizedBatchMeta(s.db, batchIndex-1)
 	}
 
-	chunks, err := s.convertBlocksToChunks(blocks, chunkRanges)
+	chunks, err := s.convertBlocksToChunks(blocks, chunkBlockRanges)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to convert blocks to chunks, batch index: %v, chunk ranges: %v, err: %w", batchIndex, chunkRanges, err)
+		return nil, nil, fmt.Errorf("failed to convert blocks to chunks, batch index: %v, chunk ranges: %v, err: %w", batchIndex, chunkBlockRanges, err)
 	}
 	return parentBatchMeta, chunks, nil
 }
@@ -299,13 +299,13 @@ func (s *RollupSyncService) decodeChunkBlockRanges(txData []byte) ([]*rawdb.Chun
 }
 
 // getBlocksInRange retrieves blocks from the blockchain within specified chunk ranges.
-func (s *RollupSyncService) getBlocksInRange(chunkRanges []*rawdb.ChunkBlockRange) ([]*types.Block, error) {
+func (s *RollupSyncService) getBlocksInRange(chunkBlockRanges []*rawdb.ChunkBlockRange) ([]*types.Block, error) {
 	var blocks []*types.Block
 
 	latestBlockNumber := s.bc.CurrentBlock().Number().Uint64()
 
 	var maxRequestedBlockNumber uint64
-	for _, chunkRange := range chunkRanges {
+	for _, chunkRange := range chunkBlockRanges {
 		if chunkRange.EndBlockNumber > maxRequestedBlockNumber {
 			maxRequestedBlockNumber = chunkRange.EndBlockNumber
 		}
@@ -316,7 +316,7 @@ func (s *RollupSyncService) getBlocksInRange(chunkRanges []*rawdb.ChunkBlockRang
 		return nil, fmt.Errorf("local node is not synced up to the required block height: %v", maxRequestedBlockNumber)
 	}
 
-	for _, chunkRange := range chunkRanges {
+	for _, chunkRange := range chunkBlockRanges {
 		for i := chunkRange.StartBlockNumber; i <= chunkRange.EndBlockNumber; i++ {
 			block := s.bc.GetBlockByNumber(i)
 			if block == nil {
@@ -330,7 +330,7 @@ func (s *RollupSyncService) getBlocksInRange(chunkRanges []*rawdb.ChunkBlockRang
 }
 
 // convertBlocksToChunks processes and groups blocks into chunks based on the provided chunk ranges.
-func (s *RollupSyncService) convertBlocksToChunks(blocks []*types.Block, chunkRanges []*rawdb.ChunkBlockRange) ([]*Chunk, error) {
+func (s *RollupSyncService) convertBlocksToChunks(blocks []*types.Block, chunkBlockRanges []*rawdb.ChunkBlockRange) ([]*Chunk, error) {
 	if len(blocks) == 0 {
 		return nil, fmt.Errorf("invalid arg: empty blocks")
 	}
@@ -352,7 +352,7 @@ func (s *RollupSyncService) convertBlocksToChunks(blocks []*types.Block, chunkRa
 
 	minBlockNumber := blocks[0].Header().Number.Uint64()
 	var chunks []*Chunk
-	for _, cr := range chunkRanges {
+	for _, cr := range chunkBlockRanges {
 		start, end := cr.StartBlockNumber-minBlockNumber, cr.EndBlockNumber-minBlockNumber
 		// ensure start and end are within valid range.
 		if start < 0 || end >= uint64(len(wrappedBlocks)) || start > end {
@@ -384,19 +384,19 @@ func validateBatch(batchIndex uint64, batchHash common.Hash, stateRoot common.Ha
 	if len(chunks) == 0 {
 		return fmt.Errorf("invalid arg: length of chunks is 0")
 	}
-	lastChunk := chunks[len(chunks)-1]
-	if len(lastChunk.Blocks) == 0 {
+	endChunk := chunks[len(chunks)-1]
+	if len(endChunk.Blocks) == 0 {
 		return fmt.Errorf("invalid arg: block number of last chunk is 0")
 	}
-	lastBlock := lastChunk.Blocks[len(lastChunk.Blocks)-1]
-	localWithdrawRoot := lastBlock.WithdrawRoot
+	endBlock := endChunk.Blocks[len(endChunk.Blocks)-1]
+	localWithdrawRoot := endBlock.WithdrawRoot
 	if localWithdrawRoot != withdrawRoot {
 		log.Error("Withdraw root mismatch", "l1 withdraw root", withdrawRoot.Hex(), "l2 withdraw root", localWithdrawRoot.Hex())
 		node.Close()
 		os.Exit(1)
 	}
 
-	localStateRoot := lastBlock.Header.Root
+	localStateRoot := endBlock.Header.Root
 	if localStateRoot != stateRoot {
 		log.Error("State root mismatch", "l1 state root", stateRoot.Hex(), "l2 state root", localStateRoot.Hex())
 		node.Close()
