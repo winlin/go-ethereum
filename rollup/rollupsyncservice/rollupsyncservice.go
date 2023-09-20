@@ -45,7 +45,7 @@ type RollupSyncService struct {
 	node                          *node.Node // to graceful shutdown the node
 }
 
-func NewRollupSyncService(ctx context.Context, genesisConfig *params.ChainConfig, nodeConfig *node.Config, db ethdb.Database, l1Client sync_service.EthClient, bc *core.BlockChain, node *node.Node) (*RollupSyncService, error) {
+func NewRollupSyncService(ctx context.Context, genesisConfig *params.ChainConfig, db ethdb.Database, l1Client sync_service.EthClient, bc *core.BlockChain, node *node.Node) (*RollupSyncService, error) {
 	// terminate if the caller does not provide an L1 client (e.g. in tests)
 	if l1Client == nil || (reflect.ValueOf(l1Client).Kind() == reflect.Ptr && reflect.ValueOf(l1Client).IsNil()) {
 		log.Warn("No L1 client provided, L1 rollup sync service will not run")
@@ -69,8 +69,8 @@ func NewRollupSyncService(ctx context.Context, genesisConfig *params.ChainConfig
 	// Initialize the latestProcessedBlock with the block just before the L1 deployment block.
 	// This serves as a default value when there's no L1 rollup events synced in the database.
 	var latestProcessedBlock uint64
-	if nodeConfig.L1DeploymentBlock > 0 {
-		latestProcessedBlock = nodeConfig.L1DeploymentBlock - 1
+	if node.Config().L1DeploymentBlock > 0 {
+		latestProcessedBlock = node.Config().L1DeploymentBlock - 1
 	}
 
 	block := rawdb.ReadRollupEventSyncedL1BlockNumber(db)
@@ -272,15 +272,25 @@ func (s *RollupSyncService) getChunkRanges(batchIndex uint64, vLog *types.Log) (
 }
 
 // decodeChunkRanges decodes chunks in a batch based on the commit batch transaction's calldata.
-// Note: We assume that `commitBatch` is always the outermost call, never an internal transaction.
 func (s *RollupSyncService) decodeChunkRanges(txData []byte) ([]*rawdb.ChunkBlockRange, error) {
-	decoded, err := s.scrollChainABI.Unpack("commitBatch", txData)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode transaction data, err: %w", err)
+	const methodIDLength = 4
+	if len(txData) < methodIDLength {
+		return nil, fmt.Errorf("transaction data is too short")
 	}
 
-	if len(decoded) != 4 {
-		return nil, fmt.Errorf("invalid decoded length, expected: 4, got: %v,", len(decoded))
+	method, err := s.scrollChainABI.MethodById(txData[:4])
+	if err != nil {
+		return nil, fmt.Errorf("failed to get method by ID, ID: %v, err: %v", txData[:4], err)
+	}
+
+	decoded, err := method.Inputs.Unpack(txData[4:])
+	if err != nil {
+		return nil, fmt.Errorf("failed to unpack transaction data using ABI: %v", err)
+	}
+
+	const expectedLength = 4
+	if len(decoded) != expectedLength {
+		return nil, fmt.Errorf("invalid decoded length, expected: %d, got: %v", expectedLength, len(decoded))
 	}
 
 	chunks, ok := decoded[2].([][]byte)

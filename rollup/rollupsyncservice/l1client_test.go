@@ -21,7 +21,7 @@ func TestL1Client(t *testing.T) {
 		t.Fatal("failed to get scroll chain abi", "err", err)
 	}
 	scrollChainAddress := common.HexToAddress("0x0123456789abcdef")
-	l1Client, err := newL1Client(ctx, mockClient, 1, scrollChainAddress, scrollChainABI)
+	l1Client, err := newL1Client(ctx, mockClient, 11155111, scrollChainAddress, scrollChainABI)
 	assert.Nil(t, err, "Failed to initialize L1Client")
 
 	blockNumber, err := l1Client.getLatestFinalizedBlockNumber(ctx)
@@ -36,11 +36,11 @@ func TestL1Client(t *testing.T) {
 type mockEthClient struct{}
 
 func (m *mockEthClient) BlockNumber(ctx context.Context) (uint64, error) {
-	return 100, nil
+	return 11155111, nil
 }
 
 func (m *mockEthClient) ChainID(ctx context.Context) (*big.Int, error) {
-	return big.NewInt(1), nil
+	return big.NewInt(11155111), nil
 }
 
 func (m *mockEthClient) FilterLogs(ctx context.Context, q ethereum.FilterQuery) ([]types.Log, error) {

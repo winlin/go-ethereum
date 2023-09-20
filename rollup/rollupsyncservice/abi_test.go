@@ -75,8 +75,8 @@ func TestUnpackLog(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.eventName, func(t *testing.T) {
 			err := UnpackLog(scrollChainABI, tt.out, tt.eventName, tt.mockLog)
-			require.NoError(t, err)
-			require.Equal(t, tt.expected, tt.out)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expected, tt.out)
 		})
 	}
 }
