@@ -202,7 +202,7 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 			}
 
 			if err := validateBatch(event, parentBatchMeta, chunks, s.node); err != nil {
-				return fmt.Errorf("fatal: validateBatch failed: batch event: %v, err: %w", event, err)
+				return fmt.Errorf("fatal: validateBatch failed: finalize event: %v, err: %w", event, err)
 			}
 			endChunk := chunks[len(chunks)-1]
 			endBlock := endChunk.Blocks[len(endChunk.Blocks)-1]
