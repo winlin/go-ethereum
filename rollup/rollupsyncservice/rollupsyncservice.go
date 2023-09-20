@@ -211,7 +211,7 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, last
 			lastChunk := chunks[len(chunks)-1]
 			lastBlock := lastChunk.Blocks[len(lastChunk.Blocks)-1]
 			rawdb.WriteFinalizedL2BlockNumber(s.db, lastBlock.Header.Number.Uint64())
-			rawdb.WriteFinalizedBatchMeta(s.db, batchIndex, s.getFinalizedBatchMeta(parentBatchMeta, batchHash, chunks))
+			rawdb.WriteFinalizedBatchMeta(s.db, batchIndex, calculateFinalizedBatchMeta(parentBatchMeta, batchHash, chunks))
 
 		default:
 			return fmt.Errorf("unknown event, topic: %v, tx hash: %v", vLog.Topics[0].Hex(), vLog.TxHash.Hex())
@@ -225,17 +225,6 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, last
 	s.latestProcessedBlock = lastBlock
 
 	return nil
-}
-
-func (s *RollupSyncService) getFinalizedBatchMeta(parentBatchMeta *rawdb.FinalizedBatchMeta, batchHash common.Hash, chunks []*Chunk) rawdb.FinalizedBatchMeta {
-	totalL1MessagePopped := parentBatchMeta.TotalL1MessagePopped
-	for _, chunk := range chunks {
-		totalL1MessagePopped += chunk.NumL1Messages(totalL1MessagePopped)
-	}
-	return rawdb.FinalizedBatchMeta{
-		BatchHash:            batchHash,
-		TotalL1MessagePopped: totalL1MessagePopped,
-	}
 }
 
 func (s *RollupSyncService) getLocalInfo(batchIndex uint64) (*rawdb.FinalizedBatchMeta, []*Chunk, error) {
@@ -376,6 +365,17 @@ func (s *RollupSyncService) convertBlocksToChunks(blocks []*types.Block, chunkRa
 	}
 
 	return chunks, nil
+}
+
+func calculateFinalizedBatchMeta(parentBatchMeta *rawdb.FinalizedBatchMeta, batchHash common.Hash, chunks []*Chunk) rawdb.FinalizedBatchMeta {
+	totalL1MessagePopped := parentBatchMeta.TotalL1MessagePopped
+	for _, chunk := range chunks {
+		totalL1MessagePopped += chunk.NumL1Messages(totalL1MessagePopped)
+	}
+	return rawdb.FinalizedBatchMeta{
+		BatchHash:            batchHash,
+		TotalL1MessagePopped: totalL1MessagePopped,
+	}
 }
 
 // validateBatch verifies the consistency between l1 contract and l2 node data.
