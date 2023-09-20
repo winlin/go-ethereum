@@ -23,15 +23,15 @@ func TestL1Client(t *testing.T) {
 	}
 	scrollChainAddress := common.HexToAddress("0x0123456789abcdef")
 	l1Client, err := newL1Client(ctx, mockClient, 11155111, scrollChainAddress, scrollChainABI)
-	assert.Nil(t, err, "Failed to initialize L1Client")
+	assert.NoError(t, err, "Failed to initialize L1Client")
 
 	blockNumber, err := l1Client.getLatestFinalizedBlockNumber(ctx)
-	assert.Nil(t, err, "Error getting latest confirmed block number")
+	assert.NoError(t, err, "Error getting latest confirmed block number")
 	assert.Equal(t, uint64(36), blockNumber, "Unexpected block number")
 
 	logs, err := l1Client.fetchRollupEventsInRange(ctx, 0, blockNumber)
+	assert.NoError(t, err, "Error fetching rollup events in range")
 	assert.Empty(t, logs, "Expected no logs from fetchRollupEventsInRange")
-	assert.Nil(t, err, "Error fetching rollup events in range")
 }
 
 type mockEthClient struct {

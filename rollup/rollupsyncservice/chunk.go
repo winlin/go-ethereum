@@ -120,10 +120,10 @@ func (c *Chunk) Hash(totalL1MessagePoppedBefore uint64) (common.Hash, error) {
 	return hash, nil
 }
 
-// DecodeChunkRanges decodes the provided chunks into a list of block ranges. Each chunk
+// DecodeChunkBlockRanges decodes the provided chunks into a list of block ranges. Each chunk
 // contains information about multiple blocks, which are decoded and their ranges (from the
 // start block to the end block) are returned.
-func DecodeChunkRanges(chunks [][]byte) ([]*rawdb.ChunkBlockRange, error) {
+func DecodeChunkBlockRanges(chunks [][]byte) ([]*rawdb.ChunkBlockRange, error) {
 	var chunkRanges []*rawdb.ChunkBlockRange
 	for _, chunk := range chunks {
 		if len(chunk) < 1 {

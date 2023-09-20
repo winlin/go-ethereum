@@ -268,11 +268,11 @@ func (s *RollupSyncService) getChunkRanges(batchIndex uint64, vLog *types.Log) (
 		return nil, fmt.Errorf("failed to get transaction, err: %w", err)
 	}
 
-	return s.decodeChunkRanges(tx.Data())
+	return s.decodeChunkBlockRanges(tx.Data())
 }
 
-// decodeChunkRanges decodes chunks in a batch based on the commit batch transaction's calldata.
-func (s *RollupSyncService) decodeChunkRanges(txData []byte) ([]*rawdb.ChunkBlockRange, error) {
+// decodeChunkBlockRanges decodes chunks in a batch based on the commit batch transaction's calldata.
+func (s *RollupSyncService) decodeChunkBlockRanges(txData []byte) ([]*rawdb.ChunkBlockRange, error) {
 	const methodIDLength = 4
 	if len(txData) < methodIDLength {
 		return nil, fmt.Errorf("transaction data is too short")
@@ -306,7 +306,7 @@ func (s *RollupSyncService) decodeChunkRanges(txData []byte) ([]*rawdb.ChunkBloc
 		return nil, fmt.Errorf("failed to cast chunks to slice of byte slices")
 	}
 
-	return DecodeChunkRanges(chunks)
+	return DecodeChunkBlockRanges(chunks)
 }
 
 // getBlocksInRange retrieves blocks from the blockchain within specified chunk ranges.

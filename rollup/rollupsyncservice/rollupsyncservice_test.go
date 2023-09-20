@@ -67,7 +67,7 @@ func TestDecodeChunkRanges(t *testing.T) {
 		t.Fatalf("Failed to decode string: %v", err)
 	}
 
-	ranges, err := service.decodeChunkRanges(testTxData)
+	ranges, err := service.decodeChunkBlockRanges(testTxData)
 	if err != nil {
 		t.Fatalf("Failed to decode chunk ranges: %v", err)
 	}
