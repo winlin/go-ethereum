@@ -156,13 +156,13 @@ func (s *RollupSyncService) fetchRollupEvents() {
 
 		logs, err := s.client.fetchRollupEventsInRange(s.ctx, from, to)
 		if err != nil {
-			// return and retry in next loop
-			log.Warn("failed to fetch rollup events in range", "fromBlock", from, "toBlock", to, "err", err)
+			log.Error("failed to fetch rollup events in range", "fromBlock", from, "toBlock", to, "err", err)
 			return
 		}
 
 		if err := s.parseAndUpdateRollupEventLogs(logs, to); err != nil {
 			log.Error("failed to parse and update rollup event logs", "err", err)
+			return
 		}
 	}
 }
