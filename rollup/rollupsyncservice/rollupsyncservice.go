@@ -293,6 +293,14 @@ func (s *RollupSyncService) decodeChunkRanges(txData []byte) ([]*rawdb.ChunkBloc
 		return nil, fmt.Errorf("invalid decoded length, expected: %d, got: %v", expectedLength, len(decoded))
 	}
 
+	version, ok := decoded[0].(uint8)
+	if !ok {
+		return nil, fmt.Errorf("failed to cast version to uint8")
+	}
+	if version != batchHeaderVersion {
+		return nil, fmt.Errorf("unexpected batch version, expected: %d, got: %v", batchHeaderVersion, version)
+	}
+
 	chunks, ok := decoded[2].([][]byte)
 	if !ok {
 		return nil, fmt.Errorf("failed to cast chunks to slice of byte slices")
