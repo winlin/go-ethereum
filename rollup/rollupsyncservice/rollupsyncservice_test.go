@@ -22,7 +22,6 @@ func TestDecodeChunkRanges(t *testing.T) {
 	data, err := os.ReadFile("testdata/commit_batch_transaction.json")
 	require.NoError(t, err, "Failed to read json file")
 
-	// Modify the structure to match the new JSON format
 	type transactionJson struct {
 		CallData string `json:"calldata"`
 	}
