@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/scroll-tech/go-ethereum"
 	"github.com/scroll-tech/go-ethereum/common"
@@ -23,7 +24,7 @@ func TestL1Client(t *testing.T) {
 	}
 	scrollChainAddress := common.HexToAddress("0x0123456789abcdef")
 	l1Client, err := newL1Client(ctx, mockClient, 11155111, scrollChainAddress, scrollChainABI)
-	assert.NoError(t, err, "Failed to initialize L1Client")
+	require.NoError(t, err, "Failed to initialize L1Client")
 
 	blockNumber, err := l1Client.getLatestFinalizedBlockNumber(ctx)
 	assert.NoError(t, err, "Error getting latest confirmed block number")

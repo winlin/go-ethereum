@@ -52,7 +52,7 @@ func TestDecodeChunkRanges(t *testing.T) {
 		scrollChainABI: scrollChainABI,
 	}
 
-	data, err := os.ReadFile("testdata/commit_batch_transaction.json")
+	data, err := os.ReadFile("./testdata/commit_batch_transaction.json")
 	require.NoError(t, err, "Failed to read json file")
 
 	type transactionJson struct {
@@ -140,4 +140,49 @@ func TestGetChunkRanges(t *testing.T) {
 			t.Fatalf("Mismatch at index %d: expected %v, got %v", i, *expectedRanges[i], *ranges[i])
 		}
 	}
+}
+
+func TestValidateBatch(t *testing.T) {
+	templateBlockTrace1, err := os.ReadFile("./testdata/blockTrace_02.json")
+	require.NoError(t, err)
+	wrappedBlock1 := &WrappedBlock{}
+	err = json.Unmarshal(templateBlockTrace1, wrappedBlock1)
+	require.NoError(t, err)
+	chunk1 := &Chunk{Blocks: []*WrappedBlock{wrappedBlock1}}
+
+	templateBlockTrace2, err := os.ReadFile("./testdata/blockTrace_03.json")
+	require.NoError(t, err)
+	wrappedBlock2 := &WrappedBlock{}
+	err = json.Unmarshal(templateBlockTrace2, wrappedBlock2)
+	require.NoError(t, err)
+	chunk2 := &Chunk{Blocks: []*WrappedBlock{wrappedBlock2}}
+
+	templateBlockTrace3, err := os.ReadFile("./testdata/blockTrace_04.json")
+	require.NoError(t, err)
+	wrappedBlock3 := &WrappedBlock{}
+	err = json.Unmarshal(templateBlockTrace3, wrappedBlock3)
+	require.NoError(t, err)
+	chunk3 := &Chunk{Blocks: []*WrappedBlock{wrappedBlock3}}
+
+	parentBatchMeta1 := &rawdb.FinalizedBatchMeta{}
+	stateRoot1 := chunk3.Blocks[len(chunk3.Blocks)-1].Header.Root
+	withdrawRoot1 := chunk3.Blocks[len(chunk3.Blocks)-1].WithdrawRoot
+	err = validateBatch(0, common.HexToHash("0xd0f52bc254646e639bf24cc34606319a111975b2fdc431b1381eb6199bc09790"), stateRoot1, withdrawRoot1, parentBatchMeta1, []*Chunk{chunk1, chunk2, chunk3}, nil)
+	assert.NoError(t, err)
+
+	templateBlockTrace4, err := os.ReadFile("./testdata/blockTrace_05.json")
+	require.NoError(t, err)
+	wrappedBlock4 := &WrappedBlock{}
+	err = json.Unmarshal(templateBlockTrace4, wrappedBlock4)
+	require.NoError(t, err)
+	chunk4 := &Chunk{Blocks: []*WrappedBlock{wrappedBlock4}}
+
+	parentBatchMeta2 := &rawdb.FinalizedBatchMeta{
+		BatchHash:            common.HexToHash("0xd0f52bc254646e639bf24cc34606319a111975b2fdc431b1381eb6199bc09790"),
+		TotalL1MessagePopped: 11,
+	}
+	stateRoot2 := chunk4.Blocks[len(chunk4.Blocks)-1].Header.Root
+	withdrawRoot2 := chunk4.Blocks[len(chunk4.Blocks)-1].WithdrawRoot
+	err = validateBatch(1, common.HexToHash("0xfb77bf8f3bf449126ebbf403fdccfcf78636e34d72d62eed8da0e8c9fd38fa63"), stateRoot2, withdrawRoot2, parentBatchMeta2, []*Chunk{chunk4}, nil)
+	assert.NoError(t, err)
 }

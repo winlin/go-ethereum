@@ -205,7 +205,7 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, last
 				return fmt.Errorf("failed to get local node info, batch index: %v, err: %w", batchIndex, err)
 			}
 
-			if err := s.validateBatch(batchIndex, batchHash, stateRoot, withdrawRoot, parentBatchMeta, chunks); err != nil {
+			if err := validateBatch(batchIndex, batchHash, stateRoot, withdrawRoot, parentBatchMeta, chunks, s.node); err != nil {
 				return fmt.Errorf("fatal: validateBatch failed: batch index: %v, err: %w", batchIndex, err)
 			}
 			lastChunk := chunks[len(chunks)-1]
@@ -380,7 +380,7 @@ func (s *RollupSyncService) convertBlocksToChunks(blocks []*types.Block, chunkRa
 
 // validateBatch verifies the consistency between l1 contract and l2 node data.
 // close the node and exit once any consistency check fails.
-func (s *RollupSyncService) validateBatch(batchIndex uint64, batchHash common.Hash, stateRoot common.Hash, withdrawRoot common.Hash, parentBatchMeta *rawdb.FinalizedBatchMeta, chunks []*Chunk) error {
+func validateBatch(batchIndex uint64, batchHash common.Hash, stateRoot common.Hash, withdrawRoot common.Hash, parentBatchMeta *rawdb.FinalizedBatchMeta, chunks []*Chunk, node *node.Node) error {
 	if len(chunks) == 0 {
 		return fmt.Errorf("invalid arg: length of chunks is 0")
 	}
@@ -392,14 +392,14 @@ func (s *RollupSyncService) validateBatch(batchIndex uint64, batchHash common.Ha
 	localWithdrawRoot := lastBlock.WithdrawRoot
 	if localWithdrawRoot != withdrawRoot {
 		log.Error("Withdraw root mismatch", "l1 withdraw root", withdrawRoot.Hex(), "l2 withdraw root", localWithdrawRoot.Hex())
-		s.node.Close()
+		node.Close()
 		os.Exit(1)
 	}
 
 	localStateRoot := lastBlock.Header.Root
 	if localStateRoot != stateRoot {
 		log.Error("State root mismatch", "l1 state root", stateRoot.Hex(), "l2 state root", localStateRoot.Hex())
-		s.node.Close()
+		node.Close()
 		os.Exit(1)
 	}
 
@@ -411,7 +411,7 @@ func (s *RollupSyncService) validateBatch(batchIndex uint64, batchHash common.Ha
 	localBatchHash := batchHeader.Hash()
 	if localBatchHash != batchHash {
 		log.Error("Batch hash mismatch", "l1 batch hash", batchHash.Hex(), "l2 batch hash", localBatchHash.Hex())
-		s.node.Close()
+		node.Close()
 		os.Exit(1)
 	}
 
