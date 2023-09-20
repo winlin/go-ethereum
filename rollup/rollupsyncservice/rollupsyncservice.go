@@ -45,7 +45,7 @@ type RollupSyncService struct {
 	node                          *node.Node // to graceful shutdown the node
 }
 
-func NewRollupSyncService(ctx context.Context, genesisConfig *params.ChainConfig, db ethdb.Database, l1Client sync_service.EthClient, bc *core.BlockChain, node *node.Node) (*RollupSyncService, error) {
+func NewRollupSyncService(ctx context.Context, genesisConfig *params.ChainConfig, db ethdb.Database, l1Client sync_service.EthClient, bc *core.BlockChain, node *node.Node, l1DeploymentBlock uint64) (*RollupSyncService, error) {
 	// terminate if the caller does not provide an L1 client (e.g. in tests)
 	if l1Client == nil || (reflect.ValueOf(l1Client).Kind() == reflect.Ptr && reflect.ValueOf(l1Client).IsNil()) {
 		log.Warn("No L1 client provided, L1 rollup sync service will not run")
@@ -69,8 +69,8 @@ func NewRollupSyncService(ctx context.Context, genesisConfig *params.ChainConfig
 	// Initialize the latestProcessedBlock with the block just before the L1 deployment block.
 	// This serves as a default value when there's no L1 rollup events synced in the database.
 	var latestProcessedBlock uint64
-	if node.Config().L1DeploymentBlock > 0 {
-		latestProcessedBlock = node.Config().L1DeploymentBlock - 1
+	if l1DeploymentBlock > 0 {
+		latestProcessedBlock = l1DeploymentBlock - 1
 	}
 
 	block := rawdb.ReadRollupEventSyncedL1BlockNumber(db)

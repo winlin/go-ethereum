@@ -1,15 +1,47 @@
 package rollupsyncservice
 
 import (
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"os"
 	"testing"
+	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/scroll-tech/go-ethereum/common"
+	"github.com/scroll-tech/go-ethereum/core"
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
+	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
+	"github.com/scroll-tech/go-ethereum/node"
+	"github.com/scroll-tech/go-ethereum/params"
 )
+
+func TestRollupSyncServiceStartAndStop(t *testing.T) {
+	genesisConfig := &params.ChainConfig{
+		Scroll: params.ScrollConfig{
+			L1Config: &params.L1Config{
+				L1ChainId:          11155111,
+				ScrollChainAddress: common.HexToAddress("0x2D567EcE699Eabe5afCd141eDB7A4f2D0D6ce8a0"),
+			},
+		},
+	}
+	db := rawdb.NewDatabase(memorydb.New())
+	l1Client := &mockEthClient{}
+	bc := &core.BlockChain{}
+	node := &node.Node{}
+	service, err := NewRollupSyncService(context.Background(), genesisConfig, db, l1Client, bc, node, 1)
+	if err != nil {
+		t.Fatalf("Failed to new rollup sync service: %v", err)
+	}
+
+	assert.NotNil(t, service)
+	service.Start()
+	time.Sleep(10 * time.Millisecond)
+	service.Stop()
+}
 
 func TestDecodeChunkRanges(t *testing.T) {
 	scrollChainABI, err := scrollChainMetaData.GetAbi()
