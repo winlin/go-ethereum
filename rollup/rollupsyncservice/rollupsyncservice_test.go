@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
+	"math/big"
 	"os"
 	"testing"
 	"time"
@@ -165,9 +166,13 @@ func TestValidateBatch(t *testing.T) {
 	chunk3 := &Chunk{Blocks: []*WrappedBlock{wrappedBlock3}}
 
 	parentBatchMeta1 := &rawdb.FinalizedBatchMeta{}
-	stateRoot1 := chunk3.Blocks[len(chunk3.Blocks)-1].Header.Root
-	withdrawRoot1 := chunk3.Blocks[len(chunk3.Blocks)-1].WithdrawRoot
-	err = validateBatch(0, common.HexToHash("0xd0f52bc254646e639bf24cc34606319a111975b2fdc431b1381eb6199bc09790"), stateRoot1, withdrawRoot1, parentBatchMeta1, []*Chunk{chunk1, chunk2, chunk3}, nil)
+	event1 := L1FinalizeBatchEvent{
+		BatchIndex:   big.NewInt(0),
+		BatchHash:    common.HexToHash("0xd0f52bc254646e639bf24cc34606319a111975b2fdc431b1381eb6199bc09790"),
+		StateRoot:    chunk3.Blocks[len(chunk3.Blocks)-1].Header.Root,
+		WithdrawRoot: chunk3.Blocks[len(chunk3.Blocks)-1].WithdrawRoot,
+	}
+	err = validateBatch(event1, parentBatchMeta1, []*Chunk{chunk1, chunk2, chunk3}, nil)
 	assert.NoError(t, err)
 
 	templateBlockTrace4, err := os.ReadFile("./testdata/blockTrace_05.json")
@@ -181,9 +186,13 @@ func TestValidateBatch(t *testing.T) {
 		BatchHash:            common.HexToHash("0xd0f52bc254646e639bf24cc34606319a111975b2fdc431b1381eb6199bc09790"),
 		TotalL1MessagePopped: 11,
 	}
-	stateRoot2 := chunk4.Blocks[len(chunk4.Blocks)-1].Header.Root
-	withdrawRoot2 := chunk4.Blocks[len(chunk4.Blocks)-1].WithdrawRoot
-	err = validateBatch(1, common.HexToHash("0xfb77bf8f3bf449126ebbf403fdccfcf78636e34d72d62eed8da0e8c9fd38fa63"), stateRoot2, withdrawRoot2, parentBatchMeta2, []*Chunk{chunk4}, nil)
+	event2 := L1FinalizeBatchEvent{
+		BatchIndex:   big.NewInt(1),
+		BatchHash:    common.HexToHash("0xfb77bf8f3bf449126ebbf403fdccfcf78636e34d72d62eed8da0e8c9fd38fa63"),
+		StateRoot:    chunk4.Blocks[len(chunk4.Blocks)-1].Header.Root,
+		WithdrawRoot: chunk4.Blocks[len(chunk4.Blocks)-1].WithdrawRoot,
+	}
+	err = validateBatch(event2, parentBatchMeta2, []*Chunk{chunk4}, nil)
 	assert.NoError(t, err)
 }
 

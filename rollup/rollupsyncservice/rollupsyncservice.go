@@ -195,23 +195,19 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 			if err := UnpackLog(s.scrollChainABI, event, "FinalizeBatch", vLog); err != nil {
 				return fmt.Errorf("failed to unpack finalized rollup event log, err: %w", err)
 			}
-			batchIndex := event.BatchIndex.Uint64()
-			batchHash := event.BatchHash
-			stateRoot := event.StateRoot
-			withdrawRoot := event.WithdrawRoot
 
-			parentBatchMeta, chunks, err := s.getLocalInfoForBatch(batchIndex)
+			parentBatchMeta, chunks, err := s.getLocalInfoForBatch(event.BatchIndex.Uint64())
 			if err != nil {
-				return fmt.Errorf("failed to get local node info, batch index: %v, err: %w", batchIndex, err)
+				return fmt.Errorf("failed to get local node info, batch index: %v, err: %w", event.BatchIndex.Uint64(), err)
 			}
 
-			if err := validateBatch(batchIndex, batchHash, stateRoot, withdrawRoot, parentBatchMeta, chunks, s.node); err != nil {
-				return fmt.Errorf("fatal: validateBatch failed: batch index: %v, err: %w", batchIndex, err)
+			if err := validateBatch(event, parentBatchMeta, chunks, s.node); err != nil {
+				return fmt.Errorf("fatal: validateBatch failed: batch event: %v, err: %w", event, err)
 			}
 			endChunk := chunks[len(chunks)-1]
 			endBlock := endChunk.Blocks[len(endChunk.Blocks)-1]
 			rawdb.WriteFinalizedL2BlockNumber(s.db, endBlock.Header.Number.Uint64())
-			rawdb.WriteFinalizedBatchMeta(s.db, batchIndex, calculateFinalizedBatchMeta(parentBatchMeta, batchHash, chunks))
+			rawdb.WriteFinalizedBatchMeta(s.db, event.BatchIndex.Uint64(), calculateFinalizedBatchMeta(parentBatchMeta, event.BatchHash, chunks))
 
 		default:
 			return fmt.Errorf("unknown event, topic: %v, tx hash: %v", vLog.Topics[0].Hex(), vLog.TxHash.Hex())
@@ -380,7 +376,7 @@ func calculateFinalizedBatchMeta(parentBatchMeta *rawdb.FinalizedBatchMeta, batc
 
 // validateBatch verifies the consistency between l1 contract and l2 node data.
 // close the node and exit once any consistency check fails.
-func validateBatch(batchIndex uint64, batchHash common.Hash, stateRoot common.Hash, withdrawRoot common.Hash, parentBatchMeta *rawdb.FinalizedBatchMeta, chunks []*Chunk, node *node.Node) error {
+func validateBatch(event L1FinalizeBatchEvent, parentBatchMeta *rawdb.FinalizedBatchMeta, chunks []*Chunk, node *node.Node) error {
 	if len(chunks) == 0 {
 		return fmt.Errorf("invalid arg: length of chunks is 0")
 	}
@@ -390,27 +386,27 @@ func validateBatch(batchIndex uint64, batchHash common.Hash, stateRoot common.Ha
 	}
 	endBlock := endChunk.Blocks[len(endChunk.Blocks)-1]
 	localWithdrawRoot := endBlock.WithdrawRoot
-	if localWithdrawRoot != withdrawRoot {
-		log.Error("Withdraw root mismatch", "l1 withdraw root", withdrawRoot.Hex(), "l2 withdraw root", localWithdrawRoot.Hex())
+	if localWithdrawRoot != event.WithdrawRoot {
+		log.Error("Withdraw root mismatch", "l1 withdraw root", event.WithdrawRoot.Hex(), "l2 withdraw root", localWithdrawRoot.Hex())
 		node.Close()
 		os.Exit(1)
 	}
 
 	localStateRoot := endBlock.Header.Root
-	if localStateRoot != stateRoot {
-		log.Error("State root mismatch", "l1 state root", stateRoot.Hex(), "l2 state root", localStateRoot.Hex())
+	if localStateRoot != event.StateRoot {
+		log.Error("State root mismatch", "l1 state root", event.StateRoot.Hex(), "l2 state root", localStateRoot.Hex())
 		node.Close()
 		os.Exit(1)
 	}
 
-	batchHeader, err := NewBatchHeader(batchHeaderVersion, batchIndex, parentBatchMeta.TotalL1MessagePopped, parentBatchMeta.BatchHash, chunks)
+	batchHeader, err := NewBatchHeader(batchHeaderVersion, event.BatchIndex.Uint64(), parentBatchMeta.TotalL1MessagePopped, parentBatchMeta.BatchHash, chunks)
 	if err != nil {
 		return fmt.Errorf("failed to construct batch header, err: %w", err)
 	}
 
 	localBatchHash := batchHeader.Hash()
-	if localBatchHash != batchHash {
-		log.Error("Batch hash mismatch", "l1 batch hash", batchHash.Hex(), "l2 batch hash", localBatchHash.Hex())
+	if localBatchHash != event.BatchHash {
+		log.Error("Batch hash mismatch", "l1 batch hash", event.BatchHash.Hex(), "l2 batch hash", localBatchHash.Hex())
 		node.Close()
 		os.Exit(1)
 	}
