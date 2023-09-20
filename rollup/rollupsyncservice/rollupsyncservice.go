@@ -211,7 +211,7 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, last
 			lastChunk := chunks[len(chunks)-1]
 			lastBlock := lastChunk.Blocks[len(lastChunk.Blocks)-1]
 			rawdb.WriteFinalizedL2BlockNumber(s.db, lastBlock.Header.Number.Uint64())
-			rawdb.WriteFinalizedBatchMeta(s.db, batchIndex, s.getFinalizedBatchMeta(batchHash, parentBatchMeta, chunks))
+			rawdb.WriteFinalizedBatchMeta(s.db, batchIndex, s.getFinalizedBatchMeta(parentBatchMeta, batchHash, chunks))
 
 		default:
 			return fmt.Errorf("unknown event, topic: %v, tx hash: %v", vLog.Topics[0].Hex(), vLog.TxHash.Hex())
@@ -227,7 +227,7 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, last
 	return nil
 }
 
-func (s *RollupSyncService) getFinalizedBatchMeta(batchHash common.Hash, parentBatchMeta *rawdb.FinalizedBatchMeta, chunks []*Chunk) rawdb.FinalizedBatchMeta {
+func (s *RollupSyncService) getFinalizedBatchMeta(parentBatchMeta *rawdb.FinalizedBatchMeta, batchHash common.Hash, chunks []*Chunk) rawdb.FinalizedBatchMeta {
 	totalL1MessagePopped := parentBatchMeta.TotalL1MessagePopped
 	for _, chunk := range chunks {
 		totalL1MessagePopped += chunk.NumL1Messages(totalL1MessagePopped)

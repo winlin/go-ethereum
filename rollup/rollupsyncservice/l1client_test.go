@@ -10,6 +10,7 @@ import (
 	"github.com/scroll-tech/go-ethereum"
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/core/types"
+	"github.com/scroll-tech/go-ethereum/rlp"
 )
 
 func TestL1Client(t *testing.T) {
@@ -33,7 +34,9 @@ func TestL1Client(t *testing.T) {
 	assert.Nil(t, err, "Error fetching rollup events in range")
 }
 
-type mockEthClient struct{}
+type mockEthClient struct {
+	commitBatchRLP []byte
+}
 
 func (m *mockEthClient) BlockNumber(ctx context.Context) (uint64, error) {
 	return 11155111, nil
@@ -57,6 +60,14 @@ func (m *mockEthClient) SubscribeFilterLogs(ctx context.Context, query ethereum.
 	return nil, nil
 }
 
-func (m *mockEthClient) TransactionByHash(ctx context.Context, txHash common.Hash) (tx *types.Transaction, isPending bool, err error) {
-	return &types.Transaction{}, false, nil
+func (m *mockEthClient) TransactionByHash(ctx context.Context, txHash common.Hash) (*types.Transaction, bool, error) {
+	if len(m.commitBatchRLP) == 0 {
+		return &types.Transaction{}, false, nil
+	}
+
+	var tx types.Transaction
+	if err := rlp.DecodeBytes(m.commitBatchRLP, &tx); err != nil {
+		return nil, false, err
+	}
+	return &tx, false, nil
 }
