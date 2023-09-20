@@ -167,7 +167,7 @@ func (s *RollupSyncService) fetchRollupEvents() {
 	}
 }
 
-func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endBlock uint64) error {
+func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endBlockNumber uint64) error {
 	for _, vLog := range logs {
 		switch vLog.Topics[0] {
 		case s.l1CommitBatchEventSignature:
@@ -217,8 +217,8 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 	// note: the batch updates above are idempotent, if we crash
 	// before this line and reexecute the previous steps, we will
 	// get the same result.
-	rawdb.WriteRollupEventSyncedL1BlockNumber(s.db, endBlock)
-	s.latestProcessedBlock = endBlock
+	rawdb.WriteRollupEventSyncedL1BlockNumber(s.db, endBlockNumber)
+	s.latestProcessedBlock = endBlockNumber
 
 	return nil
 }
