@@ -30,12 +30,12 @@ const (
 	defaultPollInterval = 60 * time.Second
 
 	// defaultMaxRetries is the maximum number of retries allowed when the local node is not synced up to the required block height.
-	defaultMaxRetries = 10
+	defaultMaxRetries = 20
 
 	// defaultGetBlockInRangeRetryDelay is the time delay between retries when attempting to get blocks in range.
 	// The service will wait for this duration if it detects that the local node has not synced up to the block height
 	// of a specific L1 batch finalize event.
-	defaultGetBlockInRangeRetryDelay = 30 * time.Second
+	defaultGetBlockInRangeRetryDelay = 60 * time.Second
 )
 
 // RollupSyncService collects ScrollChain batch commit/revert/finalize events and stores metadata into db.
