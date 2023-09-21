@@ -27,7 +27,15 @@ const (
 	defaultFetchBlockRange = uint64(100)
 
 	// defaultPollInterval is the frequency at which we query for new rollup event.
-	defaultPollInterval = time.Second * 60
+	defaultPollInterval = 60 * time.Second
+
+	// defaultMaxRetries is the maximum number of retries allowed when the local node is not synced up to the required block height.
+	defaultMaxRetries = 10
+
+	// defaultGetBlockInRangeRetryDelay is the time delay between retries when attempting to get blocks in range.
+	// The service will wait for this duration if it detects that the local node has not synced up to the block height
+	// of a specific L1 batch finalize event.
+	defaultGetBlockInRangeRetryDelay = 30 * time.Second
 )
 
 // RollupSyncService collects ScrollChain batch commit/revert/finalize events and stores metadata into db.
@@ -175,7 +183,7 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 			if err := UnpackLog(s.scrollChainABI, event, "CommitBatch", vLog); err != nil {
 				return fmt.Errorf("failed to unpack commit rollup event log, err: %w", err)
 			}
-			batchIndex := vLog.Topics[1].Big().Uint64()
+			batchIndex := event.BatchIndex.Uint64()
 
 			chunkBlockRanges, err := s.getChunkRanges(batchIndex, &vLog)
 			if err != nil {
@@ -188,7 +196,7 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 			if err := UnpackLog(s.scrollChainABI, event, "RevertBatch", vLog); err != nil {
 				return fmt.Errorf("failed to unpack revert rollup event log, err: %w", err)
 			}
-			batchIndex := vLog.Topics[1].Big().Uint64()
+			batchIndex := event.BatchIndex.Uint64()
 
 			rawdb.DeleteBatchChunkRanges(s.db, batchIndex)
 
@@ -311,12 +319,22 @@ func (s *RollupSyncService) decodeChunkBlockRanges(txData []byte) ([]*rawdb.Chun
 func (s *RollupSyncService) getBlocksInRange(chunkBlockRanges []*rawdb.ChunkBlockRange) ([]*types.Block, error) {
 	var blocks []*types.Block
 
-	latestBlockNumber := s.bc.CurrentBlock().Number().Uint64()
 	startBlockNumber, endBlockNumber := chunkBlockRanges[0].StartBlockNumber, chunkBlockRanges[len(chunkBlockRanges)-1].EndBlockNumber
 
-	if latestBlockNumber < endBlockNumber {
-		time.Sleep(300 * time.Second)
-		return nil, fmt.Errorf("local node is not synced up to the required block height: %v, synced height: %v", endBlockNumber, latestBlockNumber)
+	for i := 0; i < defaultMaxRetries; i++ {
+		localSyncedBlockHeight := s.bc.CurrentBlock().Number().Uint64()
+		if localSyncedBlockHeight >= endBlockNumber {
+			break // ready to proceed, exit retry loop
+		}
+
+		log.Debug("local node is not synced up to the required block height, waiting for next retry",
+			"retries", i+1, "local synced block height", localSyncedBlockHeight, "required end block number", endBlockNumber)
+		time.Sleep(defaultGetBlockInRangeRetryDelay)
+	}
+
+	localSyncedBlockHeight := s.bc.CurrentBlock().Number().Uint64()
+	if localSyncedBlockHeight < endBlockNumber {
+		return nil, fmt.Errorf("local node is not synced up to the required block height: %v, local synced block height: %v", endBlockNumber, localSyncedBlockHeight)
 	}
 
 	for i := startBlockNumber; i <= endBlockNumber; i++ {
