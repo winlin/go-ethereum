@@ -315,7 +315,7 @@ func (s *RollupSyncService) getBlocksInRange(chunkBlockRanges []*rawdb.ChunkBloc
 	startBlockNumber, endBlockNumber := chunkBlockRanges[0].StartBlockNumber, chunkBlockRanges[len(chunkBlockRanges)-1].EndBlockNumber
 
 	if latestBlockNumber < endBlockNumber {
-		time.Sleep(180 * time.Second)
+		time.Sleep(300 * time.Second)
 		return nil, fmt.Errorf("local node is not synced up to the required block height: %v, synced height: %v", endBlockNumber, latestBlockNumber)
 	}
 
