@@ -319,30 +319,28 @@ func (s *RollupSyncService) decodeChunkBlockRanges(txData []byte) ([]*rawdb.Chun
 		return nil, fmt.Errorf("failed to get method by ID, ID: %v, err: %w", txData[:4], err)
 	}
 
-	decoded, err := method.Inputs.Unpack(txData[4:])
+	values, err := method.Inputs.Unpack(txData[4:])
 	if err != nil {
 		return nil, fmt.Errorf("failed to unpack transaction data using ABI: %v", err)
 	}
 
-	const expectedLength = 4
-	if len(decoded) != expectedLength {
-		return nil, fmt.Errorf("invalid decoded length, expected: %d, got: %v", expectedLength, len(decoded))
+	type commitBatchArgs struct {
+		Version                uint8
+		ParentBatchHeader      []byte
+		Chunks                 [][]byte
+		SkippedL1MessageBitmap []byte
+	}
+	var args commitBatchArgs
+	err = method.Inputs.Copy(&args, values)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode calldata into commitBatch args, err: %w", err)
 	}
 
-	version, ok := decoded[0].(uint8)
-	if !ok {
-		return nil, fmt.Errorf("failed to cast version to uint8")
-	}
-	if version != batchHeaderVersion {
-		return nil, fmt.Errorf("unexpected batch version, expected: %d, got: %v", batchHeaderVersion, version)
+	if args.Version != batchHeaderVersion {
+		return nil, fmt.Errorf("unexpected batch version, expected: %d, got: %v", batchHeaderVersion, args.Version)
 	}
 
-	chunks, ok := decoded[2].([][]byte)
-	if !ok {
-		return nil, fmt.Errorf("failed to cast chunks to slice of byte slices")
-	}
-
-	return DecodeChunkBlockRanges(chunks)
+	return DecodeChunkBlockRanges(args.Chunks)
 }
 
 func calculateFinalizedBatchMeta(parentBatchMeta *rawdb.FinalizedBatchMeta, batchHash common.Hash, chunks []*Chunk) rawdb.FinalizedBatchMeta {
