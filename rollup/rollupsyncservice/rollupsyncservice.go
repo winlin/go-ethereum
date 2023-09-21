@@ -314,12 +314,12 @@ func (s *RollupSyncService) decodeChunkBlockRanges(txData []byte) ([]*rawdb.Chun
 		return nil, fmt.Errorf("transaction data is too short")
 	}
 
-	method, err := s.scrollChainABI.MethodById(txData[:4])
+	method, err := s.scrollChainABI.MethodById(txData[:methodIDLength])
 	if err != nil {
 		return nil, fmt.Errorf("failed to get method by ID, ID: %v, err: %w", txData[:4], err)
 	}
 
-	values, err := method.Inputs.Unpack(txData[4:])
+	values, err := method.Inputs.Unpack(txData[methodIDLength:])
 	if err != nil {
 		return nil, fmt.Errorf("failed to unpack transaction data using ABI: %v", err)
 	}
