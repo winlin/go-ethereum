@@ -245,22 +245,51 @@ func (s *RollupSyncService) getLocalInfoForBatch(batchIndex uint64) (*rawdb.Fina
 		return nil, nil, fmt.Errorf("failed to get batch chunk ranges, empty chunk block ranges")
 	}
 
-	blocks, err := s.getBlocksInRange(chunkBlockRanges)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get blocks in range, err: %w", err)
+	endBlockNumber := chunkBlockRanges[len(chunkBlockRanges)-1].EndBlockNumber
+	for i := 0; i < defaultMaxRetries; i++ {
+		localSyncedBlockHeight := s.bc.CurrentBlock().Number().Uint64()
+		if localSyncedBlockHeight >= endBlockNumber {
+			break // ready to proceed, exit retry loop
+		}
+
+		log.Debug("local node is not synced up to the required block height, waiting for next retry",
+			"retries", i+1, "local synced block height", localSyncedBlockHeight, "required end block number", endBlockNumber)
+		time.Sleep(defaultGetBlockInRangeRetryDelay)
 	}
 
-	// default to genesis batch meta.
+	localSyncedBlockHeight := s.bc.CurrentBlock().Number().Uint64()
+	if localSyncedBlockHeight < endBlockNumber {
+		return nil, nil, fmt.Errorf("local node is not synced up to the required block height: %v, local synced block height: %v", endBlockNumber, localSyncedBlockHeight)
+	}
+
+	chunks := make([]*Chunk, len(chunkBlockRanges))
+	for i, cr := range chunkBlockRanges {
+		chunks[i] = &Chunk{Blocks: make([]*WrappedBlock, cr.EndBlockNumber-cr.StartBlockNumber+1)}
+		for j := cr.StartBlockNumber; j <= cr.EndBlockNumber; j++ {
+			block := s.bc.GetBlockByNumber(j)
+			if block == nil {
+				return nil, nil, fmt.Errorf("failed to get block by number: %v", i)
+			}
+			txData := txsToTxsData(block.Transactions())
+			state, err := s.bc.StateAt(block.Root())
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to get block state, block: %v, err: %w", block.Hash().Hex(), err)
+			}
+			withdrawRoot := withdrawtrie.ReadWTRSlot(rcfg.L2MessageQueueAddress, state)
+			chunks[i].Blocks[j-cr.StartBlockNumber] = &WrappedBlock{
+				Header:       block.Header(),
+				Transactions: txData,
+				WithdrawRoot: withdrawRoot,
+			}
+		}
+	}
+
+	// get metadata of parent batch: default to genesis batch metadata.
 	parentBatchMeta := &rawdb.FinalizedBatchMeta{}
 	if batchIndex > 0 {
 		parentBatchMeta = rawdb.ReadFinalizedBatchMeta(s.db, batchIndex-1)
 	}
 
-	chunks, err := s.convertBlocksToChunks(blocks, chunkBlockRanges)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to convert blocks to chunks, batch index: %v, start block: %v, end block: %v, err: %w",
-			batchIndex, chunkBlockRanges[0].StartBlockNumber, chunkBlockRanges[len(chunkBlockRanges)-1].EndBlockNumber, err)
-	}
 	return parentBatchMeta, chunks, nil
 }
 
@@ -313,75 +342,6 @@ func (s *RollupSyncService) decodeChunkBlockRanges(txData []byte) ([]*rawdb.Chun
 	}
 
 	return DecodeChunkBlockRanges(chunks)
-}
-
-// getBlocksInRange retrieves blocks from the blockchain within specified chunk ranges.
-func (s *RollupSyncService) getBlocksInRange(chunkBlockRanges []*rawdb.ChunkBlockRange) ([]*types.Block, error) {
-	startBlockNumber, endBlockNumber := chunkBlockRanges[0].StartBlockNumber, chunkBlockRanges[len(chunkBlockRanges)-1].EndBlockNumber
-	for i := 0; i < defaultMaxRetries; i++ {
-		localSyncedBlockHeight := s.bc.CurrentBlock().Number().Uint64()
-		if localSyncedBlockHeight >= endBlockNumber {
-			break // ready to proceed, exit retry loop
-		}
-
-		log.Debug("local node is not synced up to the required block height, waiting for next retry",
-			"retries", i+1, "local synced block height", localSyncedBlockHeight, "required end block number", endBlockNumber)
-		time.Sleep(defaultGetBlockInRangeRetryDelay)
-	}
-
-	localSyncedBlockHeight := s.bc.CurrentBlock().Number().Uint64()
-	if localSyncedBlockHeight < endBlockNumber {
-		return nil, fmt.Errorf("local node is not synced up to the required block height: %v, local synced block height: %v", endBlockNumber, localSyncedBlockHeight)
-	}
-
-	var blocks []*types.Block
-	for i := startBlockNumber; i <= endBlockNumber; i++ {
-		block := s.bc.GetBlockByNumber(i)
-		if block == nil {
-			return nil, fmt.Errorf("failed to get block by number: %v", i)
-		}
-		blocks = append(blocks, block)
-	}
-
-	return blocks, nil
-}
-
-// convertBlocksToChunks processes and groups blocks into chunks based on the provided chunk ranges.
-func (s *RollupSyncService) convertBlocksToChunks(blocks []*types.Block, chunkBlockRanges []*rawdb.ChunkBlockRange) ([]*Chunk, error) {
-	if len(blocks) == 0 {
-		return nil, fmt.Errorf("invalid arg: empty blocks")
-	}
-
-	wrappedBlocks := make([]*WrappedBlock, len(blocks))
-	for i, block := range blocks {
-		txData := txsToTxsData(block.Transactions())
-		state, err := s.bc.StateAt(block.Root())
-		if err != nil {
-			return nil, fmt.Errorf("failed to get block state, block: %v, err: %w", block.Hash().Hex(), err)
-		}
-		withdrawRoot := withdrawtrie.ReadWTRSlot(rcfg.L2MessageQueueAddress, state)
-		wrappedBlocks[i] = &WrappedBlock{
-			Header:       block.Header(),
-			Transactions: txData,
-			WithdrawRoot: withdrawRoot,
-		}
-	}
-
-	minBlockNumber := blocks[0].Header().Number.Uint64()
-	var chunks []*Chunk
-	for _, cr := range chunkBlockRanges {
-		start, end := cr.StartBlockNumber-minBlockNumber, cr.EndBlockNumber-minBlockNumber
-		// ensure start and end are within valid range.
-		if start < 0 || end >= uint64(len(wrappedBlocks)) || start > end {
-			return nil, fmt.Errorf("invalid chunk range, start: %v, end: %v, block len: %v", start, end, len(wrappedBlocks))
-		}
-		chunk := &Chunk{
-			Blocks: wrappedBlocks[start : end+1],
-		}
-		chunks = append(chunks, chunk)
-	}
-
-	return chunks, nil
 }
 
 func calculateFinalizedBatchMeta(parentBatchMeta *rawdb.FinalizedBatchMeta, batchHash common.Hash, chunks []*Chunk) rawdb.FinalizedBatchMeta {
