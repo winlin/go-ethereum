@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"syscall"
 	"time"
 
 	"github.com/scroll-tech/go-ethereum/accounts/abi"
@@ -369,15 +370,15 @@ func validateBatch(event *L1FinalizeBatchEvent, parentBatchMeta *rawdb.Finalized
 	localWithdrawRoot := endBlock.WithdrawRoot
 	if localWithdrawRoot != event.WithdrawRoot {
 		log.Error("Withdraw root mismatch", "l1 withdraw root", event.WithdrawRoot.Hex(), "l2 withdraw root", localWithdrawRoot.Hex())
-		node.Close()
-		os.Exit(1)
+		syscall.Kill(os.Getpid(), syscall.SIGTERM)
+		return fmt.Errorf("Withdraw root mismatch")
 	}
 
 	localStateRoot := endBlock.Header.Root
 	if localStateRoot != event.StateRoot {
 		log.Error("State root mismatch", "l1 state root", event.StateRoot.Hex(), "l2 state root", localStateRoot.Hex())
-		node.Close()
-		os.Exit(1)
+		syscall.Kill(os.Getpid(), syscall.SIGTERM)
+		return fmt.Errorf("State root mismatch")
 	}
 
 	batchHeader, err := NewBatchHeader(batchHeaderVersion, event.BatchIndex.Uint64(), parentBatchMeta.TotalL1MessagePopped, parentBatchMeta.BatchHash, chunks)
@@ -388,8 +389,8 @@ func validateBatch(event *L1FinalizeBatchEvent, parentBatchMeta *rawdb.Finalized
 	localBatchHash := batchHeader.Hash()
 	if localBatchHash != event.BatchHash {
 		log.Error("Batch hash mismatch", "l1 batch hash", event.BatchHash.Hex(), "l2 batch hash", localBatchHash.Hex())
-		node.Close()
-		os.Exit(1)
+		syscall.Kill(os.Getpid(), syscall.SIGTERM)
+		return fmt.Errorf("Batch hash mismatch")
 	}
 
 	return nil
