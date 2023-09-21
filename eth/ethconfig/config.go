@@ -210,6 +210,9 @@ type Config struct {
 
 	// Check circuit capacity in block validator
 	CheckCircuitCapacity bool
+
+	// Enable verification of batch consistency between L1 and L2 in rollup
+	EnableRollupVerify bool
 }
 
 // CreateConsensusEngine creates a consensus engine for the given chain configuration.

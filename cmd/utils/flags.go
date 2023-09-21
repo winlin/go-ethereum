@@ -831,6 +831,12 @@ var (
 		Name:  "ccc",
 		Usage: "Enable circuit capacity check during block validation",
 	}
+
+	// Rollup verify service settings
+	RollupVerifyEnabledFlag = cli.BoolFlag{
+		Name:  "rollup.verify",
+		Usage: "Enable verification of batch consistency between L1 and L2 in rollup",
+	}
 )
 
 // MakeDataDir retrieves the currently requested data directory, terminating
@@ -1529,6 +1535,12 @@ func setCircuitCapacityCheck(ctx *cli.Context, cfg *ethconfig.Config) {
 	}
 }
 
+func setEnableRollupVerify(ctx *cli.Context, cfg *ethconfig.Config) {
+	if ctx.GlobalIsSet(RollupVerifyEnabledFlag.Name) {
+		cfg.EnableRollupVerify = ctx.GlobalBool(RollupVerifyEnabledFlag.Name)
+	}
+}
+
 // CheckExclusive verifies that only a single instance of the provided flags was
 // set by the user. Each flag might optionally be followed by a string type to
 // specialize it further.
@@ -1595,6 +1607,7 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 	setWhitelist(ctx, cfg)
 	setLes(ctx, cfg)
 	setCircuitCapacityCheck(ctx, cfg)
+	setEnableRollupVerify(ctx, cfg)
 
 	// Cap the cache allowance and tune the garbage collector
 	mem, err := gopsutil.VirtualMemory()
