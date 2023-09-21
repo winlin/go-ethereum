@@ -149,7 +149,7 @@ func (s *RollupSyncService) fetchRollupEvents() {
 		return
 	}
 
-	log.Trace("Sync service fetchRollupEvents", "latestProcessedBlock", s.latestProcessedBlock, "latestConfirmed", latestConfirmed)
+	log.Trace("Sync service fetch rollup events", "latest processed block", s.latestProcessedBlock, "latest confirmed", latestConfirmed)
 
 	// query in batches
 	for from := s.latestProcessedBlock + 1; from <= latestConfirmed; from += defaultFetchBlockRange {
@@ -164,7 +164,7 @@ func (s *RollupSyncService) fetchRollupEvents() {
 
 		logs, err := s.client.fetchRollupEventsInRange(s.ctx, from, to)
 		if err != nil {
-			log.Error("failed to fetch rollup events in range", "fromBlock", from, "toBlock", to, "err", err)
+			log.Error("failed to fetch rollup events in range", "from block", from, "to block", to, "err", err)
 			return
 		}
 
@@ -286,7 +286,7 @@ func (s *RollupSyncService) decodeChunkBlockRanges(txData []byte) ([]*rawdb.Chun
 
 	method, err := s.scrollChainABI.MethodById(txData[:4])
 	if err != nil {
-		return nil, fmt.Errorf("failed to get method by ID, ID: %v, err: %v", txData[:4], err)
+		return nil, fmt.Errorf("failed to get method by ID, ID: %v, err: %w", txData[:4], err)
 	}
 
 	decoded, err := method.Inputs.Unpack(txData[4:])
@@ -317,10 +317,7 @@ func (s *RollupSyncService) decodeChunkBlockRanges(txData []byte) ([]*rawdb.Chun
 
 // getBlocksInRange retrieves blocks from the blockchain within specified chunk ranges.
 func (s *RollupSyncService) getBlocksInRange(chunkBlockRanges []*rawdb.ChunkBlockRange) ([]*types.Block, error) {
-	var blocks []*types.Block
-
 	startBlockNumber, endBlockNumber := chunkBlockRanges[0].StartBlockNumber, chunkBlockRanges[len(chunkBlockRanges)-1].EndBlockNumber
-
 	for i := 0; i < defaultMaxRetries; i++ {
 		localSyncedBlockHeight := s.bc.CurrentBlock().Number().Uint64()
 		if localSyncedBlockHeight >= endBlockNumber {
@@ -337,6 +334,7 @@ func (s *RollupSyncService) getBlocksInRange(chunkBlockRanges []*rawdb.ChunkBloc
 		return nil, fmt.Errorf("local node is not synced up to the required block height: %v, local synced block height: %v", endBlockNumber, localSyncedBlockHeight)
 	}
 
+	var blocks []*types.Block
 	for i := startBlockNumber; i <= endBlockNumber; i++ {
 		block := s.bc.GetBlockByNumber(i)
 		if block == nil {
