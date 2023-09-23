@@ -180,4 +180,7 @@ func TestBatchChunkRanges(t *testing.T) {
 			t.Fatal("Chunk range was not deleted", "batch index", batchIndex)
 		}
 	}
+
+	// delete non-existing value: ensure the delete operation handles non-existing values without errors.
+	DeleteBatchChunkRanges(db, uint64(len(chunks)+1))
 }
