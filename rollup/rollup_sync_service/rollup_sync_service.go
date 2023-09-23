@@ -342,17 +342,17 @@ func (s *RollupSyncService) decodeChunkBlockRanges(txData []byte) ([]*rawdb.Chun
 	return DecodeChunkBlockRanges(args.Chunks)
 }
 
-// validateBatch verifies the consistency between L1 contract and L2 node data.
-// It will close the node and exit if any consistency check fails.
+// validateBatch verifies the consistency between the L1 contract and L2 node data.
+// The function will terminate the node and exit if any consistency check fails.
 // It returns the number of the end block, a finalized batch meta data, and an error if any.
 func validateBatch(event *L1FinalizeBatchEvent, parentBatchMeta *rawdb.FinalizedBatchMeta, chunks []*Chunk) (uint64, *rawdb.FinalizedBatchMeta, error) {
 	if len(chunks) == 0 {
-		return 0, nil, fmt.Errorf("invalid arg: length of chunks is 0")
+		return 0, nil, fmt.Errorf("invalid argument: length of chunks is 0")
 	}
 
 	endChunk := chunks[len(chunks)-1]
 	if len(endChunk.Blocks) == 0 {
-		return 0, nil, fmt.Errorf("invalid arg: block number of last chunk is 0")
+		return 0, nil, fmt.Errorf("invalid argument: block count of last chunk is 0")
 	}
 
 	endBlock := endChunk.Blocks[len(endChunk.Blocks)-1]
@@ -370,11 +370,14 @@ func validateBatch(event *L1FinalizeBatchEvent, parentBatchMeta *rawdb.Finalized
 		return 0, nil, fmt.Errorf("withdraw root mismatch")
 	}
 
+	// Note: All params for NewBatchHeader are calculated locally based on the block data.
 	batchHeader, err := NewBatchHeader(batchHeaderVersion, event.BatchIndex.Uint64(), parentBatchMeta.TotalL1MessagePopped, parentBatchMeta.BatchHash, chunks)
 	if err != nil {
 		return 0, nil, fmt.Errorf("failed to construct batch header, err: %w", err)
 	}
 
+	// Note: If the batch headers match, this ensures the consistency of blocks and transactions
+	// (including skipped transactions) between L1 and L2.
 	localBatchHash := batchHeader.Hash()
 	if localBatchHash != event.BatchHash {
 		log.Error("Batch hash mismatch", "l1 finalized batch hash", event.BatchHash.Hex(), "l2 batch hash", localBatchHash.Hex())
