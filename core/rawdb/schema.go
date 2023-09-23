@@ -290,12 +290,12 @@ func SkippedTransactionHashKey(index uint64) []byte {
 	return append(skippedTransactionHashPrefix, encodeBigEndian(index)...)
 }
 
-// batchChunkRangesKey = batchChunkRangesPrefix + batch index
+// batchChunkRangesKey = batchChunkRangesPrefix + batch index (uint64 big endian)
 func batchChunkRangesKey(batchIndex uint64) []byte {
 	return append(batchChunkRangesPrefix, encodeBigEndian(batchIndex)...)
 }
 
-// batchMetaKey = batchMetaPrefix + batch index
+// batchMetaKey = batchMetaPrefix + batch index (uint64 big endian)
 func batchMetaKey(batchIndex uint64) []byte {
 	return append(batchMetaPrefix, encodeBigEndian(batchIndex)...)
 }

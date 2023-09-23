@@ -170,6 +170,8 @@ func (s *RollupSyncService) fetchRollupEvents() {
 			log.Error("failed to parse and update rollup event logs", "err", err)
 			return
 		}
+
+		s.latestProcessedBlock = to
 	}
 }
 
@@ -182,6 +184,7 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 				return fmt.Errorf("failed to unpack commit rollup event log, err: %w", err)
 			}
 			batchIndex := event.BatchIndex.Uint64()
+			log.Trace("found new CommitBatch event", "batch index", batchIndex)
 
 			chunkBlockRanges, err := s.getChunkRanges(batchIndex, &vLog)
 			if err != nil {
@@ -195,6 +198,7 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 				return fmt.Errorf("failed to unpack revert rollup event log, err: %w", err)
 			}
 			batchIndex := event.BatchIndex.Uint64()
+			log.Trace("found new RevertBatch event", "batch index", batchIndex)
 
 			rawdb.DeleteBatchChunkRanges(s.db, batchIndex)
 
@@ -204,6 +208,7 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 				return fmt.Errorf("failed to unpack finalized rollup event log, err: %w", err)
 			}
 			batchIndex := event.BatchIndex.Uint64()
+			log.Trace("found new FinalizeBatch event", "batch index", batchIndex)
 
 			parentBatchMeta, chunks, err := s.getLocalInfoForBatch(batchIndex)
 			if err != nil {
@@ -232,8 +237,6 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 	// before this line and reexecute the previous steps, we will
 	// get the same result.
 	rawdb.WriteRollupEventSyncedL1BlockNumber(s.db, endBlockNumber)
-	s.latestProcessedBlock = endBlockNumber
-
 	return nil
 }
 
@@ -364,16 +367,16 @@ func validateBatch(event *L1FinalizeBatchEvent, parentBatchMeta *rawdb.Finalized
 	endBlock := endChunk.Blocks[len(endChunk.Blocks)-1]
 	localWithdrawRoot := endBlock.WithdrawRoot
 	if localWithdrawRoot != event.WithdrawRoot {
-		log.Error("Withdraw root mismatch", "l1 withdraw root", event.WithdrawRoot.Hex(), "l2 withdraw root", localWithdrawRoot.Hex())
+		log.Error("Withdraw root mismatch", "l1 finalized withdraw root", event.WithdrawRoot.Hex(), "l2 withdraw root", localWithdrawRoot.Hex())
 		syscall.Kill(os.Getpid(), syscall.SIGTERM)
-		return fmt.Errorf("Withdraw root mismatch")
+		return fmt.Errorf("withdraw root mismatch")
 	}
 
 	localStateRoot := endBlock.Header.Root
 	if localStateRoot != event.StateRoot {
-		log.Error("State root mismatch", "l1 state root", event.StateRoot.Hex(), "l2 state root", localStateRoot.Hex())
+		log.Error("State root mismatch", "l1 finalized state root", event.StateRoot.Hex(), "l2 state root", localStateRoot.Hex())
 		syscall.Kill(os.Getpid(), syscall.SIGTERM)
-		return fmt.Errorf("State root mismatch")
+		return fmt.Errorf("state root mismatch")
 	}
 
 	batchHeader, err := NewBatchHeader(batchHeaderVersion, event.BatchIndex.Uint64(), parentBatchMeta.TotalL1MessagePopped, parentBatchMeta.BatchHash, chunks)
@@ -383,9 +386,9 @@ func validateBatch(event *L1FinalizeBatchEvent, parentBatchMeta *rawdb.Finalized
 
 	localBatchHash := batchHeader.Hash()
 	if localBatchHash != event.BatchHash {
-		log.Error("Batch hash mismatch", "l1 batch hash", event.BatchHash.Hex(), "l2 batch hash", localBatchHash.Hex())
+		log.Error("Batch hash mismatch", "l1 finalized batch hash", event.BatchHash.Hex(), "l2 batch hash", localBatchHash.Hex())
 		syscall.Kill(os.Getpid(), syscall.SIGTERM)
-		return fmt.Errorf("Batch hash mismatch")
+		return fmt.Errorf("batch hash mismatch")
 	}
 
 	return nil

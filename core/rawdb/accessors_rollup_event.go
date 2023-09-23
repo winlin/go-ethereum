@@ -23,7 +23,7 @@ type FinalizedBatchMeta struct {
 	TotalL1MessagePopped uint64
 }
 
-// WriteRollupEventSyncedL1BlockNumber stores the database with the latest synced L1 block number related to rollup events in the database.
+// WriteRollupEventSyncedL1BlockNumber stores the latest synced L1 block number related to rollup events in the database.
 func WriteRollupEventSyncedL1BlockNumber(db ethdb.KeyValueWriter, l1BlockNumber uint64) {
 	value := big.NewInt(0).SetUint64(l1BlockNumber).Bytes()
 	if err := db.Put(rollupEventSyncedL1BlockNumberKey, value); err != nil {
@@ -83,7 +83,7 @@ func ReadBatchChunkRanges(db ethdb.Reader, batchIndex uint64) []*ChunkBlockRange
 
 	cr := new([]*ChunkBlockRange)
 	if err := rlp.Decode(bytes.NewReader(data), cr); err != nil {
-		log.Crit("Invalid BatchBlockRange RLP", "batch index", batchIndex, "data", data, "err", err)
+		log.Crit("Invalid ChunkBlockRange RLP", "batch index", batchIndex, "data", data, "err", err)
 	}
 	return *cr
 }
