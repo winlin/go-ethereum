@@ -152,6 +152,7 @@ func (s *RollupSyncService) fetchRollupEvents() {
 	// query in batches
 	for from := s.latestProcessedBlock + 1; from <= latestConfirmed; from += defaultFetchBlockRange {
 		if s.ctx.Err() != nil {
+			log.Info("Context canceled", "reason", s.ctx.Err())
 			return
 		}
 
@@ -247,6 +248,11 @@ func (s *RollupSyncService) getLocalInfoForBatch(batchIndex uint64) (*rawdb.Fina
 
 	endBlockNumber := chunkBlockRanges[len(chunkBlockRanges)-1].EndBlockNumber
 	for i := 0; i < defaultMaxRetries; i++ {
+		if s.ctx.Err() != nil {
+			log.Info("Context canceled", "reason", s.ctx.Err())
+			return nil, nil, s.ctx.Err()
+		}
+
 		localSyncedBlockHeight := s.bc.CurrentBlock().Number().Uint64()
 		if localSyncedBlockHeight >= endBlockNumber {
 			break // ready to proceed, exit retry loop
