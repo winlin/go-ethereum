@@ -59,18 +59,24 @@ func TestFinalizedL2BlockNumber(t *testing.T) {
 }
 
 func TestFinalizedBatchMeta(t *testing.T) {
-	batches := []FinalizedBatchMeta{
+	batches := []*FinalizedBatchMeta{
 		{
 			BatchHash:            common.BytesToHash([]byte("batch1")),
 			TotalL1MessagePopped: 123,
+			StateRoot:            common.BytesToHash([]byte("stateRoot1")),
+			WithdrawRoot:         common.BytesToHash([]byte("withdrawRoot1")),
 		},
 		{
 			BatchHash:            common.BytesToHash([]byte("batch2")),
 			TotalL1MessagePopped: 456,
+			StateRoot:            common.BytesToHash([]byte("stateRoot2")),
+			WithdrawRoot:         common.BytesToHash([]byte("withdrawRoot2")),
 		},
 		{
 			BatchHash:            common.BytesToHash([]byte("batch3")),
 			TotalL1MessagePopped: 789,
+			StateRoot:            common.BytesToHash([]byte("stateRoot3")),
+			WithdrawRoot:         common.BytesToHash([]byte("withdrawRoot3")),
 		},
 	}
 
@@ -87,19 +93,23 @@ func TestFinalizedBatchMeta(t *testing.T) {
 		if readBatch == nil {
 			t.Fatal("Failed to read batch from database")
 		}
-		if readBatch.BatchHash != batch.BatchHash || readBatch.TotalL1MessagePopped != batch.TotalL1MessagePopped {
+		if readBatch.BatchHash != batch.BatchHash || readBatch.TotalL1MessagePopped != batch.TotalL1MessagePopped ||
+			readBatch.StateRoot != batch.StateRoot || readBatch.WithdrawRoot != batch.WithdrawRoot {
 			t.Fatal("Mismatch in read batch", "expected", batch, "got", readBatch)
 		}
 	}
 
 	// over-write
-	newBatch := FinalizedBatchMeta{
+	newBatch := &FinalizedBatchMeta{
 		BatchHash:            common.BytesToHash([]byte("newBatch")),
 		TotalL1MessagePopped: 999,
+		StateRoot:            common.BytesToHash([]byte("newStateRoot")),
+		WithdrawRoot:         common.BytesToHash([]byte("newWithdrawRoot")),
 	}
 	WriteFinalizedBatchMeta(db, 0, newBatch) // over-writing the batch with index 0
 	readBatch := ReadFinalizedBatchMeta(db, 0)
-	if readBatch.BatchHash != newBatch.BatchHash || readBatch.TotalL1MessagePopped != newBatch.TotalL1MessagePopped {
+	if readBatch.BatchHash != newBatch.BatchHash || readBatch.TotalL1MessagePopped != newBatch.TotalL1MessagePopped ||
+		readBatch.StateRoot != newBatch.StateRoot || readBatch.WithdrawRoot != newBatch.WithdrawRoot {
 		t.Fatal("Mismatch after over-writing batch", "expected", newBatch, "got", readBatch)
 	}
 

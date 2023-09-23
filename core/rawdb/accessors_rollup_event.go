@@ -18,9 +18,10 @@ type ChunkBlockRange struct {
 
 // FinalizedBatchMeta holds metadata for finalized batches.
 type FinalizedBatchMeta struct {
-	BatchHash common.Hash
-	// Total number of L1 messages popped before and in this batch.
-	TotalL1MessagePopped uint64
+	BatchHash            common.Hash
+	TotalL1MessagePopped uint64 // total number of L1 messages popped before and in this batch.
+	StateRoot            common.Hash
+	WithdrawRoot         common.Hash
 }
 
 // WriteRollupEventSyncedL1BlockNumber stores the latest synced L1 block number related to rollup events in the database.
@@ -89,7 +90,7 @@ func ReadBatchChunkRanges(db ethdb.Reader, batchIndex uint64) []*ChunkBlockRange
 }
 
 // WriteFinalizedBatchMeta stores the metadata of a finalized batch in the database.
-func WriteFinalizedBatchMeta(db ethdb.KeyValueWriter, batchIndex uint64, finalizedBatchMeta FinalizedBatchMeta) {
+func WriteFinalizedBatchMeta(db ethdb.KeyValueWriter, batchIndex uint64, finalizedBatchMeta *FinalizedBatchMeta) {
 	var err error
 	bytes, err := rlp.EncodeToBytes(finalizedBatchMeta)
 	if err != nil {

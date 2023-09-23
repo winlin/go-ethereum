@@ -169,8 +169,9 @@ func TestValidateBatch(t *testing.T) {
 		StateRoot:    chunk3.Blocks[len(chunk3.Blocks)-1].Header.Root,
 		WithdrawRoot: chunk3.Blocks[len(chunk3.Blocks)-1].WithdrawRoot,
 	}
-	err = validateBatch(event1, parentBatchMeta1, []*Chunk{chunk1, chunk2, chunk3})
+	endBlock1, finalizedBatchMeta1, err := validateBatch(event1, parentBatchMeta1, []*Chunk{chunk1, chunk2, chunk3})
 	assert.NoError(t, err)
+	assert.Equal(t, uint64(13), endBlock1)
 
 	templateBlockTrace4, err := os.ReadFile("./testdata/blockTrace_05.json")
 	require.NoError(t, err)
@@ -180,58 +181,27 @@ func TestValidateBatch(t *testing.T) {
 	chunk4 := &Chunk{Blocks: []*WrappedBlock{wrappedBlock4}}
 
 	parentBatchMeta2 := &rawdb.FinalizedBatchMeta{
-		BatchHash:            common.HexToHash("0xd0f52bc254646e639bf24cc34606319a111975b2fdc431b1381eb6199bc09790"),
+		BatchHash:            event1.BatchHash,
 		TotalL1MessagePopped: 11,
+		StateRoot:            chunk3.Blocks[len(chunk3.Blocks)-1].Header.Root,
+		WithdrawRoot:         chunk3.Blocks[len(chunk3.Blocks)-1].WithdrawRoot,
 	}
+	assert.Equal(t, parentBatchMeta2, finalizedBatchMeta1)
 	event2 := &L1FinalizeBatchEvent{
 		BatchIndex:   big.NewInt(1),
 		BatchHash:    common.HexToHash("0xfb77bf8f3bf449126ebbf403fdccfcf78636e34d72d62eed8da0e8c9fd38fa63"),
 		StateRoot:    chunk4.Blocks[len(chunk4.Blocks)-1].Header.Root,
 		WithdrawRoot: chunk4.Blocks[len(chunk4.Blocks)-1].WithdrawRoot,
 	}
-	err = validateBatch(event2, parentBatchMeta2, []*Chunk{chunk4})
+	endBlock2, finalizedBatchMeta2, err := validateBatch(event2, parentBatchMeta2, []*Chunk{chunk4})
 	assert.NoError(t, err)
-}
+	assert.Equal(t, uint64(17), endBlock2)
 
-func TestCalculateFinalizedBatchMeta(t *testing.T) {
-	templateBlockTrace1, err := os.ReadFile("./testdata/blockTrace_02.json")
-	require.NoError(t, err)
-	wrappedBlock1 := &WrappedBlock{}
-	err = json.Unmarshal(templateBlockTrace1, wrappedBlock1)
-	require.NoError(t, err)
-	chunk1 := &Chunk{Blocks: []*WrappedBlock{wrappedBlock1}}
-
-	templateBlockTrace2, err := os.ReadFile("./testdata/blockTrace_03.json")
-	require.NoError(t, err)
-	wrappedBlock2 := &WrappedBlock{}
-	err = json.Unmarshal(templateBlockTrace2, wrappedBlock2)
-	require.NoError(t, err)
-	chunk2 := &Chunk{Blocks: []*WrappedBlock{wrappedBlock2}}
-
-	templateBlockTrace3, err := os.ReadFile("./testdata/blockTrace_04.json")
-	require.NoError(t, err)
-	wrappedBlock3 := &WrappedBlock{}
-	err = json.Unmarshal(templateBlockTrace3, wrappedBlock3)
-	require.NoError(t, err)
-	chunk3 := &Chunk{Blocks: []*WrappedBlock{wrappedBlock3}}
-
-	parentBatchMeta1 := &rawdb.FinalizedBatchMeta{}
-	finalizedBatchMeta1 := calculateFinalizedBatchMeta(parentBatchMeta1, common.HexToHash("0xd0f52bc254646e639bf24cc34606319a111975b2fdc431b1381eb6199bc09790"), []*Chunk{chunk1, chunk2, chunk3})
-	assert.Equal(t, uint64(11), finalizedBatchMeta1.TotalL1MessagePopped)
-	assert.Equal(t, common.HexToHash("0xd0f52bc254646e639bf24cc34606319a111975b2fdc431b1381eb6199bc09790"), finalizedBatchMeta1.BatchHash)
-
-	templateBlockTrace4, err := os.ReadFile("./testdata/blockTrace_05.json")
-	require.NoError(t, err)
-	wrappedBlock4 := &WrappedBlock{}
-	err = json.Unmarshal(templateBlockTrace4, wrappedBlock4)
-	require.NoError(t, err)
-	chunk4 := &Chunk{Blocks: []*WrappedBlock{wrappedBlock4}}
-
-	parentBatchMeta2 := &rawdb.FinalizedBatchMeta{
-		BatchHash:            common.HexToHash("0xd0f52bc254646e639bf24cc34606319a111975b2fdc431b1381eb6199bc09790"),
-		TotalL1MessagePopped: 11,
+	parentBatchMeta3 := &rawdb.FinalizedBatchMeta{
+		BatchHash:            event2.BatchHash,
+		TotalL1MessagePopped: 42,
+		StateRoot:            chunk4.Blocks[len(chunk4.Blocks)-1].Header.Root,
+		WithdrawRoot:         chunk4.Blocks[len(chunk4.Blocks)-1].WithdrawRoot,
 	}
-	finalizedBatchMeta2 := calculateFinalizedBatchMeta(parentBatchMeta2, common.HexToHash("0xfb77bf8f3bf449126ebbf403fdccfcf78636e34d72d62eed8da0e8c9fd38fa63"), []*Chunk{chunk4})
-	assert.Equal(t, uint64(42), finalizedBatchMeta2.TotalL1MessagePopped)
-	assert.Equal(t, common.HexToHash("0xfb77bf8f3bf449126ebbf403fdccfcf78636e34d72d62eed8da0e8c9fd38fa63"), finalizedBatchMeta2.BatchHash)
+	assert.Equal(t, parentBatchMeta3, finalizedBatchMeta2)
 }
