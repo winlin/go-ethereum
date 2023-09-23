@@ -1,4 +1,4 @@
-package rollupsyncservice
+package rollup_sync_service
 
 import (
 	"context"
@@ -17,7 +17,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/rawdb"
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
-	"github.com/scroll-tech/go-ethereum/node"
 	"github.com/scroll-tech/go-ethereum/params"
 )
 
@@ -33,8 +32,7 @@ func TestRollupSyncServiceStartAndStop(t *testing.T) {
 	db := rawdb.NewDatabase(memorydb.New())
 	l1Client := &mockEthClient{}
 	bc := &core.BlockChain{}
-	node := &node.Node{}
-	service, err := NewRollupSyncService(context.Background(), genesisConfig, db, l1Client, bc, node, 1)
+	service, err := NewRollupSyncService(context.Background(), genesisConfig, db, l1Client, bc, 1)
 	if err != nil {
 		t.Fatalf("Failed to new rollup sync service: %v", err)
 	}
@@ -114,8 +112,7 @@ func TestGetChunkRanges(t *testing.T) {
 		commitBatchRLP: rlpData,
 	}
 	bc := &core.BlockChain{}
-	node := &node.Node{}
-	service, err := NewRollupSyncService(context.Background(), genesisConfig, db, l1Client, bc, node, 1)
+	service, err := NewRollupSyncService(context.Background(), genesisConfig, db, l1Client, bc, 1)
 	if err != nil {
 		t.Fatalf("Failed to new rollup sync service: %v", err)
 	}
@@ -172,7 +169,7 @@ func TestValidateBatch(t *testing.T) {
 		StateRoot:    chunk3.Blocks[len(chunk3.Blocks)-1].Header.Root,
 		WithdrawRoot: chunk3.Blocks[len(chunk3.Blocks)-1].WithdrawRoot,
 	}
-	err = validateBatch(event1, parentBatchMeta1, []*Chunk{chunk1, chunk2, chunk3}, nil)
+	err = validateBatch(event1, parentBatchMeta1, []*Chunk{chunk1, chunk2, chunk3})
 	assert.NoError(t, err)
 
 	templateBlockTrace4, err := os.ReadFile("./testdata/blockTrace_05.json")
@@ -192,7 +189,7 @@ func TestValidateBatch(t *testing.T) {
 		StateRoot:    chunk4.Blocks[len(chunk4.Blocks)-1].Header.Root,
 		WithdrawRoot: chunk4.Blocks[len(chunk4.Blocks)-1].WithdrawRoot,
 	}
-	err = validateBatch(event2, parentBatchMeta2, []*Chunk{chunk4}, nil)
+	err = validateBatch(event2, parentBatchMeta2, []*Chunk{chunk4})
 	assert.NoError(t, err)
 }
 

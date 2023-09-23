@@ -1,4 +1,4 @@
-package rollupsyncservice
+package rollup_sync_service
 
 import (
 	"fmt"

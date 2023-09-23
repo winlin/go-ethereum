@@ -1,4 +1,4 @@
-package rollupsyncservice
+package rollup_sync_service
 
 import (
 	"context"
@@ -15,7 +15,6 @@ import (
 	"github.com/scroll-tech/go-ethereum/core/types"
 	"github.com/scroll-tech/go-ethereum/ethdb"
 	"github.com/scroll-tech/go-ethereum/log"
-	"github.com/scroll-tech/go-ethereum/node"
 	"github.com/scroll-tech/go-ethereum/params"
 
 	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
@@ -51,10 +50,9 @@ type RollupSyncService struct {
 	l1RevertBatchEventSignature   common.Hash
 	l1FinalizeBatchEventSignature common.Hash
 	bc                            *core.BlockChain
-	node                          *node.Node // to graceful shutdown the node
 }
 
-func NewRollupSyncService(ctx context.Context, genesisConfig *params.ChainConfig, db ethdb.Database, l1Client sync_service.EthClient, bc *core.BlockChain, node *node.Node, l1DeploymentBlock uint64) (*RollupSyncService, error) {
+func NewRollupSyncService(ctx context.Context, genesisConfig *params.ChainConfig, db ethdb.Database, l1Client sync_service.EthClient, bc *core.BlockChain, l1DeploymentBlock uint64) (*RollupSyncService, error) {
 	// terminate if the caller does not provide an L1 client (e.g. in tests)
 	if l1Client == nil || (reflect.ValueOf(l1Client).Kind() == reflect.Ptr && reflect.ValueOf(l1Client).IsNil()) {
 		log.Warn("No L1 client provided, L1 rollup sync service will not run")
@@ -101,7 +99,6 @@ func NewRollupSyncService(ctx context.Context, genesisConfig *params.ChainConfig
 		l1RevertBatchEventSignature:   scrollChainABI.Events["RevertBatch"].ID,
 		l1FinalizeBatchEventSignature: scrollChainABI.Events["FinalizeBatch"].ID,
 		bc:                            bc,
-		node:                          node,
 	}
 
 	return &service, nil
@@ -213,7 +210,7 @@ func (s *RollupSyncService) parseAndUpdateRollupEventLogs(logs []types.Log, endB
 				return fmt.Errorf("failed to get local node info, batch index: %v, err: %w", batchIndex, err)
 			}
 
-			if err := validateBatch(event, parentBatchMeta, chunks, s.node); err != nil {
+			if err := validateBatch(event, parentBatchMeta, chunks); err != nil {
 				return fmt.Errorf("fatal: validateBatch failed: finalize event: %v, err: %w", *event, err)
 			}
 			endChunk := chunks[len(chunks)-1]
@@ -356,7 +353,7 @@ func calculateFinalizedBatchMeta(parentBatchMeta *rawdb.FinalizedBatchMeta, batc
 
 // validateBatch verifies the consistency between l1 contract and l2 node data.
 // close the node and exit once any consistency check fails.
-func validateBatch(event *L1FinalizeBatchEvent, parentBatchMeta *rawdb.FinalizedBatchMeta, chunks []*Chunk, node *node.Node) error {
+func validateBatch(event *L1FinalizeBatchEvent, parentBatchMeta *rawdb.FinalizedBatchMeta, chunks []*Chunk) error {
 	if len(chunks) == 0 {
 		return fmt.Errorf("invalid arg: length of chunks is 0")
 	}
