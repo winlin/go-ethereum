@@ -103,6 +103,13 @@ type callContext struct {
 	Miner      common.Address        `json:"miner"`
 }
 
+// callLog is the result of LOG opCode
+type callLog struct {
+	Address common.Address `json:"address"`
+	Topics  []common.Hash  `json:"topics"`
+	Data    hexutil.Bytes  `json:"data"`
+}
+
 // callTrace is the result of a callTracer run.
 type callTrace struct {
 	Type    string          `json:"type"`
@@ -115,6 +122,7 @@ type callTrace struct {
 	Value   *hexutil.Big    `json:"value,omitempty"`
 	Error   string          `json:"error,omitempty"`
 	Calls   []callTrace     `json:"calls,omitempty"`
+	Logs    []callLog       `json:"logs,omitempty"`
 }
 
 // callTracerTest defines a single test to check the call tracer against.

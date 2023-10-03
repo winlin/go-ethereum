@@ -712,6 +712,17 @@ func (jst *jsTracer) CaptureStart(env *vm.EVM, from common.Address, to common.Ad
 	jst.ctx["intrinsicGas"] = intrinsicGas
 }
 
+// CaptureTxStart implements the Tracer interface and is invoked at the beginning of
+// transaction processing.
+func (jst *jsTracer) CaptureTxStart(gasLimit uint64) {}
+
+// CaptureTxStart implements the Tracer interface and is invoked at the end of
+// transaction processing.
+func (*jsTracer) CaptureTxEnd(restGas uint64) {}
+
+// CaptureStart implements the Tracer interface and is invoked before executing the
+// top-level call frame of a transaction.
+
 // CaptureState implements the Tracer interface to trace a single step of VM execution.
 func (jst *jsTracer) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, rData []byte, depth int, err error) {
 	if !jst.traceSteps {
