@@ -840,7 +840,7 @@ var (
 	RollupVerifyEnabledFlag = cli.BoolFlag{
 		Name:  "rollup.verify",
 		Usage: "Enable verification of batch consistency between L1 and L2 in rollup",
-  }
+	}
 
 	// Max block range for `eth_getLogs` method
 	MaxBlockRangeFlag = cli.Int64Flag{
@@ -1555,7 +1555,7 @@ func setCircuitCapacityCheck(ctx *cli.Context, cfg *ethconfig.Config) {
 func setEnableRollupVerify(ctx *cli.Context, cfg *ethconfig.Config) {
 	if ctx.GlobalIsSet(RollupVerifyEnabledFlag.Name) {
 		cfg.EnableRollupVerify = ctx.GlobalBool(RollupVerifyEnabledFlag.Name)
-  }
+	}
 }
 
 func setMaxBlockRange(ctx *cli.Context, cfg *ethconfig.Config) {
