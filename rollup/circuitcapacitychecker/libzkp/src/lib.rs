@@ -15,6 +15,11 @@ pub mod checker {
     use std::ptr::null;
 
     #[derive(Debug, Clone, Deserialize, Serialize)]
+    pub struct CommonResult {
+        pub error: Option<String>,
+    }
+
+    #[derive(Debug, Clone, Deserialize, Serialize)]
     pub struct RowUsageResult {
         pub acc_row_usage: Option<RowUsage>,
         pub error: Option<String>,
@@ -160,7 +165,7 @@ pub mod checker {
         let traces = serde_json::from_slice::<BlockTrace>(&block_trace)?;
 
         let r = panic::catch_unwind(|| {
-            let ccc_instance = CHECKERS
+            CHECKERS
                 .get_mut()
                 .ok_or(anyhow!(
                     "fail to get circuit capacity checkers map in apply_block"
@@ -168,9 +173,8 @@ pub mod checker {
                 .get_mut(&id)
                 .ok_or(anyhow!(
                     "fail to get circuit capacity checker (id: {id:?}) in apply_block"
-                ))?;
-            ccc_instance.light_mode = false;
-            ccc_instance.estimate_circuit_capacity(&[traces])
+                ))?
+                .estimate_circuit_capacity(&[traces])
         });
         match r {
             Ok(result) => result,
@@ -216,6 +220,40 @@ pub mod checker {
         })
         .map_or_else(
             |e| bail!("circuit capacity checker (id: {id}) error in get_tx_num: {e:?}"),
+            |result| result,
+        )
+    }
+
+    /// # Safety
+    #[no_mangle]
+    pub unsafe extern "C" fn set_light_mode(id: u64, light_mode: bool) -> *const c_char {
+        let result = set_light_mode_inner(id, light_mode);
+        let r = match result {
+            Ok(()) => CommonResult { error: None },
+            Err(e) => CommonResult {
+                error: Some(format!("{e:?}")),
+            },
+        };
+        serde_json::to_vec(&r).map_or(null(), vec_to_c_char)
+    }
+
+    unsafe fn set_light_mode_inner(id: u64, light_mode: bool) -> Result<(), Error> {
+        log::debug!("ccc set_light_mode raw input, id: {id}");
+        panic::catch_unwind(|| {
+            CHECKERS
+                .get_mut()
+                .ok_or(anyhow!(
+                    "fail to get circuit capacity checkers map in set_light_mode"
+                ))?
+                .get_mut(&id)
+                .ok_or(anyhow!(
+                    "fail to get circuit capacity checker (id: {id}) in set_light_mode"
+                ))?
+                .set_light_mode(light_mode);
+            Ok(())
+        })
+        .map_or_else(
+            |e| bail!("circuit capacity checker (id: {id}) error in set_light_mode: {e:?}"),
             |result| result,
         )
     }

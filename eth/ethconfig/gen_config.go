@@ -63,6 +63,7 @@ func (c Config) MarshalTOML() (interface{}, error) {
 		MPTWitness              int
 		CheckCircuitCapacity    bool
 		EnableRollupVerify      bool
+		MaxBlockRange           int64
 	}
 	var enc Config
 	enc.Genesis = c.Genesis
@@ -110,6 +111,7 @@ func (c Config) MarshalTOML() (interface{}, error) {
 	enc.MPTWitness = c.MPTWitness
 	enc.CheckCircuitCapacity = c.CheckCircuitCapacity
 	enc.EnableRollupVerify = c.EnableRollupVerify
+	enc.MaxBlockRange = c.MaxBlockRange
 	return &enc, nil
 }
 
@@ -161,6 +163,7 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 		MPTWitness              *int
 		CheckCircuitCapacity    *bool
 		EnableRollupVerify      *bool
+		MaxBlockRange           *int64
 	}
 	var dec Config
 	if err := unmarshal(&dec); err != nil {
@@ -300,6 +303,9 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 	}
 	if dec.EnableRollupVerify != nil {
 		c.EnableRollupVerify = *dec.EnableRollupVerify
+  }
+	if dec.MaxBlockRange != nil {
+		c.MaxBlockRange = *dec.MaxBlockRange
 	}
 	return nil
 }
