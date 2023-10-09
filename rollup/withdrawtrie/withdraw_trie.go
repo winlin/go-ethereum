@@ -2,7 +2,6 @@ package withdrawtrie
 
 import (
 	"github.com/scroll-tech/go-ethereum/common"
-
 	"github.com/scroll-tech/go-ethereum/rollup/rcfg"
 )
 
