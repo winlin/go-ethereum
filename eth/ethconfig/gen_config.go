@@ -303,7 +303,7 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 	}
 	if dec.EnableRollupVerify != nil {
 		c.EnableRollupVerify = *dec.EnableRollupVerify
-  }
+	}
 	if dec.MaxBlockRange != nil {
 		c.MaxBlockRange = *dec.MaxBlockRange
 	}
