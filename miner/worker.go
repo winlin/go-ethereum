@@ -913,6 +913,7 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 		// 2.3 when starting handling the following txs, `state.refund` comes as 0
 		traces, err = w.current.traceEnv.GetBlockTrace(
 			types.NewBlockWithHeader(w.current.header).WithBody([]*types.Transaction{tx}, nil),
+			nil,
 		)
 		// `w.current.traceEnv.State` & `w.current.state` share a same pointer to the state, so only need to revert `w.current.state`
 		// revert to snapshot for calling `core.ApplyMessage` again, (both `traceEnv.GetBlockTrace` & `core.ApplyTransaction` will call `core.ApplyMessage`)
@@ -1419,7 +1420,7 @@ func (w *worker) commit(uncles []*types.Header, interval func(), update bool, st
 			"number", w.current.header.Number,
 			"hash", w.current.header.Hash().String(),
 		)
-		traces, err := w.current.traceEnv.GetBlockTrace(types.NewBlockWithHeader(w.current.header))
+		traces, err := w.current.traceEnv.GetBlockTrace(types.NewBlockWithHeader(w.current.header), nil)
 		if err != nil {
 			return err
 		}

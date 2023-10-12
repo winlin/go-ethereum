@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/scroll-tech/go-ethereum/eth/tracers"
 	"runtime"
 	"sync"
 
@@ -148,7 +149,7 @@ func CreateTraceEnv(chainConfig *params.ChainConfig, chainContext ChainContext, 
 	return env, nil
 }
 
-func (env *TraceEnv) GetBlockTrace(block *types.Block) (*types.BlockTrace, error) {
+func (env *TraceEnv) GetBlockTrace(block *types.Block, tracer *string) (*types.BlockTrace, error) {
 	// Execute all the transaction contained within the block concurrently
 	var (
 		txs   = block.Transactions()
@@ -192,7 +193,26 @@ func (env *TraceEnv) GetBlockTrace(block *types.Block) (*types.BlockTrace, error
 		// Generate the next state snapshot fast without tracing
 		msg, _ := tx.AsMessage(env.signer, block.BaseFee())
 		env.state.Prepare(tx.Hash(), i)
-		vmenv := vm.NewEVM(env.blockCtx, NewEVMTxContext(msg), env.state, env.chainConfig, vm.Config{})
+
+		txContext := NewEVMTxContext(msg)
+		var txTracer vm.EVMLogger
+		if tracer != nil {
+			var err error
+			txctx := &tracers.Context{
+				BlockHash: block.Hash(),
+				TxIndex:   i,
+				TxHash:    tx.Hash(),
+			}
+			txTracer, err = tracers.New(*tracer, txctx)
+			if failed != nil {
+				failed = err
+				break
+			}
+		} else {
+			txTracer = vm.NewStructLogger(nil)
+		}
+
+		vmenv := vm.NewEVM(env.blockCtx, txContext, env.state, env.chainConfig, vm.Config{Tracer: txTracer})
 		l1DataFee, err := fees.CalculateL1DataFee(tx, env.state)
 		if err != nil {
 			failed = err

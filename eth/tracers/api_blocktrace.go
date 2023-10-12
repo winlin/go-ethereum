@@ -48,7 +48,7 @@ func (api *API) GetBlockTraceByNumberOrHash(ctx context.Context, blockNrOrHash r
 		return nil, err
 	}
 
-	return env.GetBlockTrace(block)
+	return env.GetBlockTrace(block, nil)
 }
 
 // Make trace environment for current block.

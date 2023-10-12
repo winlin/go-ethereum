@@ -288,7 +288,7 @@ func (v *BlockValidator) validateCircuitRowConsumption(block *types.Block) (*typ
 		return nil, err
 	}
 
-	traces, err := env.GetBlockTrace(block)
+	traces, err := env.GetBlockTrace(block, nil)
 	if err != nil {
 		return nil, err
 	}
