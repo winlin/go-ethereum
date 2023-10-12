@@ -198,12 +198,12 @@ func (env *TraceEnv) GetBlockTrace(block *types.Block, tracer *string) (*types.B
 		var txTracer vm.EVMLogger
 		if tracer != nil {
 			var err error
-			txctx := &tracers.Context{
+			txctx := &Context{
 				BlockHash: block.Hash(),
 				TxIndex:   i,
 				TxHash:    tx.Hash(),
 			}
-			txTracer, err = tracers.New(*tracer, txctx)
+			txTracer, err = tracers.New(*tracer, (*tracers.Context)(txctx))
 			if failed != nil {
 				failed = err
 				break
