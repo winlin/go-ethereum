@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/scroll-tech/go-ethereum/common"
-	"github.com/scroll-tech/go-ethereum/common/hexutil"
 	"github.com/scroll-tech/go-ethereum/core/vm"
 	"github.com/scroll-tech/go-ethereum/crypto"
 	"github.com/scroll-tech/go-ethereum/eth/tracers"
@@ -46,11 +45,6 @@ type account struct {
 
 func (a *account) exists() bool {
 	return a.Nonce > 0 || len(a.Code) > 0 || len(a.Storage) > 0 || (a.Balance != nil && a.Balance.Sign() != 0)
-}
-
-type accountMarshaling struct {
-	Balance *hexutil.Big
-	Code    hexutil.Bytes
 }
 
 type prestateTracer struct {
