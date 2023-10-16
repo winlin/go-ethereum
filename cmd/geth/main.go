@@ -148,6 +148,7 @@ var (
 		utils.GoerliFlag,
 		utils.ScrollAlphaFlag,
 		utils.ScrollSepoliaFlag,
+		utils.ScrollFlag,
 		utils.VMEnableDebugFlag,
 		utils.NetworkIdFlag,
 		utils.EthStatsURLFlag,
@@ -190,6 +191,7 @@ var (
 		utils.RPCGlobalEVMTimeoutFlag,
 		utils.RPCGlobalTxFeeCapFlag,
 		utils.AllowUnprotectedTxs,
+		utils.MaxBlockRangeFlag,
 	}
 
 	metricsFlags = []cli.Flag{
