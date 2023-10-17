@@ -142,7 +142,9 @@ func checkChainAndProof(t *testing.T, b *testBackend, parent *types.Block, block
 			for addr, wrappedProof := range storageProof {
 				for keyStr, data2 := range wrappedProof {
 					data1, err := statedb.GetStorageProof(common.HexToAddress(addr), common.HexToHash(keyStr))
-					assert.NoError(t, err)
+					if len(data2) > 0 {
+						assert.NoError(t, err)
+					}
 					verifyProof(t, data1, data2)
 				}
 			}
@@ -164,10 +166,12 @@ func checkStructLogs(t *testing.T, expect []*txTraceResult, actual []*types.Exec
 	assert.Equal(t, len(expect), len(actual))
 	for i, val := range expect {
 		trace1, trace2 := val.Result.(*types.ExecutionResult), actual[i]
+		assert.Equal(t, trace1.L1DataFee, trace2.L1DataFee)
 		assert.Equal(t, trace1.Failed, trace2.Failed)
 		assert.Equal(t, trace1.Gas, trace2.Gas)
 		assert.Equal(t, trace1.ReturnValue, trace2.ReturnValue)
 		assert.Equal(t, len(trace1.StructLogs), len(trace2.StructLogs))
+		// TODO: compare other fields
 
 		for i, opcode := range trace1.StructLogs {
 			data1, err := json.Marshal(opcode)

@@ -20,8 +20,12 @@ package rawdb
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
+
+	leveldb "github.com/syndtr/goleveldb/leveldb/errors"
 
 	"github.com/scroll-tech/go-ethereum/common"
+	"github.com/scroll-tech/go-ethereum/ethdb/memorydb"
 	"github.com/scroll-tech/go-ethereum/metrics"
 )
 
@@ -98,7 +102,29 @@ var (
 
 	preimageCounter    = metrics.NewRegisteredCounter("db/preimage/total", nil)
 	preimageHitCounter = metrics.NewRegisteredCounter("db/preimage/hits", nil)
+
+	// Scroll L1 message store
+	syncedL1BlockNumberKey            = []byte("LastSyncedL1BlockNumber")
+	l1MessageLegacyPrefix             = []byte("l1")
+	l1MessagePrefix                   = []byte("L1") // l1MessagePrefix + queueIndex (uint64 big endian) -> L1MessageTx
+	firstQueueIndexNotInL2BlockPrefix = []byte("q")  // firstQueueIndexNotInL2BlockPrefix + L2 block hash -> enqueue index
+	highestSyncedQueueIndexKey        = []byte("HighestSyncedQueueIndex")
+
+	// Row consumption
+	rowConsumptionPrefix = []byte("rc") // rowConsumptionPrefix + hash -> row consumption by block
+
+	// Skipped transactions
+	numSkippedTransactionsKey    = []byte("NumberOfSkippedTransactions")
+	skippedTransactionPrefix     = []byte("skip") // skippedTransactionPrefix + tx hash -> skipped transaction
+	skippedTransactionHashPrefix = []byte("sh")   // skippedTransactionHashPrefix + index -> tx hash
 )
+
+// Use the updated "L1" prefix on all new networks
+// to avoid overlap with txLookupPrefix.
+// Use the legacy "l1" prefix on Scroll Sepolia.
+func SetL1MessageLegacyPrefix() {
+	l1MessagePrefix = l1MessageLegacyPrefix
+}
 
 const (
 	// freezerHeaderTable indicates the name of the freezer header table.
@@ -229,4 +255,40 @@ func IsCodeKey(key []byte) (bool, []byte) {
 // configKey = configPrefix + hash
 func configKey(hash common.Hash) []byte {
 	return append(configPrefix, hash.Bytes()...)
+}
+
+// encodeBigEndian encodes an index as big endian uint64
+func encodeBigEndian(index uint64) []byte {
+	enc := make([]byte, 8)
+	binary.BigEndian.PutUint64(enc, index)
+	return enc
+}
+
+// L1MessageKey = l1MessagePrefix + queueIndex (uint64 big endian)
+func L1MessageKey(queueIndex uint64) []byte {
+	return append(l1MessagePrefix, encodeBigEndian(queueIndex)...)
+}
+
+// FirstQueueIndexNotInL2BlockKey = firstQueueIndexNotInL2BlockPrefix + L2 block hash
+func FirstQueueIndexNotInL2BlockKey(l2BlockHash common.Hash) []byte {
+	return append(firstQueueIndexNotInL2BlockPrefix, l2BlockHash.Bytes()...)
+}
+
+// rowConsumptionKey = rowConsumptionPrefix + hash
+func rowConsumptionKey(hash common.Hash) []byte {
+	return append(rowConsumptionPrefix, hash.Bytes()...)
+}
+
+func isNotFoundErr(err error) bool {
+	return errors.Is(err, leveldb.ErrNotFound) || errors.Is(err, memorydb.ErrMemorydbNotFound)
+}
+
+// SkippedTransactionKey = skippedTransactionPrefix + tx hash
+func SkippedTransactionKey(txHash common.Hash) []byte {
+	return append(skippedTransactionPrefix, txHash.Bytes()...)
+}
+
+// SkippedTransactionHashKey = skippedTransactionHashPrefix + index (uint64 big endian)
+func SkippedTransactionHashKey(index uint64) []byte {
+	return append(skippedTransactionHashPrefix, encodeBigEndian(index)...)
 }

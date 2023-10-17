@@ -11,15 +11,17 @@ import (
 
 // BlockTrace contains block execution traces and results required for rollers.
 type BlockTrace struct {
-	ChainID          uint64             `json:"chainID"`
-	Version          string             `json:"version"`
-	Coinbase         *AccountWrapper    `json:"coinbase"`
-	Header           *Header            `json:"header"`
-	Transactions     []*TransactionData `json:"transactions"`
-	StorageTrace     *StorageTrace      `json:"storageTrace"`
-	ExecutionResults []*ExecutionResult `json:"executionResults"`
-	MPTWitness       *json.RawMessage   `json:"mptwitness,omitempty"`
-	WithdrawTrieRoot common.Hash        `json:"withdraw_trie_root,omitempty"`
+	ChainID           uint64             `json:"chainID"`
+	Version           string             `json:"version"`
+	Coinbase          *AccountWrapper    `json:"coinbase"`
+	Header            *Header            `json:"header"`
+	Transactions      []*TransactionData `json:"transactions"`
+	StorageTrace      *StorageTrace      `json:"storageTrace"`
+	TxStorageTraces   []*StorageTrace    `json:"txStorageTraces,omitempty"`
+	ExecutionResults  []*ExecutionResult `json:"executionResults"`
+	MPTWitness        *json.RawMessage   `json:"mptwitness,omitempty"`
+	WithdrawTrieRoot  common.Hash        `json:"withdraw_trie_root,omitempty"`
+	StartL1QueueIndex uint64             `json:"startL1QueueIndex"`
 }
 
 // StorageTrace stores proofs of storage needed by storage circuit
@@ -44,10 +46,10 @@ type StorageTrace struct {
 // while replaying a transaction in debug mode as well as transaction
 // execution status, the amount of gas used and the return value
 type ExecutionResult struct {
-	L1Fee       uint64 `json:"l1Fee,omitempty"`
-	Gas         uint64 `json:"gas"`
-	Failed      bool   `json:"failed"`
-	ReturnValue string `json:"returnValue"`
+	L1DataFee   *hexutil.Big `json:"l1DataFee,omitempty"`
+	Gas         uint64       `json:"gas"`
+	Failed      bool         `json:"failed"`
+	ReturnValue string       `json:"returnValue"`
 	// Sender's account state (before Tx)
 	From *AccountWrapper `json:"from,omitempty"`
 	// Receiver's account state (before Tx)
@@ -166,10 +168,16 @@ func NewTransactionData(tx *Transaction, blockNumber uint64, config *params.Chai
 	signer := MakeSigner(config, big.NewInt(0).SetUint64(blockNumber))
 	from, _ := Sender(signer, tx)
 	v, r, s := tx.RawSignatureValues()
+
+	nonce := tx.Nonce()
+	if tx.IsL1MessageTx() {
+		nonce = tx.L1MessageQueueIndex()
+	}
+
 	result := &TransactionData{
 		Type:     tx.Type(),
 		TxHash:   tx.Hash().String(),
-		Nonce:    tx.Nonce(),
+		Nonce:    nonce,
 		ChainId:  (*hexutil.Big)(tx.ChainId()),
 		From:     from,
 		Gas:      tx.Gas(),
@@ -183,4 +191,13 @@ func NewTransactionData(tx *Transaction, blockNumber uint64, config *params.Chai
 		S:        (*hexutil.Big)(s),
 	}
 	return result
+}
+
+// WrapProof turn the bytes array into proof type (array of hexutil.Bytes)
+func WrapProof(proofBytes [][]byte) (wrappedProof []hexutil.Bytes) {
+	wrappedProof = make([]hexutil.Bytes, len(proofBytes))
+	for i, bt := range proofBytes {
+		wrappedProof[i] = bt
+	}
+	return
 }

@@ -19,6 +19,7 @@ package eth
 import (
 	"compress/gzip"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -606,4 +607,159 @@ func (api *PrivateDebugAPI) GetAccessibleState(from, to rpc.BlockNumber) (uint64
 		}
 	}
 	return 0, fmt.Errorf("No state found")
+}
+
+// ScrollAPI provides private RPC methods to query the L1 message database.
+type ScrollAPI struct {
+	eth *Ethereum
+}
+
+// l1MessageTxRPC is the RPC-layer representation of an L1 message.
+type l1MessageTxRPC struct {
+	QueueIndex uint64          `json:"queueIndex"`
+	Gas        uint64          `json:"gas"`
+	To         *common.Address `json:"to"`
+	Value      *hexutil.Big    `json:"value"`
+	Data       hexutil.Bytes   `json:"data"`
+	Sender     common.Address  `json:"sender"`
+	Hash       common.Hash     `json:"hash"`
+}
+
+// NewScrollAPI creates a new RPC service to query the L1 message database.
+func NewScrollAPI(eth *Ethereum) *ScrollAPI {
+	return &ScrollAPI{eth: eth}
+}
+
+// GetL1SyncHeight returns the latest synced L1 block height from the local database.
+func (api *ScrollAPI) GetL1SyncHeight(ctx context.Context) (height *uint64, err error) {
+	return rawdb.ReadSyncedL1BlockNumber(api.eth.ChainDb()), nil
+}
+
+// GetL1MessageByIndex queries an L1 message by its index in the local database.
+func (api *ScrollAPI) GetL1MessageByIndex(ctx context.Context, queueIndex uint64) (height *l1MessageTxRPC, err error) {
+	msg := rawdb.ReadL1Message(api.eth.ChainDb(), queueIndex)
+	if msg == nil {
+		return nil, nil
+	}
+	rpcMsg := l1MessageTxRPC{
+		QueueIndex: msg.QueueIndex,
+		Gas:        msg.Gas,
+		To:         msg.To,
+		Value:      (*hexutil.Big)(msg.Value),
+		Data:       msg.Data,
+		Sender:     msg.Sender,
+		Hash:       types.NewTx(msg).Hash(),
+	}
+	return &rpcMsg, nil
+}
+
+// GetFirstQueueIndexNotInL2Block returns the first L1 message queue index that is
+// not included in the chain up to and including the provided block.
+func (api *ScrollAPI) GetFirstQueueIndexNotInL2Block(ctx context.Context, hash common.Hash) (queueIndex *uint64, err error) {
+	return rawdb.ReadFirstQueueIndexNotInL2Block(api.eth.ChainDb(), hash), nil
+}
+
+// GetLatestRelayedQueueIndex returns the highest L1 message queue index included in the canonical chain.
+func (api *ScrollAPI) GetLatestRelayedQueueIndex(ctx context.Context) (queueIndex *uint64, err error) {
+	block := api.eth.blockchain.CurrentBlock()
+	queueIndex, err = api.GetFirstQueueIndexNotInL2Block(ctx, block.Hash())
+	if queueIndex == nil || err != nil {
+		return queueIndex, err
+	}
+	if *queueIndex == 0 {
+		return nil, nil
+	}
+	lastIncluded := *queueIndex - 1
+	return &lastIncluded, nil
+}
+
+// rpcMarshalBlock uses the generalized output filler, then adds the total difficulty field, which requires
+// a `ScrollAPI`.
+func (api *ScrollAPI) rpcMarshalBlock(ctx context.Context, b *types.Block, fullTx bool) (map[string]interface{}, error) {
+	fields, err := ethapi.RPCMarshalBlock(b, true, fullTx, api.eth.APIBackend.ChainConfig())
+	if err != nil {
+		return nil, err
+	}
+	fields["totalDifficulty"] = (*hexutil.Big)(api.eth.APIBackend.GetTd(ctx, b.Hash()))
+	rc := rawdb.ReadBlockRowConsumption(api.eth.ChainDb(), b.Hash())
+	if rc != nil {
+		fields["rowConsumption"] = rc
+	} else {
+		fields["rowConsumption"] = nil
+	}
+	return fields, err
+}
+
+// GetBlockByHash returns the requested block. When fullTx is true all transactions in the block are returned in full
+// detail, otherwise only the transaction hash is returned.
+func (api *ScrollAPI) GetBlockByHash(ctx context.Context, hash common.Hash, fullTx bool) (map[string]interface{}, error) {
+	block, err := api.eth.APIBackend.BlockByHash(ctx, hash)
+	if block != nil {
+		return api.rpcMarshalBlock(ctx, block, fullTx)
+	}
+	return nil, err
+}
+
+// GetBlockByNumber returns the requested block. When fullTx is true all transactions in the block are returned in full
+// detail, otherwise only the transaction hash is returned.
+func (api *ScrollAPI) GetBlockByNumber(ctx context.Context, number rpc.BlockNumber, fullTx bool) (map[string]interface{}, error) {
+	block, err := api.eth.APIBackend.BlockByNumber(ctx, number)
+	if block != nil {
+		return api.rpcMarshalBlock(ctx, block, fullTx)
+	}
+	return nil, err
+}
+
+// GetNumSkippedTransactions returns the number of skipped transactions.
+func (api *ScrollAPI) GetNumSkippedTransactions(ctx context.Context) (uint64, error) {
+	return rawdb.ReadNumSkippedTransactions(api.eth.ChainDb()), nil
+}
+
+// RPCTransaction is the standard RPC transaction return type with some additional skip-related fields.
+type RPCTransaction struct {
+	ethapi.RPCTransaction
+	SkipReason      string       `json:"skipReason"`
+	SkipBlockNumber *hexutil.Big `json:"skipBlockNumber"`
+	SkipBlockHash   *common.Hash `json:"skipBlockHash,omitempty"`
+
+	// wrapped traces, currently only available for `scroll_getSkippedTransaction` API, when `MinerStoreSkippedTxTracesFlag` is set
+	Traces *types.BlockTrace `json:"traces,omitempty"`
+}
+
+// GetSkippedTransaction returns a skipped transaction by its hash.
+func (api *ScrollAPI) GetSkippedTransaction(ctx context.Context, hash common.Hash) (*RPCTransaction, error) {
+	stx := rawdb.ReadSkippedTransaction(api.eth.ChainDb(), hash)
+	if stx == nil {
+		return nil, nil
+	}
+	var rpcTx RPCTransaction
+	rpcTx.RPCTransaction = *ethapi.NewRPCTransaction(stx.Tx, common.Hash{}, 0, 0, nil, api.eth.blockchain.Config())
+	rpcTx.SkipReason = stx.Reason
+	rpcTx.SkipBlockNumber = (*hexutil.Big)(new(big.Int).SetUint64(stx.BlockNumber))
+	rpcTx.SkipBlockHash = stx.BlockHash
+	if len(stx.TracesBytes) != 0 {
+		traces := &types.BlockTrace{}
+		if err := json.Unmarshal(stx.TracesBytes, traces); err != nil {
+			return nil, fmt.Errorf("fail to Unmarshal traces for skipped tx, hash: %s, err: %w", hash.String(), err)
+		}
+		rpcTx.Traces = traces
+	}
+	return &rpcTx, nil
+}
+
+// GetSkippedTransactionHashes returns a list of skipped transaction hashes between the two indices provided (inclusive).
+func (api *ScrollAPI) GetSkippedTransactionHashes(ctx context.Context, from uint64, to uint64) ([]common.Hash, error) {
+	it := rawdb.IterateSkippedTransactionsFrom(api.eth.ChainDb(), from)
+	defer it.Release()
+
+	var hashes []common.Hash
+
+	for it.Next() {
+		if it.Index() > to {
+			break
+		}
+		hashes = append(hashes, it.TransactionHash())
+	}
+
+	return hashes, nil
 }

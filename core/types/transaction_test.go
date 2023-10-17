@@ -27,6 +27,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/scroll-tech/go-ethereum/common"
 	"github.com/scroll-tech/go-ethereum/crypto"
 	"github.com/scroll-tech/go-ethereum/rlp"
@@ -405,6 +407,61 @@ func TestTransactionTimeSort(t *testing.T) {
 	}
 }
 
+func TestL1MessageQueueIndexSort(t *testing.T) {
+	assert := assert.New(t)
+
+	msgs := []L1MessageTx{
+		{QueueIndex: 3, Gas: 21016, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}},
+		{QueueIndex: 6, Gas: 21016, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}},
+		{QueueIndex: 1, Gas: 21016, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}},
+		{QueueIndex: 2, Gas: 21016, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{3}},
+		{QueueIndex: 5, Gas: 21016, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{3}},
+		{QueueIndex: 4, Gas: 21016, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{3}},
+	}
+
+	txset, err := NewL1MessagesByQueueIndex(msgs)
+	assert.NoError(err)
+
+	nextIndex := uint64(1)
+
+	for {
+		tx := txset.Peek()
+		if tx == nil {
+			break
+		}
+
+		assert.True(tx.IsL1MessageTx())
+		assert.Equal(nextIndex, tx.AsL1MessageTx().QueueIndex)
+
+		txset.Shift()
+		nextIndex++
+	}
+
+	assert.Equal(uint64(7), nextIndex)
+}
+
+func TestL1MessageQueueIndexSortInvalid(t *testing.T) {
+	assert := assert.New(t)
+
+	msgs := []L1MessageTx{
+		{QueueIndex: 1, Gas: 21016, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}},
+		{QueueIndex: 1, Gas: 21016, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}},
+		{QueueIndex: 2, Gas: 21016, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}},
+	}
+
+	_, err := NewL1MessagesByQueueIndex(msgs)
+	assert.Error(err)
+
+	msgs = []L1MessageTx{
+		{QueueIndex: 1, Gas: 21016, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}},
+		{QueueIndex: 3, Gas: 21016, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}},
+		{QueueIndex: 4, Gas: 21016, To: &common.Address{1}, Data: []byte{0x01}, Sender: common.Address{2}},
+	}
+
+	_, err = NewL1MessagesByQueueIndex(msgs)
+	assert.Error(err)
+}
+
 // TestTransactionCoding tests serializing/de-serializing to/from rlp and JSON.
 func TestTransactionCoding(t *testing.T) {
 	key, err := crypto.GenerateKey()
@@ -419,7 +476,8 @@ func TestTransactionCoding(t *testing.T) {
 	)
 	for i := uint64(0); i < 500; i++ {
 		var txdata TxData
-		switch i % 5 {
+		var isL1MessageTx bool
+		switch i % 6 {
 		case 0:
 			// Legacy tx.
 			txdata = &LegacyTx{
@@ -467,10 +525,27 @@ func TestTransactionCoding(t *testing.T) {
 				GasPrice:   big.NewInt(10),
 				AccessList: accesses,
 			}
+		case 5:
+			// L1MessageTx
+			isL1MessageTx = true
+			txdata = &L1MessageTx{
+				QueueIndex: i,
+				Gas:        123457,
+				To:         &recipient,
+				Value:      big.NewInt(10),
+				Data:       []byte("abcdef"),
+				Sender:     addr,
+			}
 		}
-		tx, err := SignNewTx(key, signer, txdata)
-		if err != nil {
-			t.Fatalf("could not sign transaction: %v", err)
+		var tx *Transaction
+		//  dont sign L1MessageTx
+		if isL1MessageTx {
+			tx = NewTx(txdata)
+		} else {
+			tx, err = SignNewTx(key, signer, txdata)
+			if err != nil {
+				t.Fatalf("could not sign transaction: %v", err)
+			}
 		}
 		// RLP
 		parsedTx, err := encodeDecodeBinary(tx)
@@ -485,6 +560,27 @@ func TestTransactionCoding(t *testing.T) {
 			t.Fatal(err)
 		}
 		assertEqual(parsedTx, tx)
+	}
+}
+
+// make sure that the transaction hash is same as bridge contract
+// go test -v -run TestBridgeTxHash
+func TestBridgeTxHash(t *testing.T) {
+	sender := common.HexToAddress("0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266")
+	to := common.HexToAddress("0x70997970C51812dc3A010C7d01b50e0d17dc79C8")
+	tx := NewTx(
+		&L1MessageTx{
+			Sender:     sender,
+			QueueIndex: 1,
+			Value:      big.NewInt(2),
+			Gas:        3,
+			To:         &to,
+			Data:       []byte{1, 2, 3, 4},
+		},
+	)
+	// assert equal
+	if tx.Hash() != common.HexToHash("0x1cebed6d90ef618f60eec1b7edc0df36b298a237c219f0950081acfb72eac6be") {
+		t.Errorf("hash does not match bridge contract")
 	}
 }
 

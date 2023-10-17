@@ -31,6 +31,7 @@ import (
 	"github.com/scroll-tech/go-ethereum/common/hexutil"
 	"github.com/scroll-tech/go-ethereum/common/math"
 	"github.com/scroll-tech/go-ethereum/core/types"
+	"github.com/scroll-tech/go-ethereum/crypto"
 	"github.com/scroll-tech/go-ethereum/log"
 	"github.com/scroll-tech/go-ethereum/params"
 )
@@ -266,6 +267,29 @@ func (l *StructLogger) CaptureState(pc uint64, op OpCode, gas, cost uint64, scop
 			if err := exec(l, scope, structLog.getOrInitExtraData()); err != nil {
 				log.Error("Failed to trace data", "opcode", op.String(), "err", err)
 			}
+		}
+	}
+
+	// in reality it is impossible for CREATE to trigger ErrContractAddressCollision
+	if op == CREATE2 && opErr == nil {
+		_ = stack.data[stack.len()-1] // value
+		offset := stack.data[stack.len()-2]
+		size := stack.data[stack.len()-3]
+		salt := stack.data[stack.len()-4]
+		// `CaptureState` is called **before** memory resizing
+		// So sometimes we need to auto pad 0.
+		code := getData(scope.Memory.Data(), offset.Uint64(), size.Uint64())
+
+		codeAndHash := &codeAndHash{code: code}
+
+		address := crypto.CreateAddress2(contract.Address(), salt.Bytes32(), codeAndHash.Hash().Bytes())
+
+		contractHash := l.env.StateDB.GetKeccakCodeHash(address)
+		if l.env.StateDB.GetNonce(address) != 0 || (contractHash != (common.Hash{}) && contractHash != emptyKeccakCodeHash) {
+			extraData := structLog.getOrInitExtraData()
+			wrappedStatus := getWrappedAccountForAddr(l, address)
+			extraData.StateList = append(extraData.StateList, wrappedStatus)
+			l.statesAffected[address] = struct{}{}
 		}
 	}
 

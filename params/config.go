@@ -29,12 +29,14 @@ import (
 
 // Genesis hashes to enforce below configs on.
 var (
-	MainnetGenesisHash     = common.HexToHash("0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3")
-	RopstenGenesisHash     = common.HexToHash("0x41941023680923e0fe4d74a34bdac8141f2540e3ae90623718e47d66d1ca4a2d")
-	SepoliaGenesisHash     = common.HexToHash("0x25a5cc106eea7138acab33231d7160d69cb777ee0c2c553fcddf5138993e6dd9")
-	RinkebyGenesisHash     = common.HexToHash("0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177")
-	GoerliGenesisHash      = common.HexToHash("0xbf7e331f7f7c1dd2e05159666b3bf8bc7a8a3a9eb1d518969eab529dd9b88c1a")
-	ScrollAlphaGenesisHash = common.HexToHash("0xa4fc62b9b0643e345bdcebe457b3ae898bef59c7203c3db269200055e037afda")
+	MainnetGenesisHash       = common.HexToHash("0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3")
+	RopstenGenesisHash       = common.HexToHash("0x41941023680923e0fe4d74a34bdac8141f2540e3ae90623718e47d66d1ca4a2d")
+	SepoliaGenesisHash       = common.HexToHash("0x25a5cc106eea7138acab33231d7160d69cb777ee0c2c553fcddf5138993e6dd9")
+	RinkebyGenesisHash       = common.HexToHash("0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177")
+	GoerliGenesisHash        = common.HexToHash("0xbf7e331f7f7c1dd2e05159666b3bf8bc7a8a3a9eb1d518969eab529dd9b88c1a")
+	ScrollAlphaGenesisHash   = common.HexToHash("0xa4fc62b9b0643e345bdcebe457b3ae898bef59c7203c3db269200055e037afda")
+	ScrollSepoliaGenesisHash = common.HexToHash("0xaa62d1a8b2bffa9e5d2368b63aae0d98d54928bd713125e3fd9e5c896c68592c")
+	ScrollMainnetGenesisHash = common.HexToHash("0xbbc05efd412b7cd47a2ed0e5ddfcf87af251e414ea4c801d78b6784513180a80")
 )
 
 // TrustedCheckpoints associates each known checkpoint with the genesis hash of
@@ -256,7 +258,7 @@ var (
 	}
 
 	// ScrollAlphaChainConfig contains the chain parameters to run a node on the Scroll Alpha test network.
-	ScrollMaxTxPerBlock             = 44
+	ScrollMaxTxPerBlock             = 100
 	ScrollMaxTxPayloadBytesPerBlock = 120 * 1024
 
 	ScrollAlphaChainConfig = &ChainConfig{
@@ -275,7 +277,7 @@ var (
 		BerlinBlock:         big.NewInt(0),
 		LondonBlock:         big.NewInt(0),
 		ArrowGlacierBlock:   nil,
-		ArchimedesBlock:     big.NewInt(2444711),
+		ArchimedesBlock:     big.NewInt(2646311),
 		ShanghaiBlock:       nil,
 		Clique: &CliqueConfig{
 			Period: 3,
@@ -288,6 +290,85 @@ var (
 			FeeVaultAddress:           &rcfg.ScrollFeeVaultAddress,
 			EnableEIP2718:             false,
 			EnableEIP1559:             false,
+			L1Config: &L1Config{
+				L1ChainId:             5,
+				L1MessageQueueAddress: common.HexToAddress("0x79DB48002Aa861C8cb189cabc21c6B1468BC83BB"),
+				NumL1MessagesPerBlock: 0,
+			},
+		},
+	}
+
+	ScrollSepoliaChainConfig = &ChainConfig{
+		ChainID:             big.NewInt(534351),
+		HomesteadBlock:      big.NewInt(0),
+		DAOForkBlock:        nil,
+		DAOForkSupport:      true,
+		EIP150Block:         big.NewInt(0),
+		EIP155Block:         big.NewInt(0),
+		EIP158Block:         big.NewInt(0),
+		ByzantiumBlock:      big.NewInt(0),
+		ConstantinopleBlock: big.NewInt(0),
+		PetersburgBlock:     big.NewInt(0),
+		IstanbulBlock:       big.NewInt(0),
+		MuirGlacierBlock:    nil,
+		BerlinBlock:         big.NewInt(0),
+		LondonBlock:         big.NewInt(0),
+		ArrowGlacierBlock:   nil,
+		ArchimedesBlock:     big.NewInt(0),
+		ShanghaiBlock:       big.NewInt(0),
+		Clique: &CliqueConfig{
+			Period: 3,
+			Epoch:  30000,
+		},
+		Scroll: ScrollConfig{
+			UseZktrie:                 true,
+			MaxTxPerBlock:             &ScrollMaxTxPerBlock,
+			MaxTxPayloadBytesPerBlock: &ScrollMaxTxPayloadBytesPerBlock,
+			FeeVaultAddress:           &rcfg.ScrollFeeVaultAddress,
+			EnableEIP2718:             false,
+			EnableEIP1559:             false,
+			L1Config: &L1Config{
+				L1ChainId:             11155111,
+				L1MessageQueueAddress: common.HexToAddress("0xF0B2293F5D834eAe920c6974D50957A1732de763"),
+				NumL1MessagesPerBlock: 10,
+			},
+		},
+	}
+
+	ScrollMainnetChainConfig = &ChainConfig{
+		ChainID:             big.NewInt(534352),
+		HomesteadBlock:      big.NewInt(0),
+		DAOForkBlock:        nil,
+		DAOForkSupport:      true,
+		EIP150Block:         big.NewInt(0),
+		EIP155Block:         big.NewInt(0),
+		EIP158Block:         big.NewInt(0),
+		ByzantiumBlock:      big.NewInt(0),
+		ConstantinopleBlock: big.NewInt(0),
+		PetersburgBlock:     big.NewInt(0),
+		IstanbulBlock:       big.NewInt(0),
+		MuirGlacierBlock:    nil,
+		BerlinBlock:         big.NewInt(0),
+		LondonBlock:         big.NewInt(0),
+		ArrowGlacierBlock:   nil,
+		ArchimedesBlock:     big.NewInt(0),
+		ShanghaiBlock:       big.NewInt(0),
+		Clique: &CliqueConfig{
+			Period: 3,
+			Epoch:  30000,
+		},
+		Scroll: ScrollConfig{
+			UseZktrie:                 true,
+			MaxTxPerBlock:             &ScrollMaxTxPerBlock,
+			MaxTxPayloadBytesPerBlock: &ScrollMaxTxPayloadBytesPerBlock,
+			FeeVaultAddress:           &rcfg.ScrollFeeVaultAddress,
+			EnableEIP2718:             false,
+			EnableEIP1559:             false,
+			L1Config: &L1Config{
+				L1ChainId:             1,
+				L1MessageQueueAddress: common.HexToAddress("0x0d7E906BD9cAFa154b048cFa766Cc1E54E39AF9B"),
+				NumL1MessagesPerBlock: 10,
+			},
 		},
 	}
 
@@ -304,6 +385,7 @@ var (
 			EnableEIP1559:             true,
 			MaxTxPerBlock:             nil,
 			MaxTxPayloadBytesPerBlock: nil,
+			L1Config:                  &L1Config{5, common.HexToAddress("0x0000000000000000000000000000000000000000"), 0},
 		}}
 
 	// AllCliqueProtocolChanges contains every protocol change (EIPs) introduced
@@ -319,6 +401,7 @@ var (
 			EnableEIP1559:             true,
 			MaxTxPerBlock:             nil,
 			MaxTxPayloadBytesPerBlock: nil,
+			L1Config:                  &L1Config{5, common.HexToAddress("0x0000000000000000000000000000000000000000"), 0},
 		}}
 
 	TestChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, new(EthashConfig), nil,
@@ -329,10 +412,11 @@ var (
 			EnableEIP1559:             true,
 			MaxTxPerBlock:             nil,
 			MaxTxPayloadBytesPerBlock: nil,
+			L1Config:                  &L1Config{5, common.HexToAddress("0x0000000000000000000000000000000000000000"), 0},
 		}}
 	TestRules = TestChainConfig.Rules(new(big.Int))
 
-	TestNoL1feeChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, new(EthashConfig), nil,
+	TestNoL1DataFeeChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, new(EthashConfig), nil,
 		ScrollConfig{
 			UseZktrie:                 false,
 			FeeVaultAddress:           nil,
@@ -340,6 +424,7 @@ var (
 			EnableEIP1559:             true,
 			MaxTxPerBlock:             nil,
 			MaxTxPayloadBytesPerBlock: nil,
+			L1Config:                  &L1Config{5, common.HexToAddress("0x0000000000000000000000000000000000000000"), 0},
 		}}
 )
 
@@ -452,6 +537,25 @@ type ScrollConfig struct {
 
 	// Enable EIP-1559 in tx pool, EnableEIP2718 should be true too [optional]
 	EnableEIP1559 bool `json:"enableEIP1559,omitempty"`
+
+	// L1 config
+	L1Config *L1Config `json:"l1Config,omitempty"`
+}
+
+// L1Config contains the l1 parameters needed to collect l1 messages in the sequencer
+type L1Config struct {
+	L1ChainId             uint64         `json:"l1ChainId,string,omitempty"`
+	L1MessageQueueAddress common.Address `json:"l1MessageQueueAddress,omitempty"`
+	NumL1MessagesPerBlock uint64         `json:"numL1MessagesPerBlock,string,omitempty"`
+}
+
+func (c *L1Config) String() string {
+	if c == nil {
+		return "<nil>"
+	}
+
+	return fmt.Sprintf("{l1ChainId: %v, l1MessageQueueAddress: %v, numL1MessagesPerBlock: %v}",
+		c.L1ChainId, c.L1MessageQueueAddress, c.NumL1MessagesPerBlock)
 }
 
 func (s ScrollConfig) BaseFeeEnabled() bool {
@@ -466,6 +570,10 @@ func (s ScrollConfig) ZktrieEnabled() bool {
 	return s.UseZktrie
 }
 
+func (s ScrollConfig) ShouldIncludeL1Messages() bool {
+	return s.L1Config != nil && s.L1Config.NumL1MessagesPerBlock > 0
+}
+
 func (s ScrollConfig) String() string {
 	maxTxPerBlock := "<nil>"
 	if s.MaxTxPerBlock != nil {
@@ -477,11 +585,12 @@ func (s ScrollConfig) String() string {
 		maxTxPayloadBytesPerBlock = fmt.Sprintf("%v", *s.MaxTxPayloadBytesPerBlock)
 	}
 
-	return fmt.Sprintf("{useZktrie: %v, maxTxPerBlock: %v, MaxTxPayloadBytesPerBlock: %v, feeVaultAddress: %v, enableEIP2718:%v, enableEIP1559:%v}",
-		s.UseZktrie, maxTxPerBlock, maxTxPayloadBytesPerBlock, s.FeeVaultAddress, s.EnableEIP2718, s.EnableEIP1559)
+	return fmt.Sprintf("{useZktrie: %v, maxTxPerBlock: %v, MaxTxPayloadBytesPerBlock: %v, feeVaultAddress: %v, enableEIP2718: %v, enableEIP1559: %v, l1Config: %v}",
+		s.UseZktrie, maxTxPerBlock, maxTxPayloadBytesPerBlock, s.FeeVaultAddress, s.EnableEIP2718, s.EnableEIP1559, s.L1Config.String())
 }
 
 // IsValidTxCount returns whether the given block's transaction count is below the limit.
+// This limit corresponds to the number of ECDSA signature checks that we can fit into the zkEVM.
 func (s ScrollConfig) IsValidTxCount(count int) bool {
 	return s.MaxTxPerBlock == nil || count <= *s.MaxTxPerBlock
 }

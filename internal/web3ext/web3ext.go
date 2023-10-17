@@ -30,6 +30,7 @@ var Modules = map[string]string{
 	"txpool":   TxpoolJs,
 	"les":      LESJs,
 	"vflux":    VfluxJs,
+	"scroll":   ScrollJs,
 }
 
 const CliqueJs = `
@@ -844,6 +845,72 @@ web3._extend({
 		new web3._extend.Property({
 			name: 'requestStats',
 			getter: 'vflux_requestStats'
+		}),
+	]
+});
+`
+
+const ScrollJs = `
+web3._extend({
+	property: 'scroll',
+	methods: [
+		new web3._extend.Method({
+			name: 'getBlockTraceByNumber',
+			call: 'scroll_getBlockTraceByNumberOrHash',
+			params: 1,
+			inputFormatter: [web3._extend.formatters.inputBlockNumberFormatter]
+		}),
+		new web3._extend.Method({
+			name: 'getBlockTraceByHash',
+			call: 'scroll_getBlockTraceByNumberOrHash',
+			params: 1
+		}),
+		new web3._extend.Method({
+			name: 'getL1MessageByIndex',
+			call: 'scroll_getL1MessageByIndex',
+			params: 1
+		}),
+		new web3._extend.Method({
+			name: 'getFirstQueueIndexNotInL2Block',
+			call: 'scroll_getFirstQueueIndexNotInL2Block',
+			params: 1
+		}),
+		new web3._extend.Method({
+			name: 'getBlockByHash',
+			call: 'scroll_getBlockByHash',
+			params: 2,
+			inputFormatter: [null, function (val) { return !!val; }]
+		}),
+		new web3._extend.Method({
+			name: 'getBlockByNumber',
+			call: 'scroll_getBlockByNumber',
+			params: 2,
+			inputFormatter: [null, function (val) { return !!val; }]
+		}),
+		new web3._extend.Method({
+			name: 'getSkippedTransaction',
+			call: 'scroll_getSkippedTransaction',
+			params: 1
+		}),
+		new web3._extend.Method({
+			name: 'getSkippedTransactionHashes',
+			call: 'scroll_getSkippedTransactionHashes',
+			params: 2
+		}),
+	],
+	properties:
+	[
+		new web3._extend.Property({
+			name: 'l1SyncHeight',
+			getter: 'scroll_getL1SyncHeight'
+		}),
+		new web3._extend.Property({
+			name: 'latestRelayedQueueIndex',
+			getter: 'scroll_getLatestRelayedQueueIndex'
+		}),
+		new web3._extend.Property({
+			name: 'numSkippedTransactions',
+			getter: 'scroll_getNumSkippedTransactions'
 		}),
 	]
 });

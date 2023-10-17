@@ -144,10 +144,10 @@ func (e *GenesisMismatchError) Error() string {
 // SetupGenesisBlock writes or updates the genesis block in db.
 // The block that will be used is:
 //
-//                          genesis == nil       genesis != nil
-//                       +------------------------------------------
-//     db has no genesis |  main-net default  |  genesis
-//     db has genesis    |  from DB           |  genesis (if compatible)
+//	                     genesis == nil       genesis != nil
+//	                  +------------------------------------------
+//	db has no genesis |  main-net default  |  genesis
+//	db has genesis    |  from DB           |  genesis (if compatible)
 //
 // The stored chain configuration will be updated if it is compatible (i.e. does not
 // specify a fork block below the local head block). In case of a conflict, the
@@ -352,6 +352,7 @@ func (g *Genesis) Commit(db ethdb.Database) (*types.Block, error) {
 	rawdb.WriteHeadFastBlockHash(db, block.Hash())
 	rawdb.WriteHeadHeaderHash(db, block.Hash())
 	rawdb.WriteChainConfig(db, block.Hash(), config)
+	rawdb.WriteFirstQueueIndexNotInL2Block(db, block.Hash(), 0)
 	return block, nil
 }
 
@@ -444,6 +445,30 @@ func DefaultScrollAlphaGenesisBlock() *Genesis {
 		GasLimit:   8000000,
 		Difficulty: big.NewInt(1),
 		Alloc:      decodePrealloc(scrollAlphaAllocData),
+	}
+}
+
+// DefaultScrollSepoliaGenesisBlock returns the Scroll Sepolia network genesis block.
+func DefaultScrollSepoliaGenesisBlock() *Genesis {
+	return &Genesis{
+		Config:     params.ScrollSepoliaChainConfig,
+		Timestamp:  0x64cfd015,
+		ExtraData:  hexutil.MustDecode("0x000000000000000000000000000000000000000000000000000000000000000048C3F81f3D998b6652900e1C3183736C238Fe4290000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
+		GasLimit:   8000000,
+		Difficulty: big.NewInt(1),
+		Alloc:      decodePrealloc(scrollSepoliaAllocData),
+	}
+}
+
+// DefaultScrollMainnetGenesisBlock returns the Scroll mainnet genesis block.
+func DefaultScrollMainnetGenesisBlock() *Genesis {
+	return &Genesis{
+		Config:     params.ScrollMainnetChainConfig,
+		Timestamp:  0x6524e860,
+		ExtraData:  hexutil.MustDecode("0x4c61206573746f6e7465636f206573746173206d616c6665726d6974612e0000d2ACF5d16a983DB0d909d9D761B8337Fabd6cBd10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
+		GasLimit:   10000000,
+		Difficulty: big.NewInt(1),
+		Alloc:      decodePrealloc(scrollMainnetAllocData),
 	}
 }
 

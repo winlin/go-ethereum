@@ -220,7 +220,7 @@ type BlockChain struct {
 // NewBlockChain returns a fully initialised block chain using information
 // available in the database. It initialises the default Ethereum Validator and
 // Processor.
-func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig, engine consensus.Engine, vmConfig vm.Config, shouldPreserve func(block *types.Block) bool, txLookupLimit *uint64) (*BlockChain, error) {
+func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig, engine consensus.Engine, vmConfig vm.Config, shouldPreserve func(block *types.Block) bool, txLookupLimit *uint64, checkCircuitCapacity bool) (*BlockChain, error) {
 	if cacheConfig == nil {
 		cacheConfig = defaultCacheConfig
 	}
@@ -263,7 +263,7 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 		engine:         engine,
 		vmConfig:       vmConfig,
 	}
-	bc.validator = NewBlockValidator(chainConfig, bc, engine)
+	bc.validator = NewBlockValidator(chainConfig, bc, engine, db, checkCircuitCapacity)
 	bc.prefetcher = newStatePrefetcher(chainConfig, bc, engine)
 	bc.processor = NewStateProcessor(chainConfig, bc, engine)
 
@@ -276,6 +276,9 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 	if bc.genesisBlock == nil {
 		return nil, ErrNoGenesis
 	}
+
+	// initialize L1 message index for genesis block
+	rawdb.WriteFirstQueueIndexNotInL2Block(db, bc.genesisBlock.Hash(), 0)
 
 	var nilBlock *types.Block
 	bc.currentBlock.Store(nilBlock)
@@ -695,6 +698,7 @@ func (bc *BlockChain) ResetWithGenesisBlock(genesis *types.Block) error {
 	batch := bc.db.NewBatch()
 	rawdb.WriteTd(batch, genesis.Hash(), genesis.NumberU64(), genesis.Difficulty())
 	rawdb.WriteBlock(batch, genesis)
+	rawdb.WriteFirstQueueIndexNotInL2Block(batch, genesis.Hash(), 0)
 	if err := batch.Write(); err != nil {
 		log.Crit("Failed to write genesis block", "err", err)
 	}
@@ -1176,6 +1180,37 @@ func (bc *BlockChain) writeBlockWithoutState(block *types.Block, td *big.Int) (e
 	batch := bc.db.NewBatch()
 	rawdb.WriteTd(batch, block.Hash(), block.NumberU64(), td)
 	rawdb.WriteBlock(batch, block)
+
+	queueIndex := rawdb.ReadFirstQueueIndexNotInL2Block(bc.db, block.ParentHash())
+
+	// note: we can insert blocks with header-only ancestors here,
+	// so queueIndex might not yet be available in DB.
+	if queueIndex != nil {
+		numProcessed := uint64(block.NumL1MessagesProcessed(*queueIndex))
+		// do not overwrite the index written by the miner worker
+		if index := rawdb.ReadFirstQueueIndexNotInL2Block(bc.db, block.Hash()); index == nil {
+			newIndex := *queueIndex + numProcessed
+			log.Trace(
+				"Blockchain.writeBlockWithoutState WriteFirstQueueIndexNotInL2Block",
+				"number", block.Number(),
+				"hash", block.Hash().String(),
+				"queueIndex", *queueIndex,
+				"numProcessed", numProcessed,
+				"newIndex", newIndex,
+			)
+			rawdb.WriteFirstQueueIndexNotInL2Block(batch, block.Hash(), newIndex)
+		} else {
+			log.Trace(
+				"Blockchain.writeBlockWithoutState WriteFirstQueueIndexNotInL2Block: not overwriting existing index",
+				"number", block.Number(),
+				"hash", block.Hash().String(),
+				"queueIndex", *queueIndex,
+				"numProcessed", numProcessed,
+				"index", *index,
+			)
+		}
+	}
+
 	if err := batch.Write(); err != nil {
 		log.Crit("Failed to write block into disk", "err", err)
 	}
@@ -1230,6 +1265,37 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 	rawdb.WriteBlock(blockBatch, block)
 	rawdb.WriteReceipts(blockBatch, block.Hash(), block.NumberU64(), receipts)
 	rawdb.WritePreimages(blockBatch, state.Preimages())
+
+	queueIndex := rawdb.ReadFirstQueueIndexNotInL2Block(bc.db, block.ParentHash())
+	if queueIndex == nil {
+		// We expect that we only insert contiguous chain segments,
+		// so the parent will always be inserted first.
+		log.Crit("Queue index in DB is nil", "parent", block.ParentHash(), "hash", block.Hash())
+	}
+	numProcessed := uint64(block.NumL1MessagesProcessed(*queueIndex))
+	// do not overwrite the index written by the miner worker
+	if index := rawdb.ReadFirstQueueIndexNotInL2Block(bc.db, block.Hash()); index == nil {
+		newIndex := *queueIndex + numProcessed
+		log.Trace(
+			"Blockchain.writeBlockWithState WriteFirstQueueIndexNotInL2Block",
+			"number", block.Number(),
+			"hash", block.Hash().String(),
+			"queueIndex", *queueIndex,
+			"numProcessed", numProcessed,
+			"newIndex", newIndex,
+		)
+		rawdb.WriteFirstQueueIndexNotInL2Block(blockBatch, block.Hash(), newIndex)
+	} else {
+		log.Trace(
+			"Blockchain.writeBlockWithState WriteFirstQueueIndexNotInL2Block: not overwriting existing index",
+			"number", block.Number(),
+			"hash", block.Hash().String(),
+			"queueIndex", *queueIndex,
+			"numProcessed", numProcessed,
+			"index", *index,
+		)
+	}
+
 	if err := blockBatch.Write(); err != nil {
 		log.Crit("Failed to write block into disk", "err", err)
 	}
@@ -1500,7 +1566,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, er
 		return bc.insertSideChain(block, it)
 
 	// First block is future, shove it (and all children) to the future queue (unknown ancestor)
-	case errors.Is(err, consensus.ErrFutureBlock) || (errors.Is(err, consensus.ErrUnknownAncestor) && bc.futureBlocks.Contains(it.first().ParentHash())):
+	case errors.Is(err, consensus.ErrFutureBlock) || errors.Is(err, consensus.ErrMissingL1MessageData) || (errors.Is(err, consensus.ErrUnknownAncestor) && bc.futureBlocks.Contains(it.first().ParentHash())):
 		for block != nil && (it.index == 0 || errors.Is(err, consensus.ErrUnknownAncestor)) {
 			log.Debug("Future block, postponing import", "number", block.Number(), "hash", block.Hash())
 			if err := bc.addFutureBlock(block); err != nil {
@@ -2175,11 +2241,12 @@ Chain config: %v
 
 Number: %v
 Hash: 0x%x
+ParentHash: 0x%x
 %v
 
 Error: %v
 ##############################
-`, bc.chainConfig, block.Number(), block.Hash(), receiptString, err))
+`, bc.chainConfig, block.Number(), block.Hash(), block.ParentHash(), receiptString, err))
 }
 
 // InsertHeaderChain attempts to insert the given header chain in to the local
