@@ -894,11 +894,6 @@ func (diff *StateOverride) Apply(state *state.StateDB) error {
 	return nil
 }
 
-func newRPCBalance(balance *big.Int) **hexutil.Big {
-	rpcBalance := (*hexutil.Big)(balance)
-	return &rpcBalance
-}
-
 func EstimateL1MsgFee(ctx context.Context, b Backend, args TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, overrides *StateOverride, timeout time.Duration, globalGasCap uint64, config *params.ChainConfig) (*big.Int, error) {
 	if !config.Scroll.FeeVaultEnabled() {
 		return big.NewInt(0), nil
