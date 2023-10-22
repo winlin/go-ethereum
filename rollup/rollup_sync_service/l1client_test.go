@@ -62,10 +62,6 @@ func (m *mockEthClient) SubscribeFilterLogs(ctx context.Context, query ethereum.
 }
 
 func (m *mockEthClient) TransactionByHash(ctx context.Context, txHash common.Hash) (*types.Transaction, bool, error) {
-	if len(m.commitBatchRLP) == 0 {
-		return &types.Transaction{}, false, nil
-	}
-
 	var tx types.Transaction
 	if err := rlp.DecodeBytes(m.commitBatchRLP, &tx); err != nil {
 		return nil, false, err
