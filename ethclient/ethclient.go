@@ -59,6 +59,10 @@ func (ec *Client) SetHeader(key, value string) {
 	ec.c.SetHeader(key, value)
 }
 
+func (ec *Client) Client() *rpc.Client {
+	return ec.c
+}
+
 func (ec *Client) Close() {
 	ec.c.Close()
 }
