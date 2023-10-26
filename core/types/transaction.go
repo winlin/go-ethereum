@@ -209,6 +209,11 @@ func (tx *Transaction) setDecoded(inner TxData, size int) {
 	}
 }
 
+// 获取交易的本地时间
+func (tx *Transaction) LocalTime() time.Time {
+	return tx.time
+}
+
 func sanityCheckSignature(v *big.Int, r *big.Int, s *big.Int, maybeProtected bool) error {
 	if isProtectedV(v) && !maybeProtected {
 		return ErrUnexpectedProtection
